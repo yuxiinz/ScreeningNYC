@@ -1,65 +1,272 @@
-import Image from "next/image";
+// app/page.tsx
 
-export default function Home() {
+import Header from '@/components/Header'
+import { prisma } from '@/lib/prisma'
+import Link from 'next/link'
+
+export const dynamic = 'force-dynamic'
+
+function getYear(date?: Date | null) {
+  if (!date) return ''
+  return new Date(date).getFullYear()
+}
+
+function isTmdbPoster(url?: string | null) {
+  return !!url && url.includes('image.tmdb.org')
+}
+
+function cleanDirectorText(input?: string | null) {
+  const text = (input || '').replace(/\s+/g, ' ').trim()
+  if (!text) return 'UNKNOWN DIRECTOR'
+
+  const withoutDirectedBy = text.replace(/^directed by\s*/i, '').trim()
+
+  const stopPatterns = [
+    /\b(18|19|20)\d{2}\b/,
+    /\b\d+\s*min\b/i,
+    /\b(4k dcp|dcp|35mm|70mm|imax|digital)\b/i,
+    /\bthe first\b/i,
+    /\bwinner\b/i,
+    /\bpresented\b/i,
+    /\bproduced by\b/i,
+  ]
+
+  let cutIndex = withoutDirectedBy.length
+
+  for (const pattern of stopPatterns) {
+    const match = withoutDirectedBy.match(pattern)
+    if (match && typeof match.index === 'number') {
+      cutIndex = Math.min(cutIndex, match.index)
+    }
+  }
+
+  const cleaned = withoutDirectedBy.slice(0, cutIndex).trim()
+  if (!cleaned) return 'UNKNOWN DIRECTOR'
+
+  return cleaned
+}
+
+export default async function HomePage() {
+  const now = new Date()
+
+  const movies = await prisma.movie.findMany({
+    where: {
+      showtimes: {
+        some: {
+          startTime: {
+            gt: now,
+          },
+          status: 'SCHEDULED',
+        },
+      },
+    },
+    orderBy: {
+      updatedAt: 'desc',
+    },
+  })
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div
+      style={{
+        backgroundColor: '#0a0a0a',
+        color: '#fff',
+        minHeight: '100vh',
+        padding: '40px 20px',
+      }}
+    >
+      <Header />
+      <main
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+          gap: '28px',
+          maxWidth: '1600px',
+          margin: '0 auto',
+        }}
+      >
+        {movies.map((movie) => {
+          const year = getYear(movie.releaseDate)
+          const posterIsTmdb = isTmdbPoster(movie.posterUrl)
+          const director = cleanDirectorText(movie.directorText)
+
+          return (
+            <div
+              key={movie.id}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+              }}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+              <Link
+                href={`/films/${movie.id}`}
+                style={{
+                  textDecoration: 'none',
+                  color: 'inherit',
+                  display: 'block',
+                }}
+              >
+                <div
+                  style={{
+                    width: '100%',
+                    aspectRatio: '2 / 3',
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    backgroundColor: '#111',
+                    marginBottom: '12px',
+                    boxShadow: '0 6px 18px rgba(0,0,0,0.45)',
+                    border: '1px solid #1f1f1f',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {movie.posterUrl ? (
+                    <img
+                      src={movie.posterUrl}
+                      alt={movie.title}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: posterIsTmdb ? 'cover' : 'contain',
+                        backgroundColor: '#111',
+                        display: 'block',
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        color: '#666',
+                        fontSize: '0.9rem',
+                      }}
+                    >
+                      No Poster
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ padding: '0 2px' }}>
+                  <h3
+                    style={{
+                      fontSize: '0.95rem',
+                      margin: '0 0 8px 0',
+                      fontWeight: '700',
+                      lineHeight: '1.25',
+                      textTransform: 'uppercase',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      minHeight: '2.5em',
+                    }}
+                  >
+                    {movie.title}
+                  </h3>
+
+                  <p
+                    style={{
+                      fontSize: '0.78rem',
+                      color: '#b0b0b0',
+                      margin: '0 0 4px 0',
+                      lineHeight: '1.35',
+                      textTransform: 'none',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 1,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      minHeight: '1.35em',
+                    }}
+                  >
+                    {director}
+                  </p>
+
+                  <p
+                    style={{
+                      fontSize: '0.76rem',
+                      color: '#7d7d7d',
+                      margin: 0,
+                      lineHeight: '1.35',
+                      minHeight: '1.35em',
+                    }}
+                  >
+                    {year || ''}
+                  </p>
+                </div>
+              </Link>
+
+              <div
+                style={{
+                  marginTop: '12px',
+                  padding: '0 2px',
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '8px',
+                  fontSize: '0.68rem',
+                  fontWeight: 'bold',
+                }}
+              >
+                {movie.imdbUrl && (
+                  <a
+                    href={movie.imdbUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: '#f5c518',
+                      textDecoration: 'none',
+                      border: '1px solid #f5c518',
+                      padding: '3px 8px',
+                      borderRadius: '4px',
+                      minWidth: '38px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    IMDb
+                  </a>
+                )}
+
+                {movie.letterboxdUrl && (
+                  <a
+                    href={movie.letterboxdUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: '#ff8000',
+                      textDecoration: 'none',
+                      border: '1px solid #ff8000',
+                      padding: '3px 8px',
+                      borderRadius: '4px',
+                      minWidth: '38px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    LB
+                  </a>
+                )}
+
+                {movie.doubanUrl && (
+                  <a
+                    href={movie.doubanUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      color: '#00b51d',
+                      textDecoration: 'none',
+                      border: '1px solid #00b51d',
+                      padding: '3px 8px',
+                      borderRadius: '4px',
+                      minWidth: '38px',
+                      textAlign: 'center',
+                    }}
+                  >
+                    豆瓣
+                  </a>
+                )}
+              </div>
+            </div>
+          )
+        })}
       </main>
+
+      <footer style={{ height: '100px' }} />
     </div>
-  );
+  )
 }
