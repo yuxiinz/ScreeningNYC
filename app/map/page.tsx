@@ -1,6 +1,6 @@
 // app/map/page.tsx
 import { prisma } from "@/lib/prisma";
-import MapClientWrapper from "@/components/MapClientWrapper";
+import MapClientWrapper from '@/components/map/MapClientWrapper'
 import Header from '@/components/Header'
 
 export default async function MapPage() {

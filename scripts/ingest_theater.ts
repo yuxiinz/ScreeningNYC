@@ -58,6 +58,19 @@ const THEATER_CONFIGS: TheaterIngestConfig[] = [
   // },
 ]
 
+const THEATER_META = {
+  metrograph: {
+    latitude: 40.7182,
+    longitude: -73.9902,
+    address: '7 Ludlow St, New York, NY',
+  },
+  filmforum: {
+    latitude: 40.7287,
+    longitude: -74.0053,
+    address: '209 W Houston St, New York, NY',
+  },
+}
+
 // Normalize whitespace utility (local helper)
 function normalizeWhitespace(input?: string | null): string {
   return (input || '').replace(/\s+/g, ' ').trim()

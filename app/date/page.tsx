@@ -1,8 +1,7 @@
-// app/date/page.tsx
-
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import DateSelector from '@/components/DateSelector'
+import TheaterFilter from '@/components/TheaterFilter'
 import { DateTime } from 'luxon'
 import Header from '@/components/Header'
 
@@ -50,10 +49,14 @@ function cleanDirectorText(input?: string | null) {
 export default async function DatePage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string }>
+  searchParams: Promise<{ date?: string; theaters?: string }>
 }) {
   const params = await searchParams
   const selectedDateStr = params.date
+  const selectedTheaterSlugs = (params.theaters || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
 
   const nowNy = DateTime.now().setZone(TIMEZONE)
   const today = nowNy.toFormat('yyyy-MM-dd')
@@ -67,6 +70,17 @@ export default async function DatePage({
   const queryStart = queryStartNy.toUTC().toJSDate()
   const queryEnd = endOfDayNy.toUTC().toJSDate()
 
+  const allTheaters = await prisma.theater.findMany({
+    orderBy: {
+      name: 'asc',
+    },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+    },
+  })
+
   const showtimes = await prisma.showtime.findMany({
     where: {
       startTime: {
@@ -74,6 +88,15 @@ export default async function DatePage({
         lte: queryEnd,
       },
       status: 'SCHEDULED',
+      ...(selectedTheaterSlugs.length > 0
+        ? {
+            theater: {
+              slug: {
+                in: selectedTheaterSlugs,
+              },
+            },
+          }
+        : {}),
     },
     include: {
       movie: true,
@@ -128,6 +151,14 @@ export default async function DatePage({
 
       <main style={{ maxWidth: '1200px', margin: '0 auto' }}>
         <DateSelector currentSafeDate={targetDate} />
+
+        <TheaterFilter
+          theaters={allTheaters.map(t => ({
+            slug: t.slug,
+            name: t.name,
+          }))}
+          selectedTheaters={selectedTheaterSlugs}
+        />
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '60px' }}>
           {moviesOnDate.length > 0 ? (
