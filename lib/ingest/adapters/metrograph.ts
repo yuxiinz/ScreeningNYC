@@ -16,7 +16,6 @@ export async function fetchMetrograph(): Promise<RawShowtime[]> {
   const $ = cheerio.load(html);
   const results: RawShowtime[] = [];
 
-  // Metrograph 结构：通常场次在 .calendar-slot 或类似容器里
   $('.calendar-slot, .film-display').each((_, el) => {
     const title = $(el).find('.film-title, h3').text().trim();
     const time = $(el).find('.showtime-time, .time').text().trim();

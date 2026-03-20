@@ -48,6 +48,14 @@ const THEATER_CONFIGS: TheaterIngestConfig[] = [
     officialSiteUrl: process.env.FILMFORUM_OFFICIAL_URL || 'https://filmforum.org',
   },
 
+  {
+  theaterName: 'IFC Center',
+  theaterSlug: 'ifc',
+  sourceName: 'ifc',
+  sourceUrl: process.env.IFC_SHOWTIMES_URL || 'https://www.ifccenter.com/',
+  officialSiteUrl: process.env.IFC_OFFICIAL_URL || 'https://www.ifccenter.com',
+},
+
   // Example:
   // {
   //   theaterName: 'IFC Center',
@@ -69,7 +77,20 @@ const THEATER_META = {
     longitude: -74.0053,
     address: '209 W Houston St, New York, NY',
   },
+  ifc: {
+  latitude: 40.7301,
+  longitude: -74.0002,
+  address: '323 6th Ave, New York, NY',
+},
 }
+
+function getRequestedTheaterSlugs(): string[] {
+  return process.argv
+    .slice(2)
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+}
+
 
 // Normalize whitespace utility (local helper)
 function normalizeWhitespace(input?: string | null): string {
@@ -245,13 +266,31 @@ async function ingestOneTheater(config: TheaterIngestConfig) {
 
 // Main entry: ingest all configured theaters
 async function main() {
-  const enabledConfigs = THEATER_CONFIGS.filter((config) => config.sourceUrl)
+  const requestedSlugs = getRequestedTheaterSlugs()
 
-  if (enabledConfigs.length === 0) {
-    throw new Error('No valid theater configs found. Check your .env')
+  let enabledConfigs = THEATER_CONFIGS.filter((config) => config.sourceUrl)
+
+  if (requestedSlugs.length > 0) {
+    enabledConfigs = enabledConfigs.filter((config) =>
+      requestedSlugs.includes(config.theaterSlug.toLowerCase())
+    )
+
+    const foundSlugs = enabledConfigs.map((c) => c.theaterSlug)
+    const missingSlugs = requestedSlugs.filter((slug) => !foundSlugs.includes(slug))
+
+    if (missingSlugs.length > 0) {
+      console.warn(`Unknown or unavailable theater slug(s): ${missingSlugs.join(', ')}`)
+    }
   }
 
-  console.log(`Preparing to ingest ${enabledConfigs.length} theaters`)
+  if (enabledConfigs.length === 0) {
+    throw new Error('No valid theater configs found for this run.')
+  }
+
+  console.log(`Preparing to ingest ${enabledConfigs.length} theater(s):`)
+  for (const config of enabledConfigs) {
+    console.log(`  ${config.theaterSlug}`)
+  }
 
   for (const config of enabledConfigs) {
     try {

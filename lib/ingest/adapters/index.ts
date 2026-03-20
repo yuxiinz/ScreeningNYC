@@ -2,6 +2,7 @@
 
 import { scrapeMetrographShowtimes } from './metrograph_adapter'
 import { scrapeFilmForumShowtimes } from './filmforum_adapter'
+import { scrapeIfcCenter } from './ifc_adapter'
 
 export function getShowtimeScraper(theaterSlug: string) {
   switch (theaterSlug) {
@@ -9,6 +10,8 @@ export function getShowtimeScraper(theaterSlug: string) {
       return scrapeMetrographShowtimes
     case 'filmforum':
       return scrapeFilmForumShowtimes
+    case 'ifc':
+      return scrapeIfcCenter
     default:
       throw new Error(`Unsupported theater: ${theaterSlug}`)
   }
