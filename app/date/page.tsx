@@ -183,7 +183,7 @@ export default async function DatePage({
 
         <p
           style={{
-            color: '#b0b0b0',
+            color: '#ffffff',
             fontSize: '0.98rem',
             lineHeight: 1.5,
             margin: '0 0 18px 0',

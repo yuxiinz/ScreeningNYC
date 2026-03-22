@@ -4,6 +4,7 @@ import Header from '@/components/Header'
 import TheaterFilter from '@/components/TheaterFilter'
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
+import FilmSearchBox from "@/components/FilmSearchBox";
 
 export const dynamic = 'force-dynamic'
 
@@ -118,6 +119,18 @@ export default async function HomePage({
     >
       <Header />
 
+      <div
+        style={{
+          maxWidth: "1600px",
+          margin: "0 auto",
+          marginBottom: "20px",
+          display: "flex",
+          justifyContent: "flex-end",
+        }}
+      >
+        <FilmSearchBox />
+      </div>
+
       <main
         style={{
           maxWidth: '1600px',
@@ -135,7 +148,7 @@ export default async function HomePage({
 
           <p
             style={{
-              color: '#b0b0b0',
+              color: '#ffffff',
               fontSize: '0.98rem',
               lineHeight: 1.5,
               margin: '0 0 18px 0',
