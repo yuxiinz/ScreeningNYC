@@ -73,8 +73,8 @@ export default async function HomePage({
   })
 
   const selectedTheaterNames = allTheaters
-    .filter(t => selectedTheaterSlugs.includes(t.slug))
-    .map(t => t.name)
+  .filter((t) => t.slug !== null && selectedTheaterSlugs.includes(t.slug))
+  .map((t) => t.name)
 
   const movies = await prisma.movie.findMany({
     where: {
@@ -139,10 +139,12 @@ export default async function HomePage({
       >
         <div style={{ marginBottom: '28px' }}>
           <TheaterFilter
-            theaters={allTheaters.map(t => ({
-              slug: t.slug,
-              name: t.name,
-            }))}
+            theaters={allTheaters
+              .filter((t): t is typeof t & { slug: string } => !!t.slug)
+              .map((t) => ({
+                slug: t.slug,
+                name: t.name,
+              }))}
             selectedTheaters={selectedTheaterSlugs}
           />
 

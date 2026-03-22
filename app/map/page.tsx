@@ -4,13 +4,22 @@ import Header from '@/components/Header'
 import MapPageClient from '@/components/map/MapPageClient'
 
 export default async function MapPage() {
-  const rawTheaters = await prisma.theater.findMany()
+  const rawTheaters = await prisma.theater.findMany();
 
-  const theaters = rawTheaters.map((t) => ({
+const theaters = rawTheaters
+  .filter(
+    (
+      t
+    ): t is typeof t & {
+      latitude: NonNullable<typeof t.latitude>;
+      longitude: NonNullable<typeof t.longitude>;
+    } => t.latitude !== null && t.longitude !== null
+  )
+  .map((t) => ({
     ...t,
-    latitude: t.latitude != null ? Number(t.latitude) : null,
-    longitude: t.longitude != null ? Number(t.longitude) : null,
-  }))
+    latitude: Number(t.latitude),
+    longitude: Number(t.longitude),
+  }));
 
   return (
     <div

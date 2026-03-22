@@ -11,8 +11,8 @@ datasource db {
 
 model Movie {
   id              Int        @id @default(autoincrement())
-  tmdbId          Int?       @unique // 核心：以此作为 TMDB 的对齐标准
-  title           String     // 不再唯一，允许同名电影
+  tmdbId          Int?       @unique 
+  title           String     
   originalTitle   String?
   releaseDate     DateTime?
   runtimeMinutes  Int?
@@ -20,13 +20,13 @@ model Movie {
   posterUrl       String?
   backdropUrl     String?
   
-  // 社交/专业平台链接
+
   imdbUrl         String?
   doubanUrl       String?
   letterboxdUrl   String?
   officialSiteUrl String?
 
-  // 聚合文本，方便展示
+
   genresText      String?
   directorText    String?
   castText        String?
@@ -36,24 +36,23 @@ model Movie {
 
   showtimes       Showtime[]
 
-  @@index([title]) // 优化按标题搜索的速度
+  @@index([title]) 
 }
 
 model Theater {
   id              Int        @id @default(autoincrement())
   name            String
-  slug            String?    @unique // 用于 URL: /map?theater=metrograph
+  slug            String    @unique 
   
-  // 来源追踪
-  sourceName      String?    // 例如 "metrograph", "film-forum"
-  sourceTheaterId String?    @unique // 爬虫抓到的原始 ID
+  sourceName      String?    
+  sourceTheaterId String?    @unique 
   
   address         String?
-  // 经纬度改为可空，初期抓不到坐标不影响入库
+
   latitude        Decimal?   @db.Decimal(10, 8)
   longitude       Decimal?   @db.Decimal(11, 8)
   
-  borough         String?    // 曼哈顿、布鲁克林等
+  borough         String?    
   officialSiteUrl String?
 
   createdAt       DateTime   @default(now())
