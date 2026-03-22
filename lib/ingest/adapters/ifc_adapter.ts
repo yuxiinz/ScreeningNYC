@@ -1,14 +1,20 @@
 // lib/ingest/adapters/ifc_adapter.ts
 
 import * as cheerio from 'cheerio'
-import { DateTime } from 'luxon'
 import type { ScrapedShowtime, TheaterAdapterConfig } from './types'
-import { fetchHtml } from './shared'
+import { fetchHtml } from '../core/http'
+import {
+  cleanText,
+  decodeHtmlEntities,
+  normalizeWhitespace,
+} from '../core/text'
+import { buildAbsoluteUrl } from '../core/url'
+import { parseYear, parseRuntimeMinutes } from '../core/meta'
+import { parseShowtime, formatShowtimeRaw } from '../core/datetime'
 
 const IFC_BASE = 'https://www.ifccenter.com'
 const IFC_HOME = 'https://www.ifccenter.com/'
 const IFC_COMING_SOON = 'https://www.ifccenter.com/coming-soon/#all-films'
-const TIMEZONE = 'America/New_York'
 
 type RawMovie = {
   title: string
@@ -34,7 +40,7 @@ type RawShowtime = {
   canonicalTitle: string
   detailUrl: string
   ticketUrl?: string | null
-  startTime: Date
+  startTimeRaw: string
   dateLabel: string
   timeLabel: string
   isOpenCaptioning?: boolean
@@ -46,25 +52,7 @@ type IfcIngestResult = {
 }
 
 function absoluteUrl(url?: string | null): string | undefined {
-  if (!url) return undefined
-  try {
-    return new URL(url, IFC_BASE).toString()
-  } catch {
-    return undefined
-  }
-}
-
-function cleanText(text?: string | null): string {
-  return (text || '').replace(/\s+/g, ' ').trim()
-}
-
-function decodeHtmlEntities(text: string): string {
-  return text
-    .replace(/&amp;/g, '&')
-    .replace(/&#8217;/g, '’')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&quot;/g, '"')
-    .replace(/&#038;/g, '&')
+  return buildAbsoluteUrl(IFC_BASE, url)
 }
 
 function normalizeTitle(title: string): string {
@@ -77,18 +65,6 @@ function normalizeTitle(title: string): string {
 
 function isOpenCaptioningTitle(title: string): boolean {
   return /\bopen captioning\b/i.test(title)
-}
-
-function parseRunningTimeMinutes(value?: string | null): number | null {
-  if (!value) return null
-  const m = value.match(/(\d+)\s*minutes?/i)
-  return m ? Number(m[1]) : null
-}
-
-function parseYear(value?: string | null): number | null {
-  if (!value) return null
-  const m = value.match(/\b(19|20)\d{2}\b/)
-  return m ? Number(m[0]) : null
 }
 
 function parseCast(value?: string | null): string[] | null {
@@ -109,32 +85,17 @@ function parseAccessibility(value?: string | null): string[] | null {
   return arr.length ? arr : null
 }
 
-function parseIfcDateTime(dateLabel: string, timeLabel: string): Date | null {
-  const cleanDate = cleanText(dateLabel)
-  const cleanTime = cleanText(timeLabel).toLowerCase()
+function buildIfcStartTimeRaw(dateLabel: string, timeLabel: string): string {
+  const parsed = parseShowtime({
+    dateText: dateLabel,
+    timeText: timeLabel,
+  })
 
-  const nowNy = DateTime.now().setZone(TIMEZONE)
-  let dt = DateTime.fromFormat(
-    `${cleanDate} ${cleanTime} ${nowNy.year}`,
-    'ccc LLL d h:mm a yyyy',
-    { zone: TIMEZONE }
-  )
-
-  if (!dt.isValid) {
-    dt = DateTime.fromFormat(
-      `${cleanDate} ${cleanTime} ${nowNy.year}`,
-      'ccc LLL dd h:mm a yyyy',
-      { zone: TIMEZONE }
-    )
+  if (parsed) {
+    return formatShowtimeRaw(parsed)
   }
 
-  if (!dt.isValid) return null
-
-  if (dt < nowNy.minus({ months: 9 })) {
-    dt = dt.plus({ years: 1 })
-  }
-
-  return dt.toUTC().toJSDate()
+  return `${normalizeWhitespace(dateLabel)} ${normalizeWhitespace(timeLabel)}`.trim()
 }
 
 function extractSourceShowtimeId(ticketUrl?: string | null): string | undefined {
@@ -143,10 +104,15 @@ function extractSourceShowtimeId(ticketUrl?: string | null): string | undefined 
   return m?.[1]
 }
 
-function extractHomeFilmLinks(html: string): Map<string, {
-  title: string
-  posterUrl?: string | null
-}> {
+function extractHomeFilmLinks(
+  html: string
+): Map<
+  string,
+  {
+    title: string
+    posterUrl?: string | null
+  }
+> {
   const $ = cheerio.load(html)
   const map = new Map<string, { title: string; posterUrl?: string | null }>()
 
@@ -166,17 +132,25 @@ function extractHomeFilmLinks(html: string): Map<string, {
   return map
 }
 
-function extractComingSoonFilmLinks(html: string): Map<string, {
-  title: string
-  posterUrl?: string | null
-  openDate?: string | null
-}> {
-  const $ = cheerio.load(html)
-  const map = new Map<string, {
+function extractComingSoonFilmLinks(
+  html: string
+): Map<
+  string,
+  {
     title: string
     posterUrl?: string | null
     openDate?: string | null
-  }>()
+  }
+> {
+  const $ = cheerio.load(html)
+  const map = new Map<
+    string,
+    {
+      title: string
+      posterUrl?: string | null
+      openDate?: string | null
+    }
+  >()
 
   $('#all-films .ifc-grid-item').each((_, el) => {
     const title = cleanText($(el).find('.ifc-grid-info h2').first().text())
@@ -223,6 +197,7 @@ function parseSynopsis($: cheerio.CheerioAPI): string | undefined {
   })
 
   if (!candidates.length) return undefined
+
   candidates.sort((a, b) => b.length - a.length)
   return candidates[0]
 }
@@ -243,16 +218,16 @@ function parseScheduleFromDetailPage(
       .each((__, timeEl) => {
         const timeLabel = cleanText($(timeEl).find('span').first().text())
         const ticketUrl = absoluteUrl($(timeEl).find('a.ifc-button').attr('href'))
-        const startTime = parseIfcDateTime(dateLabel, timeLabel)
+        const startTimeRaw = buildIfcStartTimeRaw(dateLabel, timeLabel)
 
-        if (!dateLabel || !timeLabel || !startTime) return
+        if (!dateLabel || !timeLabel) return
 
         showtimes.push({
           movieTitle: pageTitle,
           canonicalTitle,
           detailUrl,
           ticketUrl: ticketUrl || null,
-          startTime,
+          startTimeRaw,
           dateLabel,
           timeLabel,
           isOpenCaptioning: isOpenCaptioningTitle(pageTitle),
@@ -301,8 +276,8 @@ async function parseFilmDetailPage(
     posterUrl,
     synopsis,
     country: details['Country'] || null,
-    year: parseYear(details['Year']),
-    runningTimeMinutes: parseRunningTimeMinutes(details['Running Time']),
+    year: parseYear(details['Year']) || null,
+    runningTimeMinutes: parseRuntimeMinutes(details['Running Time']) || null,
     format: details['Format'] || null,
     distributor: details['Distributor'] || null,
     director: details['Director'] || null,
@@ -312,7 +287,7 @@ async function parseFilmDetailPage(
     openDate: fallback.openDate ?? null,
     metadata: {
       country: details['Country'] || null,
-      year: parseYear(details['Year']),
+      year: parseYear(details['Year']) || null,
       runningTime: details['Running Time'] || null,
       format: details['Format'] || null,
       distributor: details['Distributor'] || null,
@@ -401,7 +376,7 @@ export async function scrapeIfcCenter(
 
     return {
       movieTitle: s.canonicalTitle || s.movieTitle,
-      startTimeRaw: s.startTime.toISOString(),
+      startTimeRaw: s.startTimeRaw,
       ticketUrl: s.ticketUrl || undefined,
       sourceUrl: s.detailUrl,
       rawFormat: movie?.format || undefined,
@@ -413,19 +388,4 @@ export async function scrapeIfcCenter(
       posterUrl: movie?.posterUrl || undefined,
     }
   })
-}
-
-if (require.main === module) {
-  scrapeIfcCenter({
-    theaterSlug: 'ifc',
-    sourceUrl: IFC_HOME,
-  })
-    .then((data) => {
-      console.log('showtimes:', data.length)
-      console.log(JSON.stringify(data.slice(0, 3), null, 2))
-    })
-    .catch((err) => {
-      console.error(err)
-      process.exit(1)
-    })
 }

@@ -2,12 +2,11 @@
 
 import * as cheerio from 'cheerio'
 import type { ScrapedShowtime, TheaterAdapterConfig } from './types'
-import {
-  normalizeWhitespace,
-  buildAbsoluteUrl,
-  fetchHtml,
-  parseMetaLine,
-} from './shared'
+import { fetchHtml } from '../core/http'
+import { normalizeWhitespace } from '../core/text'
+import { buildAbsoluteUrl, pickFirstAbsoluteUrl } from '../core/url'
+import { parseMetaLine } from '../core/meta'
+import { parseShowtime, formatShowtimeRaw } from '../core/datetime'
 
 type DetailMovieInfo = {
   title?: string
@@ -17,18 +16,6 @@ type DetailMovieInfo = {
   rawFormat?: string
   overview?: string
   posterUrl?: string
-}
-
-function pickFirstAbsoluteUrl(
-  pageUrl: string,
-  candidates: Array<string | undefined>
-): string | undefined {
-  for (const candidate of candidates) {
-    if (!candidate) continue
-    const abs = buildAbsoluteUrl(pageUrl, candidate)
-    if (abs) return abs
-  }
-  return undefined
 }
 
 function isBadMetrographPoster(url?: string): boolean {
@@ -42,17 +29,23 @@ function isBadMetrographPoster(url?: string): boolean {
   )
 }
 
-function getBestPosterUrl($: cheerio.CheerioAPI, pageUrl: string): string | undefined {
+function getBestPosterUrl(
+  $: cheerio.CheerioAPI,
+  pageUrl: string
+): string | undefined {
   const preferred = pickFirstAbsoluteUrl(pageUrl, [
     $('img.main-image').first().attr('src'),
     $('img.main-image').first().attr('data-src'),
     $('img.main-image').first().attr('data-lazy-src'),
-    $('img.main-image').first().attr('srcset')?.split(',')[0]?.trim().split(' ')[0],
-
+    $('img.main-image')
+      .first()
+      .attr('srcset')
+      ?.split(',')[0]
+      ?.trim()
+      .split(' ')[0],
     $('.main-image').first().attr('src'),
     $('.main-image').first().attr('data-src'),
     $('.main-image').first().attr('data-lazy-src'),
-
     $('meta[property="og:image"]').attr('content'),
   ])
 
@@ -64,12 +57,15 @@ function getBestPosterUrl($: cheerio.CheerioAPI, pageUrl: string): string | unde
     $('.film_poster img').first().attr('src'),
     $('.film_poster img').first().attr('data-src'),
     $('.film_poster img').first().attr('data-lazy-src'),
-    $('.film_poster img').first().attr('srcset')?.split(',')[0]?.trim().split(' ')[0],
-
+    $('.film_poster img')
+      .first()
+      .attr('srcset')
+      ?.split(',')[0]
+      ?.trim()
+      .split(' ')[0],
     $('.film_image img').first().attr('src'),
     $('.film_image img').first().attr('data-src'),
     $('.film_image img').first().attr('data-lazy-src'),
-
     $('img').first().attr('src'),
     $('img').first().attr('data-src'),
   ])
@@ -122,9 +118,15 @@ function extractDirectorFromNodeText(text: string): string | undefined {
   if (!cleaned) return undefined
 
   const explicitMatch =
-    cleaned.match(/Director:\s*(.+?)(?=(?:\b(18|19|20)\d{2}\b|\b\d+\s*min\b|\b(4K DCP|DCP|35MM|70MM|DIGITAL|IMAX)\b|$))/i) ||
-    cleaned.match(/Directors:\s*(.+?)(?=(?:\b(18|19|20)\d{2}\b|\b\d+\s*min\b|\b(4K DCP|DCP|35MM|70MM|DIGITAL|IMAX)\b|$))/i) ||
-    cleaned.match(/Directed by\s+(.+?)(?=(?:\b(18|19|20)\d{2}\b|\b\d+\s*min\b|\b(4K DCP|DCP|35MM|70MM|DIGITAL|IMAX)\b|$))/i)
+    cleaned.match(
+      /Director:\s*(.+?)(?=(?:\b(18|19|20)\d{2}\b|\b\d+\s*min\b|\b(4K DCP|DCP|35MM|70MM|DIGITAL|IMAX)\b|$))/i
+    ) ||
+    cleaned.match(
+      /Directors:\s*(.+?)(?=(?:\b(18|19|20)\d{2}\b|\b\d+\s*min\b|\b(4K DCP|DCP|35MM|70MM|DIGITAL|IMAX)\b|$))/i
+    ) ||
+    cleaned.match(
+      /Directed by\s+(.+?)(?=(?:\b(18|19|20)\d{2}\b|\b\d+\s*min\b|\b(4K DCP|DCP|35MM|70MM|DIGITAL|IMAX)\b|$))/i
+    )
 
   if (explicitMatch?.[1]) {
     return cleanMetrographDirectorText(explicitMatch[1])
@@ -222,9 +224,11 @@ function extractMetrographMetaLine($: cheerio.CheerioAPI): string | undefined {
         const match = text.match(
           /\b(18|19|20)\d{2}\s*\/\s*\d+\s*min(?:\s*\/\s*(?:4K DCP|DCP|35MM|70MM|DIGITAL|IMAX))?/i
         )
+
         if (match?.[0]) {
           return normalizeWhitespace(match[0])
         }
+
         return text
       }
     }
@@ -257,6 +261,39 @@ async function scrapeMetrographDetailPage(url: string): Promise<DetailMovieInfo>
   }
 }
 
+function extractSourceShowtimeId(
+  sourceUrl: string,
+  href?: string | null
+): string | undefined {
+  if (!href) return undefined
+
+  try {
+    const absoluteHref = buildAbsoluteUrl(sourceUrl, href)
+    if (!absoluteHref) return undefined
+
+    const parsed = new URL(absoluteHref)
+    return parsed.searchParams.get('txtSessionId') || undefined
+  } catch {
+    return undefined
+  }
+}
+
+function buildMetrographStartTimeRaw(
+  dateLabel: string,
+  timeText: string
+): string {
+  const parsed = parseShowtime({
+    dateText: dateLabel,
+    timeText,
+  })
+
+  if (parsed) {
+    return formatShowtimeRaw(parsed)
+  }
+
+  return `${normalizeWhitespace(dateLabel)} ${normalizeWhitespace(timeText)}`.trim()
+}
+
 export async function scrapeMetrographShowtimes(
   config: TheaterAdapterConfig
 ): Promise<ScrapedShowtime[]> {
@@ -282,6 +319,7 @@ export async function scrapeMetrographShowtimes(
     if (!movieTitle) continue
 
     let detailInfo = detailCache.get(detailUrl)
+
     if (!detailInfo) {
       try {
         detailInfo = await scrapeMetrographDetailPage(detailUrl)
@@ -330,22 +368,15 @@ export async function scrapeMetrographShowtimes(
 
           const href = link.attr('href')
           const ticketUrl = buildAbsoluteUrl(config.sourceUrl, href)
+          const sourceShowtimeId = extractSourceShowtimeId(
+            config.sourceUrl,
+            href
+          )
 
-          let sourceShowtimeId: string | undefined
-          if (href) {
-            try {
-              const absoluteHref = buildAbsoluteUrl(config.sourceUrl, href)
-              if (absoluteHref) {
-                const parsed = new URL(absoluteHref)
-                sourceShowtimeId =
-                  parsed.searchParams.get('txtSessionId') || undefined
-              }
-            } catch {
-              sourceShowtimeId = undefined
-            }
-          }
-
-          const startTimeRaw = `${currentDateLabel} ${timeText}`.trim()
+          const startTimeRaw = buildMetrographStartTimeRaw(
+            currentDateLabel,
+            timeText
+          )
 
           rows.push({
             movieTitle: detailInfo?.title || movieTitle,
@@ -358,7 +389,7 @@ export async function scrapeMetrographShowtimes(
             releaseYear: detailInfo?.releaseYear || fallbackMeta.year,
             runtimeMinutes:
               detailInfo?.runtimeMinutes || fallbackMeta.runtimeMinutes,
-            overview: undefined,
+            overview: detailInfo?.overview,
             posterUrl: detailInfo?.posterUrl || fallbackPoster,
           })
         })

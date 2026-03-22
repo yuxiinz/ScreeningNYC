@@ -2,12 +2,18 @@
 
 import * as cheerio from 'cheerio'
 import type { ScrapedShowtime, TheaterAdapterConfig } from './types'
+import { fetchHtml } from '../core/http'
 import {
   normalizeWhitespace,
-  buildAbsoluteUrl,
-  fetchHtml,
   cleanPossessivePrefixTitle,
-} from './shared'
+} from '../core/text'
+import { buildAbsoluteUrl } from '../core/url'
+import {
+  parseYear,
+  parseRuntimeMinutes,
+  parseFormat,
+} from '../core/meta'
+import { parseShowtime, formatShowtimeRaw } from '../core/datetime'
 
 type DetailMovieInfo = {
   title?: string
@@ -33,6 +39,7 @@ type FilmForumEntry = {
 function getFilmForumUrls(sourceUrl: string) {
   const root = new URL(sourceUrl)
   const origin = root.origin
+
   return {
     nowPlayingUrl: `${origin}/now_playing`,
     comingSoonUrl: `${origin}/coming_soon`,
@@ -72,21 +79,10 @@ function parseFilmForumMetaText(metaText: string): {
   const cleaned = normalizeWhitespace(metaText)
   if (!cleaned) return {}
 
-  const yearMatch = cleaned.match(/\b(18|19|20)\d{2}\b/)
-  const runtimeMatch = cleaned.match(/(\d+)\s*MIN\.?/i)
-
-  let rawFormat: string | undefined
-  if (/35\s*MM/i.test(cleaned)) rawFormat = '35mm'
-  else if (/70\s*MM/i.test(cleaned)) rawFormat = '70mm'
-  else if (/4K\s*DCP/i.test(cleaned)) rawFormat = '4K DCP'
-  else if (/\bDCP\b/i.test(cleaned)) rawFormat = 'DCP'
-  else if (/DIGITAL/i.test(cleaned)) rawFormat = 'Digital'
-  else if (/IMAX/i.test(cleaned)) rawFormat = 'IMAX'
-
   return {
-    releaseYear: yearMatch ? Number(yearMatch[0]) : undefined,
-    runtimeMinutes: runtimeMatch ? Number(runtimeMatch[1]) : undefined,
-    rawFormat,
+    releaseYear: parseYear(cleaned),
+    runtimeMinutes: parseRuntimeMinutes(cleaned),
+    rawFormat: parseFormat(cleaned),
   }
 }
 
@@ -94,25 +90,27 @@ function extractDirectorFromDetailPage($: cheerio.CheerioAPI): string | undefine
   const texts = $('p, div, span, li, strong, b')
     .map((_, el) => normalizeWhitespace($(el).text()))
     .get()
-    .filter(Boolean);
+    .filter(Boolean)
 
   for (const text of texts) {
-    // 关键：在遇到 Starring, With, Written by, Approx 等词之前停止匹配
     const m =
-      text.match(/DIRECTED BY\s+([^|•·]+?)(?=\s+(?:Starring|Cast|With|Written by|Approx|Country|Produced)|\s{2,}|$)/i) ||
-      text.match(/^Director:\s*(.+)$/i);
+      text.match(
+        /DIRECTED BY\s+([^|•·]+?)(?=\s+(?:Starring|Cast|With|Written by|Approx|Country|Produced)|\s{2,}|$)/i
+      ) ||
+      text.match(/^Director:\s*(.+)$/i)
 
     if (m?.[1]) {
       const director = normalizeWhitespace(m[1])
         .replace(/\bwith\b.*$/i, '')
         .replace(/\bwritten by\b.*$/i, '')
         .replace(/\bstarring\b.*$/i, '')
-        .trim();
+        .trim()
 
-      if (director) return director;
+      if (director) return director
     }
   }
-  return undefined;
+
+  return undefined
 }
 
 async function scrapeFilmForumDetailPage(url: string): Promise<DetailMovieInfo> {
@@ -134,8 +132,10 @@ async function scrapeFilmForumDetailPage(url: string): Promise<DetailMovieInfo> 
   const directorText = extractDirectorFromDetailPage($)
 
   let metaText: string | undefined
+
   $('p, strong, b, li').each((_, el) => {
     const text = normalizeWhitespace($(el).text())
+
     if (!metaText && /\b\d{4}\b/.test(text) && /MIN\.?/i.test(text)) {
       metaText = text
     }
@@ -155,8 +155,11 @@ async function scrapeFilmForumDetailPage(url: string): Promise<DetailMovieInfo> 
 }
 
 function hasConcreteDate(text: string): boolean {
-  const cleaned = normalizeWhitespace(text);
-  return /(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+[A-Z][a-z]+\s+\d{1,2}(?:,?\s+\d{4})?/i.test(cleaned);
+  const cleaned = normalizeWhitespace(text)
+
+  return /(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+[A-Z][a-z]+\s+\d{1,2}(?:,?\s+\d{4})?/i.test(
+    cleaned
+  )
 }
 
 function extractTimesFromPiece(piece: string): string[] {
@@ -176,6 +179,19 @@ function normalizeFallbackText(detailsText: string): string[] {
     .filter(Boolean)
 }
 
+function buildFilmForumStartTimeRaw(dateText: string, timeText: string): string {
+  const parsed = parseShowtime({
+    dateText,
+    timeText,
+  })
+
+  if (parsed) {
+    return formatShowtimeRaw(parsed)
+  }
+
+  return `${normalizeWhitespace(dateText)} ${normalizeWhitespace(timeText)}`.trim()
+}
+
 function parseFallbackDetailsText(detailsText: string): {
   startTimeRaw: string
   rawFormat?: string
@@ -193,18 +209,12 @@ function parseFallbackDetailsText(detailsText: string): {
 
     if (!currentDate) continue
 
-    let rawFormat: string | undefined
-    if (/35\s*MM/i.test(piece)) rawFormat = '35mm'
-    else if (/70\s*MM/i.test(piece)) rawFormat = '70mm'
-    else if (/4K\s*DCP/i.test(piece)) rawFormat = '4K DCP'
-    else if (/\bDCP\b/i.test(piece)) rawFormat = 'DCP'
-    else if (/DIGITAL/i.test(piece)) rawFormat = 'Digital'
-    else if (/IMAX/i.test(piece)) rawFormat = 'IMAX'
-
+    const rawFormat = parseFormat(piece)
     const times = extractTimesFromPiece(piece)
+
     for (const timeText of times) {
       rows.push({
-        startTimeRaw: `${currentDate} ${timeText}`.trim(),
+        startTimeRaw: buildFilmForumStartTimeRaw(currentDate, timeText),
         rawFormat,
       })
     }
@@ -264,6 +274,7 @@ function collectSeriesUrls($: cheerio.CheerioAPI, pageUrl: string): string[] {
   $('a.blue-type[href*="/series/"]').each((_, el) => {
     const href = $(el).attr('href')
     const abs = buildAbsoluteUrl(pageUrl, href)
+
     if (abs && !seen.has(abs)) {
       seen.add(abs)
       urls.push(abs)
@@ -289,7 +300,9 @@ async function scrapeTicketPageShowtimes(params: {
   const $ = cheerio.load(html)
 
   const detailInfo = params.detailUrl
-    ? await scrapeFilmForumDetailPage(params.detailUrl).catch(() => ({} as DetailMovieInfo))
+    ? await scrapeFilmForumDetailPage(params.detailUrl).catch(
+        () => ({} as DetailMovieInfo)
+      )
     : {}
 
   const rows: ScrapedShowtime[] = []
@@ -299,9 +312,15 @@ async function scrapeTicketPageShowtimes(params: {
     const statusText = item.find('.tn-prod-list-item__perf-status').text()
     const isSoldOut = /Sold Out/i.test(statusText)
 
-    const dateText = normalizeWhitespace(item.find('.tn-prod-list-item__perf-date').first().text())
-    const timeText = normalizeWhitespace(item.find('.tn-prod-list-item__perf-time').first().text())
-    const perfTitle = cleanTitleText(item.find('.tn-performance-title').first().text())
+    const dateText = normalizeWhitespace(
+      item.find('.tn-prod-list-item__perf-date').first().text()
+    )
+    const timeText = normalizeWhitespace(
+      item.find('.tn-prod-list-item__perf-time').first().text()
+    )
+    const perfTitle = cleanTitleText(
+      item.find('.tn-performance-title').first().text()
+    )
 
     const href = item.find('a.tn-prod-list-item__perf-anchor').first().attr('href')
     const purchaseUrl = buildAbsoluteUrl(params.ticketUrl, href) || params.ticketUrl
@@ -311,7 +330,7 @@ async function scrapeTicketPageShowtimes(params: {
 
     rows.push({
       movieTitle: detailInfo.title || perfTitle || params.movieTitle,
-      startTimeRaw: `${dateText} ${timeText}`.trim(),
+      startTimeRaw: buildFilmForumStartTimeRaw(dateText, timeText),
       ticketUrl: isSoldOut ? undefined : purchaseUrl,
       sourceUrl: params.detailUrl || params.ticketUrl,
       rawFormat: detailInfo.rawFormat,
@@ -331,7 +350,9 @@ async function buildFallbackRowsFromEntry(entry: FilmForumEntry): Promise<Scrape
   if (!entry.fallbackShowtimes?.length) return []
 
   const detailInfo = entry.detailUrl
-    ? await scrapeFilmForumDetailPage(entry.detailUrl).catch(() => ({} as DetailMovieInfo))
+    ? await scrapeFilmForumDetailPage(entry.detailUrl).catch(
+        () => ({} as DetailMovieInfo)
+      )
     : {}
 
   return entry.fallbackShowtimes.map((show) => ({
@@ -356,13 +377,17 @@ async function scrapeEntriesFromPage(pageUrl: string): Promise<FilmForumEntry[]>
   const seriesUrls = collectSeriesUrls($, pageUrl)
 
   const allEntries: FilmForumEntry[] = [...directEntries]
-  const seen = new Set(allEntries.map((e) => `${e.movieTitle}|${e.detailUrl || ''}|${e.ticketUrl || ''}`))
+  const seen = new Set(
+    allEntries.map((e) => `${e.movieTitle}|${e.detailUrl || ''}|${e.ticketUrl || ''}`)
+  )
 
   for (const seriesUrl of seriesUrls) {
     try {
       const seriesEntries = await collectEntriesFromSeriesPage(seriesUrl)
+
       for (const entry of seriesEntries) {
         const key = `${entry.movieTitle}|${entry.detailUrl || ''}|${entry.ticketUrl || ''}`
+
         if (!seen.has(key)) {
           seen.add(key)
           allEntries.push(entry)
@@ -388,8 +413,10 @@ export async function scrapeFilmForumShowtimes(
   for (const pageUrl of [nowPlayingUrl, comingSoonUrl]) {
     try {
       const entries = await scrapeEntriesFromPage(pageUrl)
+
       for (const entry of entries) {
         const key = `${entry.movieTitle}|${entry.detailUrl || ''}|${entry.ticketUrl || ''}`
+
         if (!seenEntries.has(key)) {
           seenEntries.add(key)
           allEntries.push(entry)
@@ -419,6 +446,7 @@ export async function scrapeFilmForumShowtimes(
 
       for (const row of rows) {
         const key = `${row.movieTitle}|${row.startTimeRaw}|${row.ticketUrl || ''}|${row.sourceShowtimeId || ''}`
+
         if (!seenRows.has(key)) {
           seenRows.add(key)
           allRows.push(row)

@@ -27,23 +27,25 @@ export default function TheaterMarkers({
 
   return (
     <>
-      {theaters.map((theater) => (
-        <Marker
-          key={theater.id}
-          position={[theater.latitude, theater.longitude]}
-          icon={theaterIcon}
-          eventHandlers={{
-            click: () => {
-              const today = new Date().toISOString().split('T')[0]
-              router.push(`/date?date=${today}&theaters=${theater.slug}`)
-            },
-          }}
-        >
-          <Tooltip direction="top" offset={[0, -10]} opacity={1}>
-            {theater.name}
-          </Tooltip>
-        </Marker>
-      ))}
+      {theaters
+        .filter((theater) => theater.latitude !== null && theater.longitude !== null)
+        .map((theater) => (
+          <Marker
+            key={theater.id}
+            position={[theater.latitude as number, theater.longitude as number]}
+            icon={theaterIcon}
+            eventHandlers={{
+              click: () => {
+                const today = new Date().toISOString().split('T')[0]
+                router.push(`/date?date=${today}&theaters=${theater.slug}`)
+              },
+            }}
+          >
+            <Tooltip direction="top" offset={[0, -10]} opacity={1}>
+              {theater.name}
+            </Tooltip>
+          </Marker>
+        ))}
     </>
   )
 }

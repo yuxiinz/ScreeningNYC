@@ -1,3 +1,5 @@
+// app/date/page.tsx
+
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import DateSelector from '@/components/DateSelector'
@@ -46,6 +48,10 @@ function cleanDirectorText(input?: string | null) {
   return cleaned || 'UNKNOWN'
 }
 
+function formatReadableDate(targetDate: string) {
+  return DateTime.fromISO(targetDate, { zone: TIMEZONE }).toFormat('LLLL d, yyyy')
+}
+
 export default async function DatePage({
   searchParams,
 }: {
@@ -80,6 +86,10 @@ export default async function DatePage({
       name: true,
     },
   })
+
+  const selectedTheaterNames = allTheaters
+    .filter(t => selectedTheaterSlugs.includes(t.slug))
+    .map(t => t.name)
 
   const showtimes = await prisma.showtime.findMany({
     where: {
@@ -138,6 +148,17 @@ export default async function DatePage({
       return aFirst - bFirst
     })
 
+  const filmCount = moviesOnDate.length
+
+  const subtitle =
+    targetDate === today
+      ? selectedTheaterNames.length > 0
+        ? `There are ${filmCount} film${filmCount === 1 ? '' : 's'} you can watch today at ${selectedTheaterNames.join(', ')}!`
+        : `There are ${filmCount} film${filmCount === 1 ? '' : 's'} you can watch today!`
+      : selectedTheaterNames.length > 0
+      ? `There are ${filmCount} film${filmCount === 1 ? '' : 's'} you can watch on ${formatReadableDate(targetDate)} at ${selectedTheaterNames.join(', ')}!`
+      : `There are ${filmCount} film${filmCount === 1 ? '' : 's'} you can watch on ${formatReadableDate(targetDate)}!`
+
   return (
     <div
       style={{
@@ -159,6 +180,17 @@ export default async function DatePage({
           }))}
           selectedTheaters={selectedTheaterSlugs}
         />
+
+        <p
+          style={{
+            color: '#b0b0b0',
+            fontSize: '0.98rem',
+            lineHeight: 1.5,
+            margin: '0 0 18px 0',
+          }}
+        >
+          {subtitle}
+        </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '60px' }}>
           {moviesOnDate.length > 0 ? (

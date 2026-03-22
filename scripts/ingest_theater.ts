@@ -3,7 +3,11 @@
 import 'dotenv/config'
 import { DateTime } from 'luxon'
 import { getShowtimeScraper } from '../lib/ingest/adapters'
-import { searchTmdbMovie, canonicalizeTitle } from '../lib/ingest/services/tmdb_service'
+import { THEATER_META } from '../lib/ingest/config/theater_meta'
+import {
+  searchTmdbMovie,
+  canonicalizeTitle,
+} from '../lib/ingest/services/tmdb_service'
 import {
   upsertTheater,
   upsertFormat,
@@ -21,7 +25,7 @@ const TIMEZONE = 'America/New_York'
 
 type TheaterIngestConfig = {
   theaterName: string
-  theaterSlug: string
+  theaterSlug: keyof typeof THEATER_META | string
   sourceName: string
   sourceUrl: string
   officialSiteUrl?: string
@@ -29,8 +33,6 @@ type TheaterIngestConfig = {
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY || ''
 
-// List of all theaters to ingest
-// Add new theaters here after implementing their adapters
 const THEATER_CONFIGS: TheaterIngestConfig[] = [
   {
     theaterName: 'Metrograph',
@@ -39,50 +41,42 @@ const THEATER_CONFIGS: TheaterIngestConfig[] = [
     sourceUrl: process.env.METROGRAPH_SHOWTIMES_URL || '',
     officialSiteUrl: process.env.METROGRAPH_OFFICIAL_URL || '',
   },
-
   {
     theaterName: 'Film Forum',
     theaterSlug: 'filmforum',
     sourceName: 'filmforum',
-    sourceUrl: process.env.FILMFORUM_SHOWTIMES_URL || 'https://filmforum.org/now_playing',
-    officialSiteUrl: process.env.FILMFORUM_OFFICIAL_URL || 'https://filmforum.org',
+    sourceUrl:
+      process.env.FILMFORUM_SHOWTIMES_URL || 'https://filmforum.org/now_playing',
+    officialSiteUrl:
+      process.env.FILMFORUM_OFFICIAL_URL || 'https://filmforum.org',
   },
-
   {
-  theaterName: 'IFC Center',
-  theaterSlug: 'ifc',
-  sourceName: 'ifc',
-  sourceUrl: process.env.IFC_SHOWTIMES_URL || 'https://www.ifccenter.com/',
-  officialSiteUrl: process.env.IFC_OFFICIAL_URL || 'https://www.ifccenter.com',
-},
-
-  // Example:
-  // {
-  //   theaterName: 'IFC Center',
-  //   theaterSlug: 'ifc',
-  //   sourceName: 'ifc',
-  //   sourceUrl: process.env.IFC_SHOWTIMES_URL || '',
-  //   officialSiteUrl: process.env.IFC_OFFICIAL_URL || '',
-  // },
+    theaterName: 'IFC Center',
+    theaterSlug: 'ifc',
+    sourceName: 'ifc',
+    sourceUrl: process.env.IFC_SHOWTIMES_URL || 'https://www.ifccenter.com/',
+    officialSiteUrl:
+      process.env.IFC_OFFICIAL_URL || 'https://www.ifccenter.com',
+  },
+  {
+    theaterName: 'Quad Cinema',
+    theaterSlug: 'quad',
+    sourceName: 'quad',
+    sourceUrl:
+      process.env.QUAD_SHOWTIMES_URL || 'https://quadcinema.com/all/',
+    officialSiteUrl:
+      process.env.QUAD_OFFICIAL_URL || 'https://quadcinema.com',
+  },
+  {
+    theaterName: 'MoMA',
+    theaterSlug: 'moma',
+    sourceName: 'moma',
+    sourceUrl:
+      process.env.MOMA_SHOWTIMES_URL ||
+      'https://www.moma.org/calendar/?happening_filter=Films&locale=en&location=both',
+    officialSiteUrl: process.env.MOMA_OFFICIAL_URL || 'https://www.moma.org',
+  },
 ]
-
-const THEATER_META = {
-  metrograph: {
-    latitude: 40.7182,
-    longitude: -73.9902,
-    address: '7 Ludlow St, New York, NY',
-  },
-  filmforum: {
-    latitude: 40.7287,
-    longitude: -74.0053,
-    address: '209 W Houston St, New York, NY',
-  },
-  ifc: {
-  latitude: 40.7301,
-  longitude: -74.0002,
-  address: '323 6th Ave, New York, NY',
-},
-}
 
 function getRequestedTheaterSlugs(): string[] {
   return process.argv
@@ -91,14 +85,10 @@ function getRequestedTheaterSlugs(): string[] {
     .filter(Boolean)
 }
 
-
-// Normalize whitespace utility (local helper)
 function normalizeWhitespace(input?: string | null): string {
   return (input || '').replace(/\s+/g, ' ').trim()
 }
 
-// Detect whether a scraped item is a "program" instead of a single film
-// Programs should NOT go through TMDB matching
 function isProgramContent(input: {
   title?: string
   overview?: string
@@ -125,7 +115,6 @@ function isProgramContent(input: {
   )
 }
 
-// Ingest pipeline for a single theater
 async function ingestOneTheater(config: TheaterIngestConfig) {
   if (!config.sourceUrl) {
     console.warn(`[${config.theaterSlug}] Missing sourceUrl, skipping`)
@@ -134,21 +123,32 @@ async function ingestOneTheater(config: TheaterIngestConfig) {
 
   console.log(`\n========== Start ingesting ${config.theaterName} ==========`)
 
-  // Select correct scraper (adapter) based on theaterSlug
   const scraper = getShowtimeScraper(config.theaterSlug)
+  const theaterMeta =
+    config.theaterSlug in THEATER_META
+      ? THEATER_META[config.theaterSlug as keyof typeof THEATER_META]
+      : undefined
 
-  // Ensure theater exists in DB
+  if (!theaterMeta) {
+    console.warn(
+      `[${config.theaterSlug}] Missing theater meta, address and coordinates may be empty`
+    )
+  }
+
   const theater = await upsertTheater({
     theaterName: config.theaterName,
     theaterSlug: config.theaterSlug,
     sourceName: config.sourceName,
     sourceUrl: config.sourceUrl,
     officialSiteUrl: config.officialSiteUrl,
+    address: theaterMeta?.address,
+    latitude: theaterMeta?.latitude,
+    longitude: theaterMeta?.longitude,
   })
 
-  // Scrape raw showtimes
   const scraped = await scraper({
     sourceUrl: config.sourceUrl,
+    theaterSlug: config.theaterSlug,
   })
 
   console.log(`[${config.theaterSlug}] Scraped ${scraped.length} raw showtimes`)
@@ -156,7 +156,6 @@ async function ingestOneTheater(config: TheaterIngestConfig) {
   const fingerprints: string[] = []
 
   for (const item of scraped) {
-    // Parse start time
     const parsedStart = parseStartTime(item.startTimeRaw)
     if (!parsedStart) {
       console.warn(
@@ -165,21 +164,18 @@ async function ingestOneTheater(config: TheaterIngestConfig) {
       continue
     }
 
-    // Normalize format
     const formatName = normalizeFormat(item.rawFormat)
     const format = await upsertFormat(formatName)
 
-    // Determine whether this is a program or a standard movie
     const titleForDecision = item.movieTitle
-    const programLike = isProgramContent({
+    const isProgram = isProgramContent({
       title: titleForDecision,
       overview: item.overview,
     })
 
     let movie
 
-    // If program-like, skip TMDB and store locally
-    if (programLike) {
+    if (isProgram) {
       movie = await upsertLocalMovie({
         title: canonicalizeTitle(titleForDecision),
         releaseYear: item.releaseYear,
@@ -191,7 +187,6 @@ async function ingestOneTheater(config: TheaterIngestConfig) {
         genresText: 'Program',
       })
     } else {
-      // Try matching with TMDB
       const tmdbMovie = await searchTmdbMovie({
         title: item.movieTitle,
         directorText: item.directorText,
@@ -201,7 +196,6 @@ async function ingestOneTheater(config: TheaterIngestConfig) {
       })
 
       if (tmdbMovie.tmdbId) {
-        // Use TMDB-enriched data
         movie = await upsertMovie(tmdbMovie, {
           title: canonicalizeTitle(titleForDecision),
           directorText: item.directorText,
@@ -213,7 +207,6 @@ async function ingestOneTheater(config: TheaterIngestConfig) {
           genresText: config.theaterName,
         })
       } else {
-        // Fallback to local movie creation
         movie = await upsertLocalMovie({
           title: canonicalizeTitle(titleForDecision),
           releaseYear: item.releaseYear,
@@ -227,7 +220,6 @@ async function ingestOneTheater(config: TheaterIngestConfig) {
       }
     }
 
-    // Build unique fingerprint for deduplication
     const fingerprint = buildFingerprint({
       theaterSlug: config.theaterSlug,
       movieTitle: movie.title,
@@ -237,7 +229,6 @@ async function ingestOneTheater(config: TheaterIngestConfig) {
 
     fingerprints.push(fingerprint)
 
-    // Upsert showtime
     await upsertShowtime({
       movieId: movie.id,
       theaterId: theater.id,
@@ -252,19 +243,19 @@ async function ingestOneTheater(config: TheaterIngestConfig) {
     })
 
     console.log(
-      `[${config.theaterSlug}] Upserted: ${movie.title} | ${DateTime.fromJSDate(parsedStart)
+      `[${config.theaterSlug}] Upserted: ${movie.title} | ${DateTime.fromJSDate(
+        parsedStart
+      )
         .setZone(TIMEZONE)
         .toFormat('yyyy-MM-dd HH:mm')} | ${formatName}`
     )
   }
 
-  // Mark missing future showtimes as canceled
   await markMissingShowtimesAsCanceled(theater.id, fingerprints)
 
   console.log(`[${config.theaterSlug}] Ingestion completed`)
 }
 
-// Main entry: ingest all configured theaters
 async function main() {
   const requestedSlugs = getRequestedTheaterSlugs()
 

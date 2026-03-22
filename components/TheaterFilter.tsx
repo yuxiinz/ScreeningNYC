@@ -49,7 +49,8 @@ export default function TheaterFilter({
       params.set('theaters', nextSelected.join(','))
     }
 
-    router.push(`${pathname}?${params.toString()}`)
+    const query = params.toString()
+    router.push(query ? `${pathname}?${query}` : pathname)
   }
 
   function toggleTheater(slug: string) {
@@ -66,6 +67,7 @@ export default function TheaterFilter({
 
   function clearAll() {
     updateUrl([])
+    setOpen(false)
   }
 
   const buttonLabel =
@@ -83,7 +85,7 @@ export default function TheaterFilter({
       ref={containerRef}
       style={{
         position: 'relative',
-        marginBottom: '30px',
+        marginBottom: '12px',
       }}
     >
       <button

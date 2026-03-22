@@ -8,12 +8,15 @@ import { canonicalizeTitle } from './tmdb_service'
 
 const TIMEZONE = 'America/New_York'
 
-export type PersistConfig = {
+type PersistConfig = {
   theaterName: string
   theaterSlug: string
   sourceName: string
-  sourceUrl: string
+  sourceUrl?: string
   officialSiteUrl?: string
+  address?: string
+  latitude?: number
+  longitude?: number
 }
 
 export type FallbackMovieData = {
@@ -274,12 +277,20 @@ export async function upsertTheater(config: PersistConfig) {
       name: config.theaterName,
       sourceName: config.sourceName,
       officialSiteUrl: config.officialSiteUrl || config.sourceUrl || null,
+      ...(config.address !== undefined ? { address: config.address } : {}),
+      ...(config.latitude !== undefined ? { latitude: config.latitude } : {}),
+      ...(config.longitude !== undefined ? { longitude: config.longitude } : {}),
     },
     create: {
       name: config.theaterName,
       slug: config.theaterSlug,
       sourceName: config.sourceName,
       officialSiteUrl: config.officialSiteUrl || config.sourceUrl || null,
+      address: config.address || null,
+      latitude:
+        typeof config.latitude === 'number' ? config.latitude : null,
+      longitude:
+        typeof config.longitude === 'number' ? config.longitude : null,
     },
   })
 }

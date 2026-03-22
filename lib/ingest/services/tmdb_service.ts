@@ -1,7 +1,11 @@
 // lib/ingest/services/tmdb_service.ts
 
 import axios from 'axios'
-import { isLikelyProgramTitle } from '../adapters/shared'
+import {
+  normalizeWhitespace,
+  stripLeadingBullets,
+  isLikelyProgramTitle,
+} from '../core/text'
 
 export type TmdbMovie = {
   tmdbId?: number
@@ -27,13 +31,8 @@ type SearchTmdbParams = {
   tmdbApiKey?: string
 }
 
-function normalizeWhitespace(input?: string | null): string {
-  return (input || '').replace(/\s+/g, ' ').trim()
-}
-
 export function canonicalizeTitle(title: string): string {
-  return normalizeWhitespace(title)
-    .replace(/^[·•●▪◦‣\.\s]+/u, '')
+  return stripLeadingBullets(title)
     .replace(/\bpreceded by\b.*$/i, '')
     .replace(/\bmembers only:\b/i, '')
     .replace(/\bace presents\b/i, '')
