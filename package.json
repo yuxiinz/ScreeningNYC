@@ -2,13 +2,17 @@
   "name": "screeningnyc",
   "version": "0.1.0",
   "private": true,
+  
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "ingest:theater": "tsx scripts/ingest_theater.ts"
+
+    "typecheck": "tsc --noEmit",
+    "lint": "next lint",
+    "check": "npm run typecheck && npm run lint && npm run build"
   },
+
   "dependencies": {
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
