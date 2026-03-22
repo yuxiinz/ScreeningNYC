@@ -1,12 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
-
-type MovieWithShowtimes = Prisma.MovieGetPayload<{
-  include: {
-    showtimes: true;
-  };
-}>;
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -18,7 +11,7 @@ export async function GET(req: Request) {
 
   const now = new Date();
 
-  const movies: MovieWithShowtimes[] = await prisma.movie.findMany({
+  const movies = await prisma.movie.findMany({
     where: {
       OR: [
         {
@@ -52,7 +45,7 @@ export async function GET(req: Request) {
     },
   });
 
-  const result = movies.map((m: MovieWithShowtimes) => {
+  const result = movies.map((m: (typeof movies)[number]) => {
     let status: "NOW_SHOWING" | "UPCOMING" | "NONE" = "NONE";
 
     if (m.showtimes.length > 0) {
