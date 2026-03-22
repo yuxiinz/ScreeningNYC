@@ -122,9 +122,26 @@ export default async function DatePage({
     },
   })
 
-  const groupedByMovie: Record<number, any> = {}
+  type ShowtimeItem = typeof showtimes[number]
 
-  showtimes.forEach((st) => {
+type GroupedMovie = ShowtimeItem["movie"] & {
+  showtimes: ShowtimeItem[]
+}
+
+const groupedByMovie: Record<number, GroupedMovie> = {}
+
+showtimes.forEach((st: ShowtimeItem) => {
+  if (!groupedByMovie[st.movieId]) {
+    groupedByMovie[st.movieId] = {
+      ...st.movie,
+      showtimes: [],
+    }
+  }
+
+  groupedByMovie[st.movieId].showtimes.push(st)
+})
+
+  showtimes.forEach((st: typeof showtimes[number]) => {
     if (!groupedByMovie[st.movieId]) {
       groupedByMovie[st.movieId] = {
         ...st.movie,
