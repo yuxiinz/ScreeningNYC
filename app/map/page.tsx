@@ -9,13 +9,16 @@ export default async function MapPage() {
 const theaters = rawTheaters
   .filter(
     (
-      t
+      t: typeof rawTheaters[number]
     ): t is typeof t & {
       latitude: NonNullable<typeof t.latitude>;
       longitude: NonNullable<typeof t.longitude>;
     } => t.latitude !== null && t.longitude !== null
   )
-  .map((t) => ({
+  .map((t: typeof rawTheaters[number] & {
+    latitude: NonNullable<typeof rawTheaters[number]['latitude']>;
+    longitude: NonNullable<typeof rawTheaters[number]['longitude']>;
+  }) => ({
     ...t,
     latitude: Number(t.latitude),
     longitude: Number(t.longitude),

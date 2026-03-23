@@ -77,8 +77,8 @@ export default async function HomePage({
       (t: (typeof allTheaters)[number]): t is (typeof allTheaters)[number] & { slug: string } =>
         !!t.slug
     )
-    .filter((t) => selectedTheaterSlugs.includes(t.slug))
-    .map((t) => t.name)
+    .filter((t: (typeof allTheaters)[number] & { slug: string }) => selectedTheaterSlugs.includes(t.slug))
+    .map((t: (typeof allTheaters)[number] & { slug: string }) => t.name)
 
   const movies = await prisma.movie.findMany({
     where: {
@@ -144,8 +144,8 @@ export default async function HomePage({
         <div style={{ marginBottom: '28px' }}>
           <TheaterFilter
             theaters={allTheaters
-              .filter((t): t is typeof t & { slug: string } => !!t.slug)
-              .map((t) => ({
+              .filter((t: (typeof allTheaters)[number]): t is typeof t & { slug: string } => !!t.slug)
+              .map((t: (typeof allTheaters)[number] & { slug: string }) => ({
                 slug: t.slug,
                 name: t.name,
               }))}
@@ -171,7 +171,7 @@ export default async function HomePage({
             gap: '28px',
           }}
         >
-          {movies.map((movie) => {
+          {movies.map((movie: (typeof movies)[number]) => {
             const year = getYear(movie.releaseDate)
             const posterIsTmdb = isTmdbPoster(movie.posterUrl)
             const director = cleanDirectorText(movie.directorText)

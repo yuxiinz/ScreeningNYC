@@ -137,7 +137,7 @@ export default async function MovieDetailPage({
   if (!movie) return notFound()
 
   const groupedByDate: Record<string, typeof movie.showtimes> = {}
-  movie.showtimes.forEach((st) => {
+  movie.showtimes.forEach((st: (typeof movie.showtimes)[number]) => {
     const date = new Date(st.startTime).toISOString().split('T')[0]
     if (!groupedByDate[date]) groupedByDate[date] = []
     groupedByDate[date].push(st)
@@ -365,7 +365,7 @@ export default async function MovieDetailPage({
                     gap: '10px',
                   }}
                 >
-                  {times.map((st) => (
+                  {times.map((st: (typeof movie.showtimes)[number]) => (
                     <div
                       key={st.id}
                       style={{
