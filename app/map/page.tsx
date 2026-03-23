@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma'
 import Header from '@/components/Header'
 import MapPageClient from '@/components/map/MapPageClient'
 
+export const dynamic = "force-dynamic"
+
 export default async function MapPage() {
   const rawTheaters = await prisma.theater.findMany();
 
