@@ -1,5 +1,3 @@
-// lib/ingest/services/persist_service.ts
-
 import crypto from 'crypto'
 import { DateTime } from 'luxon'
 import { prisma } from '../../prisma'
@@ -12,7 +10,6 @@ type PersistConfig = {
   theaterName: string
   theaterSlug: string
   sourceName: string
-  sourceUrl?: string
   officialSiteUrl?: string
   address?: string
   latitude?: number
@@ -49,6 +46,7 @@ function releaseYearToDate(year?: number): Date | undefined {
 function isBadPosterUrl(url?: string | null): boolean {
   const s = normalizeWhitespace(url).toLowerCase()
   if (!s) return true
+
   return (
     s.includes('cropped-logo_metrograph') ||
     s.includes('/logo_metrograph') ||
@@ -62,19 +60,23 @@ function choosePosterUrl(params: {
   fallbackPosterUrl?: string | null
 }): string | undefined {
   if (params.tmdbPosterUrl) return params.tmdbPosterUrl
+
   const existingGood =
     params.existingPosterUrl && !isBadPosterUrl(params.existingPosterUrl)
       ? params.existingPosterUrl
       : undefined
+
   const fallbackGood =
     params.fallbackPosterUrl && !isBadPosterUrl(params.fallbackPosterUrl)
       ? params.fallbackPosterUrl
       : undefined
+
   return fallbackGood || existingGood || undefined
 }
 
 export function normalizeFormat(raw?: string | null): string {
   const s = normalizeWhitespace(raw).toLowerCase()
+
   if (!s) return 'Standard'
   if (s.includes('70mm')) return '70mm'
   if (s.includes('35mm')) return '35mm'
@@ -84,6 +86,7 @@ export function normalizeFormat(raw?: string | null): string {
   if (s.includes('digital')) return 'Digital'
   if (s.includes('4k dcp')) return '4K DCP'
   if (s.includes('dcp')) return 'DCP'
+
   return 'Standard'
 }
 
@@ -116,6 +119,7 @@ export function parseStartTime(raw: string): Date | null {
     const monthDayTimeMatch = withoutWeekday.match(
       /^([A-Za-z]+\.?\s+\d{1,2})(?:,\s*)?\s+(\d{1,2}:\d{2}\s*(?:am|pm)?)$/i
     )
+
     if (monthDayTimeMatch) {
       candidates.add(`${monthDayTimeMatch[1]} ${now.year} ${monthDayTimeMatch[2]}`)
       candidates.add(`${monthDayTimeMatch[1]} ${monthDayTimeMatch[2]} ${now.year}`)
@@ -124,6 +128,7 @@ export function parseStartTime(raw: string): Date | null {
     const numericDateTimeMatch = withoutWeekday.match(
       /^(\d{1,2}\/\d{1,2})(?:\/\d{2,4})?\s+(\d{1,2}:\d{2}\s*(?:am|pm)?)$/i
     )
+
     if (numericDateTimeMatch) {
       candidates.add(`${numericDateTimeMatch[1]}/${now.year} ${numericDateTimeMatch[2]}`)
       candidates.add(`${numericDateTimeMatch[1]} ${now.year} ${numericDateTimeMatch[2]}`)
@@ -276,7 +281,7 @@ export async function upsertTheater(config: PersistConfig) {
     update: {
       name: config.theaterName,
       sourceName: config.sourceName,
-      officialSiteUrl: config.officialSiteUrl || config.sourceUrl || null,
+      officialSiteUrl: config.officialSiteUrl || null,
       ...(config.address !== undefined ? { address: config.address } : {}),
       ...(config.latitude !== undefined ? { latitude: config.latitude } : {}),
       ...(config.longitude !== undefined ? { longitude: config.longitude } : {}),
@@ -285,12 +290,10 @@ export async function upsertTheater(config: PersistConfig) {
       name: config.theaterName,
       slug: config.theaterSlug,
       sourceName: config.sourceName,
-      officialSiteUrl: config.officialSiteUrl || config.sourceUrl || null,
+      officialSiteUrl: config.officialSiteUrl || null,
       address: config.address || null,
-      latitude:
-        typeof config.latitude === 'number' ? config.latitude : null,
-      longitude:
-        typeof config.longitude === 'number' ? config.longitude : null,
+      latitude: typeof config.latitude === 'number' ? config.latitude : null,
+      longitude: typeof config.longitude === 'number' ? config.longitude : null,
     },
   })
 }
@@ -326,7 +329,9 @@ async function findLocalMovieBySignature(input: {
 
     const directorMatch =
       !normalizedDirector || !candidateDirector || normalizedDirector === candidateDirector
-    const yearMatch = !inputYear || !candidateYear || inputYear === candidateYear
+
+    const yearMatch =
+      !inputYear || !candidateYear || inputYear === candidateYear
 
     if (directorMatch && yearMatch) return candidate
   }
@@ -371,7 +376,9 @@ export async function upsertLocalMovie(fallback: FallbackMovieData) {
       releaseDate,
       runtimeMinutes: fallback.runtimeMinutes,
       overview: fallback.overview,
-      posterUrl: choosePosterUrl({ fallbackPosterUrl: fallback.posterUrl }),
+      posterUrl: choosePosterUrl({
+        fallbackPosterUrl: fallback.posterUrl,
+      }),
       officialSiteUrl: fallback.officialSiteUrl,
       genresText: fallback.genresText,
     },
@@ -447,7 +454,8 @@ export async function upsertMovie(tmdb: TmdbMovie, fallback?: FallbackMovieData)
         }),
         backdropUrl: existing.backdropUrl || tmdb.backdropUrl,
         imdbUrl: existing.imdbUrl || tmdb.imdbUrl,
-        officialSiteUrl: existing.officialSiteUrl || tmdb.officialSiteUrl || fallback?.officialSiteUrl,
+        officialSiteUrl:
+          existing.officialSiteUrl || tmdb.officialSiteUrl || fallback?.officialSiteUrl,
         genresText: existing.genresText || tmdb.genresText || fallback?.genresText,
         directorText: existing.directorText || tmdb.directorText || fallback?.directorText,
         castText: existing.castText || tmdb.castText,
@@ -496,6 +504,8 @@ export async function upsertShowtime(params: {
       sourceUrl: params.sourceUrl,
       sourceName: params.sourceName,
       sourceShowtimeId: params.sourceShowtimeId,
+      formatId: params.formatId,
+      startTime: params.startTime,
       status: 'SCHEDULED',
       lastVerifiedAt: new Date(),
     },
@@ -532,7 +542,10 @@ export async function markMissingShowtimesAsCanceled(
         notIn: currentFingerprints.length > 0 ? currentFingerprints : ['__never_match__'],
       },
     },
-    data: { status: 'CANCELED', lastVerifiedAt: new Date() },
+    data: {
+      status: 'CANCELED',
+      lastVerifiedAt: new Date(),
+    },
   })
 }
 

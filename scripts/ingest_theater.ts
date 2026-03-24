@@ -23,12 +23,28 @@ import {
 
 const TIMEZONE = 'America/New_York'
 
+type KnownTheaterSlug = keyof typeof THEATER_META
+type TheaterSlug = KnownTheaterSlug | string
+
 type TheaterIngestConfig = {
   theaterName: string
-  theaterSlug: keyof typeof THEATER_META | string
+  theaterSlug: TheaterSlug
   sourceName: string
   sourceUrl: string
   officialSiteUrl?: string
+}
+
+type TheaterRunStats = {
+  theaterSlug: string
+  theaterName: string
+  rawCount: number
+  parsedCount: number
+  dedupedCount: number
+  parseFailedCount: number
+  upsertedCount: number
+  success: boolean
+  durationMs: number
+  error?: string
 }
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY || ''
@@ -38,8 +54,10 @@ const THEATER_CONFIGS: TheaterIngestConfig[] = [
     theaterName: 'Metrograph',
     theaterSlug: 'metrograph',
     sourceName: 'metrograph',
-    sourceUrl: process.env.METROGRAPH_SHOWTIMES_URL || '',
-    officialSiteUrl: process.env.METROGRAPH_OFFICIAL_URL || '',
+    sourceUrl:
+      process.env.METROGRAPH_SHOWTIMES_URL || 'https://metrograph.com/film/',
+    officialSiteUrl:
+      process.env.METROGRAPH_OFFICIAL_URL || 'https://metrograph.com/',
   },
   {
     theaterName: 'Film Forum',
@@ -115,18 +133,33 @@ function isProgramContent(input: {
   )
 }
 
-async function ingestOneTheater(config: TheaterIngestConfig) {
+function toErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message
+  return String(error)
+}
+
+function formatLocalTime(date: Date): string {
+  return DateTime.fromJSDate(date)
+    .setZone(TIMEZONE)
+    .toFormat('yyyy-MM-dd HH:mm')
+}
+
+async function ingestOneTheater(
+  config: TheaterIngestConfig
+): Promise<TheaterRunStats> {
+  const startedAt = Date.now()
+
   if (!config.sourceUrl) {
-    console.warn(`[${config.theaterSlug}] Missing sourceUrl, skipping`)
-    return
+    throw new Error(`[${config.theaterSlug}] Missing sourceUrl`)
   }
 
   console.log(`\n========== Start ingesting ${config.theaterName} ==========`)
 
   const scraper = getShowtimeScraper(config.theaterSlug)
+
   const theaterMeta =
     config.theaterSlug in THEATER_META
-      ? THEATER_META[config.theaterSlug as keyof typeof THEATER_META]
+      ? THEATER_META[config.theaterSlug as KnownTheaterSlug]
       : undefined
 
   if (!theaterMeta) {
@@ -139,7 +172,6 @@ async function ingestOneTheater(config: TheaterIngestConfig) {
     theaterName: config.theaterName,
     theaterSlug: config.theaterSlug,
     sourceName: config.sourceName,
-    sourceUrl: config.sourceUrl,
     officialSiteUrl: config.officialSiteUrl,
     address: theaterMeta?.address,
     latitude: theaterMeta?.latitude,
@@ -153,23 +185,51 @@ async function ingestOneTheater(config: TheaterIngestConfig) {
 
   console.log(`[${config.theaterSlug}] Scraped ${scraped.length} raw showtimes`)
 
-  const fingerprints: string[] = []
+  const fingerprintsForCancel: string[] = []
+  const seenFingerprints = new Set<string>()
+
+  let parsedCount = 0
+  let dedupedCount = 0
+  let parseFailedCount = 0
+  let upsertedCount = 0
 
   for (const item of scraped) {
     const parsedStart = parseStartTime(item.startTimeRaw)
+
     if (!parsedStart) {
+      parseFailedCount += 1
       console.warn(
         `[${config.theaterSlug}] Failed to parse time: ${item.movieTitle} | ${item.startTimeRaw}`
       )
       continue
     }
 
+    parsedCount += 1
+
+    const canonicalTitle = canonicalizeTitle(item.movieTitle)
     const formatName = normalizeFormat(item.rawFormat)
+
+    const preFingerprint = buildFingerprint({
+      theaterSlug: config.theaterSlug,
+      movieTitle: canonicalTitle,
+      startTimeUtcIso: parsedStart.toISOString(),
+      formatName,
+    })
+
+    if (seenFingerprints.has(preFingerprint)) {
+      dedupedCount += 1
+      console.warn(
+        `[${config.theaterSlug}] Duplicate scraped showtime skipped: ${canonicalTitle} | ${formatLocalTime(parsedStart)} | ${formatName}`
+      )
+      continue
+    }
+
+    seenFingerprints.add(preFingerprint)
+
     const format = await upsertFormat(formatName)
 
-    const titleForDecision = item.movieTitle
     const isProgram = isProgramContent({
-      title: titleForDecision,
+      title: item.movieTitle,
       overview: item.overview,
     })
 
@@ -177,7 +237,7 @@ async function ingestOneTheater(config: TheaterIngestConfig) {
 
     if (isProgram) {
       movie = await upsertLocalMovie({
-        title: canonicalizeTitle(titleForDecision),
+        title: canonicalTitle,
         releaseYear: item.releaseYear,
         runtimeMinutes: item.runtimeMinutes,
         overview: item.overview,
@@ -186,7 +246,7 @@ async function ingestOneTheater(config: TheaterIngestConfig) {
         directorText: item.directorText,
         genresText: 'Program',
       })
-    } else {
+    } else if (TMDB_API_KEY) {
       const tmdbMovie = await searchTmdbMovie({
         title: item.movieTitle,
         directorText: item.directorText,
@@ -197,7 +257,7 @@ async function ingestOneTheater(config: TheaterIngestConfig) {
 
       if (tmdbMovie.tmdbId) {
         movie = await upsertMovie(tmdbMovie, {
-          title: canonicalizeTitle(titleForDecision),
+          title: canonicalTitle,
           directorText: item.directorText,
           releaseYear: item.releaseYear,
           runtimeMinutes: item.runtimeMinutes,
@@ -208,7 +268,7 @@ async function ingestOneTheater(config: TheaterIngestConfig) {
         })
       } else {
         movie = await upsertLocalMovie({
-          title: canonicalizeTitle(titleForDecision),
+          title: canonicalTitle,
           releaseYear: item.releaseYear,
           runtimeMinutes: item.runtimeMinutes,
           overview: item.overview,
@@ -218,6 +278,17 @@ async function ingestOneTheater(config: TheaterIngestConfig) {
           genresText: config.theaterName,
         })
       }
+    } else {
+      movie = await upsertLocalMovie({
+        title: canonicalTitle,
+        releaseYear: item.releaseYear,
+        runtimeMinutes: item.runtimeMinutes,
+        overview: item.overview,
+        posterUrl: item.posterUrl,
+        officialSiteUrl: item.sourceUrl,
+        directorText: item.directorText,
+        genresText: config.theaterName,
+      })
     }
 
     const fingerprint = buildFingerprint({
@@ -227,7 +298,7 @@ async function ingestOneTheater(config: TheaterIngestConfig) {
       formatName,
     })
 
-    fingerprints.push(fingerprint)
+    fingerprintsForCancel.push(fingerprint)
 
     await upsertShowtime({
       movieId: movie.id,
@@ -242,35 +313,53 @@ async function ingestOneTheater(config: TheaterIngestConfig) {
       sourceName: config.sourceName,
     })
 
+    upsertedCount += 1
+
     console.log(
-      `[${config.theaterSlug}] Upserted: ${movie.title} | ${DateTime.fromJSDate(
-        parsedStart
-      )
-        .setZone(TIMEZONE)
-        .toFormat('yyyy-MM-dd HH:mm')} | ${formatName}`
+      `[${config.theaterSlug}] Upserted: ${movie.title} | ${formatLocalTime(parsedStart)} | ${formatName}`
     )
   }
 
-  await markMissingShowtimesAsCanceled(theater.id, fingerprints)
+  await markMissingShowtimesAsCanceled(theater.id, fingerprintsForCancel)
 
-  console.log(`[${config.theaterSlug}] Ingestion completed`)
+  const durationMs = Date.now() - startedAt
+
+  console.log(
+    `[${config.theaterSlug}] Completed. raw=${scraped.length}, parsed=${parsedCount}, deduped=${dedupedCount}, parseFailed=${parseFailedCount}, upserted=${upsertedCount}, durationMs=${durationMs}`
+  )
+
+  return {
+    theaterSlug: String(config.theaterSlug),
+    theaterName: config.theaterName,
+    rawCount: scraped.length,
+    parsedCount,
+    dedupedCount,
+    parseFailedCount,
+    upsertedCount,
+    success: true,
+    durationMs,
+  }
 }
 
 async function main() {
   const requestedSlugs = getRequestedTheaterSlugs()
 
-  let enabledConfigs = THEATER_CONFIGS.filter((config) => config.sourceUrl)
+  let enabledConfigs = THEATER_CONFIGS.filter((config) => Boolean(config.sourceUrl))
 
   if (requestedSlugs.length > 0) {
     enabledConfigs = enabledConfigs.filter((config) =>
-      requestedSlugs.includes(config.theaterSlug.toLowerCase())
+      requestedSlugs.includes(String(config.theaterSlug).toLowerCase())
     )
 
-    const foundSlugs = enabledConfigs.map((c) => c.theaterSlug)
+    const foundSlugs = enabledConfigs.map((c) =>
+      String(c.theaterSlug).toLowerCase()
+    )
     const missingSlugs = requestedSlugs.filter((slug) => !foundSlugs.includes(slug))
 
     if (missingSlugs.length > 0) {
-      console.warn(`Unknown or unavailable theater slug(s): ${missingSlugs.join(', ')}`)
+      console.warn(
+        `Unknown or unavailable theater slug(s): ${missingSlugs.join(', ')}`
+      )
     }
   }
 
@@ -278,20 +367,62 @@ async function main() {
     throw new Error('No valid theater configs found for this run.')
   }
 
+  if (!TMDB_API_KEY) {
+    console.warn(
+      '[ingest] TMDB_API_KEY is missing. The script will still run, but unmatched titles will be stored as local movies only.'
+    )
+  }
+
   console.log(`Preparing to ingest ${enabledConfigs.length} theater(s):`)
   for (const config of enabledConfigs) {
     console.log(`  ${config.theaterSlug}`)
   }
 
+  const results: TheaterRunStats[] = []
+
   for (const config of enabledConfigs) {
     try {
-      await ingestOneTheater(config)
+      const result = await ingestOneTheater(config)
+      results.push(result)
     } catch (error) {
-      console.error(`[${config.theaterSlug}] Ingestion failed`, error)
+      const failedResult: TheaterRunStats = {
+        theaterSlug: String(config.theaterSlug),
+        theaterName: config.theaterName,
+        rawCount: 0,
+        parsedCount: 0,
+        dedupedCount: 0,
+        parseFailedCount: 0,
+        upsertedCount: 0,
+        success: false,
+        durationMs: 0,
+        error: toErrorMessage(error),
+      }
+
+      results.push(failedResult)
+      console.error(`[${config.theaterSlug}] Ingestion failed: ${failedResult.error}`)
     }
   }
 
-  console.log('\nAll theaters ingestion finished')
+  console.log('\n========== Ingest summary ==========')
+
+  for (const result of results) {
+    if (result.success) {
+      console.log(
+        `[${result.theaterSlug}] success | raw=${result.rawCount} | parsed=${result.parsedCount} | deduped=${result.dedupedCount} | parseFailed=${result.parseFailedCount} | upserted=${result.upsertedCount} | durationMs=${result.durationMs}`
+      )
+    } else {
+      console.log(`[${result.theaterSlug}] failed | error=${result.error}`)
+    }
+  }
+
+  const failedCount = results.filter((r) => !r.success).length
+
+  if (failedCount > 0) {
+    process.exitCode = 1
+    console.error(`\nIngest finished with ${failedCount} failed theater(s).`)
+  } else {
+    console.log('\nAll theaters ingestion finished successfully.')
+  }
 }
 
 main()
