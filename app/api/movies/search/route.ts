@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getReleaseYear } from "@/lib/movie/display";
 import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
@@ -55,7 +56,7 @@ export async function GET(req: Request) {
     return {
       id: m.id,
       title: m.title,
-      year: m.releaseDate ? new Date(m.releaseDate).getUTCFullYear() : null,
+      year: getReleaseYear(m.releaseDate),
       status,
     };
   });

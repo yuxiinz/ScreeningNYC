@@ -3,6 +3,12 @@
 import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import BackButton from '@/components/BackButton'
+import MovieExternalLinks from '@/components/movie/MovieExternalLinks'
+import {
+  cleanDirectorText,
+  getReleaseYear,
+  isTmdbPoster,
+} from '@/lib/movie/display'
 import {
   formatDateKeyInAppTimezone,
   formatTimeInAppTimezone,
@@ -10,44 +16,6 @@ import {
 } from '@/lib/timezone'
 
 export const dynamic = 'force-dynamic'
-
-function isTmdbPoster(url?: string | null) {
-  return !!url && url.includes('image.tmdb.org')
-}
-
-function getYear(date?: Date | null) {
-  if (!date) return ''
-  return String(new Date(date).getUTCFullYear())
-}
-
-function cleanDirectorText(input?: string | null) {
-  const text = (input || '').replace(/\s+/g, ' ').trim()
-  if (!text) return 'Unknown'
-
-  const withoutDirectedBy = text.replace(/^directed by\s*/i, '').trim()
-
-  const stopPatterns = [
-    /\b(18|19|20)\d{2}\b/,
-    /\b\d+\s*min\b/i,
-    /\b(4k dcp|dcp|35mm|70mm|imax|digital)\b/i,
-    /\bthe first\b/i,
-    /\bwinner\b/i,
-    /\bpresented\b/i,
-    /\bproduced by\b/i,
-  ]
-
-  let cutIndex = withoutDirectedBy.length
-
-  for (const pattern of stopPatterns) {
-    const match = withoutDirectedBy.match(pattern)
-    if (match && typeof match.index === 'number') {
-      cutIndex = Math.min(cutIndex, match.index)
-    }
-  }
-
-  const cleaned = withoutDirectedBy.slice(0, cutIndex).trim()
-  return cleaned || 'Unknown'
-}
 
 function extractMetaFromOverview(input?: string | null) {
   const text = (input || '').replace(/\s+/g, ' ').trim()
@@ -134,7 +102,7 @@ export default async function MovieDetailPage({
 
   const posterIsTmdb = isTmdbPoster(movie.posterUrl)
   const director = cleanDirectorText(movie.directorText)
-  const year = getYear(movie.releaseDate)
+  const year = getReleaseYear(movie.releaseDate)
   const overviewMeta = extractMetaFromOverview(movie.overview)
   const displayFormat = overviewMeta.inferredFormat || ''
 
@@ -245,67 +213,17 @@ export default async function MovieDetailPage({
               </p>
             )}
 
-            <div
+            <MovieExternalLinks
+              imdbUrl={movie.imdbUrl}
+              doubanUrl={movie.doubanUrl}
+              letterboxdUrl={movie.letterboxdUrl}
+              size="md"
               style={{
-                display: 'flex',
-                gap: '12px',
                 marginBottom: '28px',
                 fontSize: '0.85rem',
                 fontWeight: 'bold',
-                flexWrap: 'wrap',
               }}
-            >
-              {movie.imdbUrl && (
-                <a
-                  href={movie.imdbUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    color: '#f5c518',
-                    textDecoration: 'none',
-                    border: '1px solid #f5c518',
-                    padding: '6px 10px',
-                    borderRadius: '6px',
-                  }}
-                >
-                  IMDb
-                </a>
-              )}
-
-              {movie.doubanUrl && (
-                <a
-                  href={movie.doubanUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    color: '#00b51d',
-                    textDecoration: 'none',
-                    border: '1px solid #00b51d',
-                    padding: '6px 10px',
-                    borderRadius: '6px',
-                  }}
-                >
-                  豆瓣
-                </a>
-              )}
-
-              {movie.letterboxdUrl && (
-                <a
-                  href={movie.letterboxdUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{
-                    color: '#ff8000',
-                    textDecoration: 'none',
-                    border: '1px solid #ff8000',
-                    padding: '6px 10px',
-                    borderRadius: '6px',
-                  }}
-                >
-                  LB
-                </a>
-              )}
-            </div>
+            />
 
             <p
               style={{

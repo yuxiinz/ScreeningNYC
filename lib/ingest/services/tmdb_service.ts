@@ -31,6 +31,45 @@ type SearchTmdbParams = {
   tmdbApiKey?: string
 }
 
+type TmdbSearchMovieResult = {
+  id: number
+}
+
+type TmdbSearchMovieResponse = {
+  results?: TmdbSearchMovieResult[]
+}
+
+type TmdbMovieDetailResponse = {
+  id: number
+  title?: string
+  original_title?: string
+  release_date?: string
+  runtime?: number
+  overview?: string
+  poster_path?: string | null
+  backdrop_path?: string | null
+  homepage?: string | null
+  genres?: Array<{
+    name?: string
+  }>
+}
+
+type TmdbCreditsPerson = {
+  job?: string
+  name?: string
+}
+
+type TmdbCreditsResponse = {
+  crew?: TmdbCreditsPerson[]
+  cast?: Array<{
+    name?: string
+  }>
+}
+
+type TmdbExternalIdsResponse = {
+  imdb_id?: string | null
+}
+
 export function canonicalizeTitle(title: string): string {
   return stripLeadingBullets(title)
     .replace(/\bpreceded by\b.*$/i, '')
@@ -155,21 +194,27 @@ export async function searchTmdbMovie(params: SearchTmdbParams): Promise<TmdbMov
     return buildFallbackOnly(params)
   }
 
-  const searchRes = await axios.get('https://api.themoviedb.org/3/search/movie', {
-    timeout: 20000,
-    params: {
-      api_key: params.tmdbApiKey,
-      query,
-      include_adult: false,
-    },
-  })
+  const searchRes = await axios.get<TmdbSearchMovieResponse>(
+    'https://api.themoviedb.org/3/search/movie',
+    {
+      timeout: 20000,
+      params: {
+        api_key: params.tmdbApiKey,
+        query,
+        include_adult: false,
+      },
+    }
+  )
 
   const results = searchRes.data?.results || []
   if (!results.length) {
     return buildFallbackOnly(params)
   }
 
-  let best: { detail: any; credits: any } | null = null
+  let best: {
+    detail: TmdbMovieDetailResponse
+    credits: TmdbCreditsResponse
+  } | null = null
   let bestScore = Number.NEGATIVE_INFINITY
 
   for (const candidate of results.slice(0, 6)) {
@@ -177,20 +222,26 @@ export async function searchTmdbMovie(params: SearchTmdbParams): Promise<TmdbMov
 
     try {
       const [detailRes, creditsRes] = await Promise.all([
-        axios.get(`https://api.themoviedb.org/3/movie/${movieId}`, {
+        axios.get<TmdbMovieDetailResponse>(
+          `https://api.themoviedb.org/3/movie/${movieId}`,
+          {
           timeout: 20000,
           params: { api_key: params.tmdbApiKey },
-        }),
-        axios.get(`https://api.themoviedb.org/3/movie/${movieId}/credits`, {
+          }
+        ),
+        axios.get<TmdbCreditsResponse>(
+          `https://api.themoviedb.org/3/movie/${movieId}/credits`,
+          {
           timeout: 20000,
           params: { api_key: params.tmdbApiKey },
-        }),
+          }
+        ),
       ])
 
       const detail = detailRes.data
       const credits = creditsRes.data
 
-      const director = (credits?.crew || []).find((p: any) => p.job === 'Director')?.name
+      const director = (credits.crew || []).find((p) => p.job === 'Director')?.name
       const year = detail?.release_date
         ? Number(String(detail.release_date).slice(0, 4))
         : undefined
@@ -220,7 +271,7 @@ export async function searchTmdbMovie(params: SearchTmdbParams): Promise<TmdbMov
     return buildFallbackOnly(params)
   }
 
-  const externalRes = await axios.get(
+  const externalRes = await axios.get<TmdbExternalIdsResponse>(
     `https://api.themoviedb.org/3/movie/${best.detail.id}/external_ids`,
     {
       timeout: 20000,
@@ -233,17 +284,22 @@ export async function searchTmdbMovie(params: SearchTmdbParams): Promise<TmdbMov
   const external = externalRes.data
 
   const directors = (credits?.crew || [])
-    .filter((p: any) => p.job === 'Director')
+    .filter((p) => p.job === 'Director')
     .slice(0, 3)
-    .map((p: any) => p.name)
+    .map((p) => p.name)
+    .filter(Boolean)
     .join(', ')
 
   const cast = (credits?.cast || [])
     .slice(0, 8)
-    .map((p: any) => p.name)
+    .map((p) => p.name)
+    .filter(Boolean)
     .join(', ')
 
-  const genres = (detail?.genres || []).map((g: any) => g.name).join(', ')
+  const genres = (detail?.genres || [])
+    .map((g) => g.name)
+    .filter(Boolean)
+    .join(', ')
 
   return {
     tmdbId: detail.id,

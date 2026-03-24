@@ -2,6 +2,7 @@
 
 import axios from 'axios'
 import * as cheerio from 'cheerio'
+import type { AnyNode } from 'domhandler'
 import type { ScrapedShowtime, TheaterAdapter, TheaterAdapterConfig } from './types'
 import { fetchHtml } from '../core/http'
 import { formatShowtimeRaw, parseShowtime } from '../core/datetime'
@@ -271,7 +272,7 @@ function buildStableShowtimeId(input: {
 
 function findBestTicketUrl(
   $: cheerio.CheerioAPI,
-  card: cheerio.Cheerio<any>,
+  card: cheerio.Cheerio<AnyNode>,
   sourceUrl?: string
 ): string | undefined {
   const localTicket = card.find('a[href]').filter((_, el) => {

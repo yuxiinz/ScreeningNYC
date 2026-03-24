@@ -1,49 +1,20 @@
-// app/date/page.tsx
+// app/(browse)/date/page.tsx
 
 import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
 import DateSelector from '@/components/DateSelector'
 import TheaterFilter from '@/components/TheaterFilter'
 import { DateTime } from 'luxon'
-import Header from '@/components/Header'
+import MovieExternalLinks from '@/components/movie/MovieExternalLinks'
+import {
+  cleanDirectorText,
+  isTmdbPoster,
+} from '@/lib/movie/display'
 import {
   APP_TIMEZONE,
   formatTimeInAppTimezone,
   getTodayInAppTimezone,
 } from '@/lib/timezone'
-
-function isTmdbPoster(url?: string | null) {
-  return !!url && url.includes('image.tmdb.org')
-}
-
-function cleanDirectorText(input?: string | null) {
-  const text = (input || '').replace(/\s+/g, ' ').trim()
-  if (!text) return 'UNKNOWN'
-
-  const withoutDirectedBy = text.replace(/^directed by\s*/i, '').trim()
-
-  const stopPatterns = [
-    /\b(18|19|20)\d{2}\b/,
-    /\b\d+\s*min\b/i,
-    /\b(4k dcp|dcp|35mm|70mm|imax|digital)\b/i,
-    /\bthe first\b/i,
-    /\bwinner\b/i,
-    /\bpresented\b/i,
-    /\bproduced by\b/i,
-  ]
-
-  let cutIndex = withoutDirectedBy.length
-
-  for (const pattern of stopPatterns) {
-    const match = withoutDirectedBy.match(pattern)
-    if (match && typeof match.index === 'number') {
-      cutIndex = Math.min(cutIndex, match.index)
-    }
-  }
-
-  const cleaned = withoutDirectedBy.slice(0, cutIndex).trim()
-  return cleaned || 'UNKNOWN'
-}
 
 function formatReadableDate(targetDate: string) {
   return DateTime.fromISO(targetDate, { zone: APP_TIMEZONE }).toFormat('LLLL d, yyyy')
@@ -135,25 +106,19 @@ export default async function DatePage({
       }
     }
 
-  groupedByMovie[st.movieId].showtimes.push(st)
-})
+    groupedByMovie[st.movieId].showtimes.push(st)
+  })
 
-
-  const moviesOnDate = Object.values(groupedByMovie)
-    .map((movie: any) => ({
+  const moviesOnDate: GroupedMovie[] = Object.values(groupedByMovie)
+    .map((movie) => ({
       ...movie,
       showtimes: [...movie.showtimes].sort(
-        (a: any, b: any) =>
-          new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+        (a, b) => a.startTime.getTime() - b.startTime.getTime()
       ),
     }))
-    .sort((a: any, b: any) => {
-      const aFirst = a.showtimes[0]
-        ? new Date(a.showtimes[0].startTime).getTime()
-        : Number.MAX_SAFE_INTEGER
-      const bFirst = b.showtimes[0]
-        ? new Date(b.showtimes[0].startTime).getTime()
-        : Number.MAX_SAFE_INTEGER
+    .sort((a, b) => {
+      const aFirst = a.showtimes[0]?.startTime.getTime() ?? Number.MAX_SAFE_INTEGER
+      const bFirst = b.showtimes[0]?.startTime.getTime() ?? Number.MAX_SAFE_INTEGER
       return aFirst - bFirst
     })
 
@@ -169,16 +134,7 @@ export default async function DatePage({
       : `There are ${filmCount} film${filmCount === 1 ? '' : 's'} you can watch on ${formatReadableDate(targetDate)}!`
 
   return (
-    <div
-      style={{
-        backgroundColor: '#0a0a0a',
-        color: '#fff',
-        minHeight: '100vh',
-        padding: '40px 20px',
-      }}
-    >
-      <Header />
-
+    <>
       <main style={{ maxWidth: '1200px', margin: '0 auto' }}>
         <DateSelector currentSafeDate={targetDate} />
 
@@ -205,9 +161,9 @@ export default async function DatePage({
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '60px' }}>
           {moviesOnDate.length > 0 ? (
-            moviesOnDate.map((movie: any) => {
+            moviesOnDate.map((movie) => {
               const posterIsTmdb = isTmdbPoster(movie.posterUrl)
-              const director = cleanDirectorText(movie.directorText)
+              const director = cleanDirectorText(movie.directorText, 'UNKNOWN')
 
               return (
                 <section
@@ -292,71 +248,19 @@ export default async function DatePage({
                       DIRECTED BY {director}
                     </p>
 
-                    <div
+                    <MovieExternalLinks
+                      imdbUrl={movie.imdbUrl}
+                      doubanUrl={movie.doubanUrl}
+                      letterboxdUrl={movie.letterboxdUrl}
+                      size="sm"
+                      showExternalIndicator
                       style={{
-                        display: 'flex',
                         gap: '12px',
                         marginBottom: '30px',
-                        flexWrap: 'wrap',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
                       }}
-                    >
-                      {movie.imdbUrl && (
-                        <a
-                          href={movie.imdbUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            color: '#f5c518',
-                            border: '1px solid #f5c518',
-                            padding: '3px 10px',
-                            borderRadius: '4px',
-                            fontSize: '11px',
-                            fontWeight: 'bold',
-                            textDecoration: 'none',
-                          }}
-                        >
-                          IMDb ↗
-                        </a>
-                      )}
-
-                      {movie.doubanUrl && (
-                        <a
-                          href={movie.doubanUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            color: '#00b51d',
-                            border: '1px solid #00b51d',
-                            padding: '3px 10px',
-                            borderRadius: '4px',
-                            fontSize: '11px',
-                            fontWeight: 'bold',
-                            textDecoration: 'none',
-                          }}
-                        >
-                          豆瓣 ↗
-                        </a>
-                      )}
-
-                      {movie.letterboxdUrl && (
-                        <a
-                          href={movie.letterboxdUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            color: '#ff8000',
-                            border: '1px solid #ff8000',
-                            padding: '3px 10px',
-                            borderRadius: '4px',
-                            fontSize: '11px',
-                            fontWeight: 'bold',
-                            textDecoration: 'none',
-                          }}
-                        >
-                          LB ↗
-                        </a>
-                      )}
-                    </div>
+                    />
 
                     <div
                       style={{
@@ -365,7 +269,7 @@ export default async function DatePage({
                         gap: '12px',
                       }}
                     >
-                      {movie.showtimes.map((st: any) => (
+                      {movie.showtimes.map((st) => (
                         <div
                           key={st.id}
                           style={{
@@ -483,6 +387,6 @@ export default async function DatePage({
       </main>
 
       <footer style={{ height: '100px' }} />
-    </div>
+    </>
   )
 }
