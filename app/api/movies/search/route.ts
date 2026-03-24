@@ -55,7 +55,7 @@ export async function GET(req: Request) {
     return {
       id: m.id,
       title: m.title,
-      year: m.releaseDate ? new Date(m.releaseDate).getFullYear() : null,
+      year: m.releaseDate ? new Date(m.releaseDate).getUTCFullYear() : null,
       status,
     };
   });

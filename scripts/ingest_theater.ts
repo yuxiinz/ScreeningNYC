@@ -4,6 +4,7 @@ import 'dotenv/config'
 import { DateTime } from 'luxon'
 import { getShowtimeScraper } from '../lib/ingest/adapters'
 import { THEATER_META } from '../lib/ingest/config/theater_meta'
+import { APP_TIMEZONE } from '../lib/timezone'
 import {
   searchTmdbMovie,
   canonicalizeTitle,
@@ -20,8 +21,6 @@ import {
   buildFingerprint,
   disconnectPrisma,
 } from '../lib/ingest/services/persist_service'
-
-const TIMEZONE = 'America/New_York'
 
 type KnownTheaterSlug = keyof typeof THEATER_META
 type TheaterSlug = KnownTheaterSlug | string
@@ -140,7 +139,7 @@ function toErrorMessage(error: unknown): string {
 
 function formatLocalTime(date: Date): string {
   return DateTime.fromJSDate(date)
-    .setZone(TIMEZONE)
+    .setZone(APP_TIMEZONE)
     .toFormat('yyyy-MM-dd HH:mm')
 }
 

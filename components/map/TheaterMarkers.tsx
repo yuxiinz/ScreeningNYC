@@ -7,6 +7,7 @@ import { Marker, Tooltip } from 'react-leaflet'
 import { useRouter } from 'next/navigation'
 import { createEmojiIcon } from './icons'
 import type { TheaterForMap } from './types'
+import { getTodayInAppTimezone } from '@/lib/timezone'
 
 export default function TheaterMarkers({
   theaters,
@@ -36,7 +37,7 @@ export default function TheaterMarkers({
             icon={theaterIcon}
             eventHandlers={{
               click: () => {
-                const today = new Date().toISOString().split('T')[0]
+                const today = getTodayInAppTimezone()
                 router.push(`/date?date=${today}&theaters=${theater.slug}`)
               },
             }}

@@ -6,17 +6,14 @@ import DateSelector from '@/components/DateSelector'
 import TheaterFilter from '@/components/TheaterFilter'
 import { DateTime } from 'luxon'
 import Header from '@/components/Header'
-
-const TIMEZONE = 'America/New_York'
+import {
+  APP_TIMEZONE,
+  formatTimeInAppTimezone,
+  getTodayInAppTimezone,
+} from '@/lib/timezone'
 
 function isTmdbPoster(url?: string | null) {
   return !!url && url.includes('image.tmdb.org')
-}
-
-function formatShowTime(date: Date) {
-  return DateTime.fromJSDate(new Date(date))
-    .setZone(TIMEZONE)
-    .toFormat('HH:mm')
 }
 
 function cleanDirectorText(input?: string | null) {
@@ -49,7 +46,7 @@ function cleanDirectorText(input?: string | null) {
 }
 
 function formatReadableDate(targetDate: string) {
-  return DateTime.fromISO(targetDate, { zone: TIMEZONE }).toFormat('LLLL d, yyyy')
+  return DateTime.fromISO(targetDate, { zone: APP_TIMEZONE }).toFormat('LLLL d, yyyy')
 }
 
 export default async function DatePage({
@@ -64,12 +61,12 @@ export default async function DatePage({
     .map(s => s.trim())
     .filter(Boolean)
 
-  const nowNy = DateTime.now().setZone(TIMEZONE)
-  const today = nowNy.toFormat('yyyy-MM-dd')
+  const nowNy = DateTime.now().setZone(APP_TIMEZONE)
+  const today = getTodayInAppTimezone(nowNy.toJSDate())
   const targetDate = selectedDateStr || today
 
-  const startOfDayNy = DateTime.fromISO(targetDate, { zone: TIMEZONE }).startOf('day')
-  const endOfDayNy = DateTime.fromISO(targetDate, { zone: TIMEZONE }).endOf('day')
+  const startOfDayNy = DateTime.fromISO(targetDate, { zone: APP_TIMEZONE }).startOf('day')
+  const endOfDayNy = DateTime.fromISO(targetDate, { zone: APP_TIMEZONE }).endOf('day')
 
   const queryStartNy = startOfDayNy < nowNy ? nowNy : startOfDayNy
 
@@ -398,7 +395,7 @@ export default async function DatePage({
                                 fontFamily: 'monospace',
                               }}
                             >
-                              {formatShowTime(st.startTime)}
+                              {formatTimeInAppTimezone(st.startTime)}
                             </span>
 
                             <span

@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
 
 function getYear(date?: Date | null) {
   if (!date) return ''
-  return new Date(date).getFullYear()
+  return new Date(date).getUTCFullYear()
 }
 
 function isTmdbPoster(url?: string | null) {

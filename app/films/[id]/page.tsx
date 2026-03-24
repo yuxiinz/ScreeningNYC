@@ -3,6 +3,11 @@
 import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
 import BackButton from '@/components/BackButton'
+import {
+  formatDateKeyInAppTimezone,
+  formatTimeInAppTimezone,
+  getDateKeyInAppTimezone,
+} from '@/lib/timezone'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,25 +15,9 @@ function isTmdbPoster(url?: string | null) {
   return !!url && url.includes('image.tmdb.org')
 }
 
-function formatShowDate(date: string) {
-  return new Date(date).toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  }).toUpperCase()
-}
-
-function formatShowTime(date: Date) {
-  return new Date(date).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  })
-}
-
 function getYear(date?: Date | null) {
   if (!date) return ''
-  return String(new Date(date).getFullYear())
+  return String(new Date(date).getUTCFullYear())
 }
 
 function cleanDirectorText(input?: string | null) {
@@ -138,7 +127,7 @@ export default async function MovieDetailPage({
 
   const groupedByDate: Record<string, typeof movie.showtimes> = {}
   movie.showtimes.forEach((st: (typeof movie.showtimes)[number]) => {
-    const date = new Date(st.startTime).toISOString().split('T')[0]
+    const date = getDateKeyInAppTimezone(st.startTime)
     if (!groupedByDate[date]) groupedByDate[date] = []
     groupedByDate[date].push(st)
   })
@@ -355,7 +344,7 @@ export default async function MovieDetailPage({
                     letterSpacing: '1px',
                   }}
                 >
-                  {formatShowDate(date)}
+                  {formatDateKeyInAppTimezone(date)}
                 </h3>
 
                 <div
@@ -395,7 +384,7 @@ export default async function MovieDetailPage({
                             fontFamily: 'monospace',
                           }}
                         >
-                          {formatShowTime(st.startTime)}
+                          {formatTimeInAppTimezone(st.startTime)}
                         </span>
 
                         <span

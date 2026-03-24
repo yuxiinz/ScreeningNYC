@@ -1,10 +1,9 @@
 import crypto from 'crypto'
 import { DateTime } from 'luxon'
 import { prisma } from '../../prisma'
+import { APP_TIMEZONE } from '../../timezone'
 import type { TmdbMovie } from './tmdb_service'
 import { canonicalizeTitle } from './tmdb_service'
-
-const TIMEZONE = 'America/New_York'
 
 type PersistConfig = {
   theaterName: string
@@ -94,7 +93,7 @@ export function parseStartTime(raw: string): Date | null {
   const cleaned = normalizeWhitespace(raw)
   if (!cleaned) return null
 
-  const now = DateTime.now().setZone(TIMEZONE)
+  const now = DateTime.now().setZone(APP_TIMEZONE)
   const hasExplicitYear = /\b(18|19|20)\d{2}\b/.test(cleaned)
 
   const withoutWeekday = cleaned
@@ -216,7 +215,7 @@ export function parseStartTime(raw: string): Date | null {
 
   for (const candidate of candidates) {
     for (const fmt of formats) {
-      const dt = DateTime.fromFormat(candidate, fmt, { zone: TIMEZONE })
+      const dt = DateTime.fromFormat(candidate, fmt, { zone: APP_TIMEZONE })
 
       if (dt.isValid) {
         let finalDt = dt
@@ -238,12 +237,12 @@ export function parseStartTime(raw: string): Date | null {
     }
   }
 
-  const iso = DateTime.fromISO(cleaned, { zone: TIMEZONE })
+  const iso = DateTime.fromISO(cleaned, { zone: APP_TIMEZONE })
   if (iso.isValid) return iso.toUTC().toJSDate()
 
   const native = new Date(cleaned)
   if (!isNaN(native.getTime())) {
-    let dt = DateTime.fromJSDate(native).setZone(TIMEZONE, { keepLocalTime: true })
+    let dt = DateTime.fromJSDate(native).setZone(APP_TIMEZONE, { keepLocalTime: true })
 
     if (!hasAmPm && dt.hour >= 1 && dt.hour <= 10) {
       dt = dt.plus({ hours: 12 })
@@ -531,7 +530,7 @@ export async function markMissingShowtimesAsCanceled(
   currentFingerprints: string[]
 ) {
   const now = new Date()
-  const future30Days = DateTime.now().plus({ days: 30 }).toJSDate()
+  const future30Days = DateTime.now().setZone(APP_TIMEZONE).plus({ days: 30 }).toJSDate()
 
   await prisma.showtime.updateMany({
     where: {

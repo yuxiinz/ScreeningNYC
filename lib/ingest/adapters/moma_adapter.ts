@@ -13,6 +13,7 @@ import {
   normalizeWhitespace,
 } from '../core/text'
 import { buildAbsoluteUrl } from '../core/url'
+import { getTodayInAppTimezone } from '../../timezone'
 
 const MOMA_BASE_URL = 'https://www.moma.org'
 const DEFAULT_MOMA_FILMS_URL =
@@ -204,7 +205,7 @@ async function scrapeAllListingRows(listingUrl: string): Promise<ListingRow[]> {
 
   const dateParam =
     extractCalendarDateFromUrl(listingUrl) ||
-    new Date().toISOString().slice(0, 10)
+    getTodayInAppTimezone()
 
   let emptyPageStreak = 0
   const maxPages = 20
