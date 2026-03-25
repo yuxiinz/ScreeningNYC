@@ -339,7 +339,12 @@ async function findLocalMovieBySignature(input: {
   const yearDate = releaseYearToDate(input.releaseYear)
 
   const candidates = await prisma.movie.findMany({
-    where: { title: canonicalTitle },
+    where: {
+      title: {
+        equals: canonicalTitle,
+        mode: 'insensitive',
+      },
+    },
     orderBy: { id: 'asc' },
   })
 

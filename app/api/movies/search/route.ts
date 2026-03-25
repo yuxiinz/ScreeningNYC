@@ -3,6 +3,16 @@ import type { MovieSearchResult, MovieSearchStatus } from '@/lib/movie/search'
 import { prisma } from '@/lib/prisma'
 import { NextResponse } from 'next/server'
 
+function normalizeSearchTitle(title?: string | null) {
+  return (title || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[’']/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const q = searchParams.get('q')?.trim()
@@ -38,6 +48,10 @@ export async function GET(req: Request) {
           },
           status: 'SCHEDULED',
         },
+        select: {
+          startTime: true,
+          theaterId: true,
+        },
         take: 1,
       },
     },
@@ -47,7 +61,29 @@ export async function GET(req: Request) {
     },
   })
 
-  const result: MovieSearchResult[] = movies.map((movie) => {
+  const dedupedMovies = movies.filter((movie, index, arr) => {
+    const firstShowtime = movie.showtimes[0]
+    const normalizedTitle = normalizeSearchTitle(movie.title)
+    const year = getReleaseYear(movie.releaseDate)
+    const dedupeKey = firstShowtime
+      ? `${normalizedTitle}|${firstShowtime.startTime.toISOString()}|${firstShowtime.theaterId}`
+      : `${normalizedTitle}|${year ?? ''}`
+
+    return (
+      arr.findIndex((candidate) => {
+        const candidateShowtime = candidate.showtimes[0]
+        const candidateTitle = normalizeSearchTitle(candidate.title)
+        const candidateYear = getReleaseYear(candidate.releaseDate)
+        const candidateKey = candidateShowtime
+          ? `${candidateTitle}|${candidateShowtime.startTime.toISOString()}|${candidateShowtime.theaterId}`
+          : `${candidateTitle}|${candidateYear ?? ''}`
+
+        return candidateKey === dedupeKey
+      }) === index
+    )
+  })
+
+  const result: MovieSearchResult[] = dedupedMovies.map((movie) => {
     let status: MovieSearchStatus = 'NONE'
 
     if (movie.showtimes.length > 0) {
