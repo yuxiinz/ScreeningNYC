@@ -46,6 +46,9 @@ type TheaterRunStats = {
 }
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY || ''
+const THEATER_SLUG_GROUPS: Record<string, string[]> = {
+  angelika: ['angelikanyc', 'angelikaev', 'angelika123'],
+}
 
 const THEATER_CONFIGS: TheaterIngestConfig[] = [
   {
@@ -92,13 +95,59 @@ const THEATER_CONFIGS: TheaterIngestConfig[] = [
       'https://www.moma.org/calendar/?happening_filter=Films&locale=en&location=both',
     officialSiteUrl: process.env.MOMA_OFFICIAL_URL || 'https://www.moma.org',
   },
+  {
+    theaterName: 'Anthology Film Archives',
+    theaterSlug: 'anthology',
+    sourceName: 'anthology',
+    sourceUrl:
+      process.env.ANTHOLOGY_SHOWTIMES_URL ||
+      'https://ticketing.uswest.veezi.com/sessions/?siteToken=bsrxtagjxmgh2qy0b6p646xdcr',
+    officialSiteUrl:
+      process.env.ANTHOLOGY_OFFICIAL_URL ||
+      'https://www.anthologyfilmarchives.org',
+  },
+  {
+    theaterName: 'Angelika New York',
+    theaterSlug: 'angelikaNYC',
+    sourceName: 'angelika',
+    sourceUrl:
+      process.env.ANGELIKA_NYC_SHOWTIMES_URL ||
+      'https://angelikafilmcenter.com/nyc/now-playing',
+    officialSiteUrl:
+      process.env.ANGELIKA_NYC_OFFICIAL_URL ||
+      'https://angelikafilmcenter.com/nyc/',
+  },
+  {
+    theaterName: 'Village East by Angelika',
+    theaterSlug: 'angelikaEV',
+    sourceName: 'angelika',
+    sourceUrl:
+      process.env.ANGELIKA_EV_SHOWTIMES_URL ||
+      'https://angelikafilmcenter.com/villageeast/now-playing',
+    officialSiteUrl:
+      process.env.ANGELIKA_EV_OFFICIAL_URL ||
+      'https://angelikafilmcenter.com/villageeast/',
+  },
+  {
+    theaterName: 'Cinema 123 by Angelika',
+    theaterSlug: 'angelika123',
+    sourceName: 'angelika',
+    sourceUrl:
+      process.env.ANGELIKA_123_SHOWTIMES_URL ||
+      'https://angelikafilmcenter.com/cinemas123/now-playing',
+    officialSiteUrl:
+      process.env.ANGELIKA_123_OFFICIAL_URL ||
+      'https://angelikafilmcenter.com/cinemas123/',
+  },
 ]
 
 function getRequestedTheaterSlugs(): string[] {
-  return process.argv
+  const requested = process.argv
     .slice(2)
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean)
+
+  return [...new Set(requested.flatMap((slug) => THEATER_SLUG_GROUPS[slug] || [slug]))]
 }
 
 function normalizeWhitespace(input?: string | null): string {
@@ -195,6 +244,10 @@ async function ingestOneTheater(
     parsedCount += 1
 
     const canonicalTitle = canonicalizeTitle(item.movieTitle)
+    const fallbackMovieTitle = item.shownTitle || canonicalTitle
+    const matchedMovieTitle = canonicalizeTitle(
+      item.matchedMovieTitleHint || item.movieTitle
+    )
     const formatName = normalizeFormat(item.rawFormat)
 
     const preFingerprint = buildFingerprint({
@@ -225,7 +278,7 @@ async function ingestOneTheater(
 
     if (isProgram) {
       movie = await upsertLocalMovie({
-        title: canonicalTitle,
+        title: fallbackMovieTitle,
         releaseYear: item.releaseYear,
         runtimeMinutes: item.runtimeMinutes,
         overview: item.overview,
@@ -237,6 +290,7 @@ async function ingestOneTheater(
     } else if (TMDB_API_KEY) {
       const tmdbMovie = await searchTmdbMovie({
         title: item.movieTitle,
+        titleCandidates: item.tmdbTitleCandidates,
         directorText: item.directorText,
         releaseYear: item.releaseYear,
         runtimeMinutes: item.runtimeMinutes,
@@ -244,8 +298,12 @@ async function ingestOneTheater(
       })
 
       if (tmdbMovie.tmdbId) {
+        const tmdbMatchedTitle = canonicalizeTitle(
+          tmdbMovie.matchedQueryTitle || matchedMovieTitle || canonicalTitle
+        )
+
         movie = await upsertMovie(tmdbMovie, {
-          title: canonicalTitle,
+          title: tmdbMatchedTitle,
           directorText: item.directorText,
           releaseYear: item.releaseYear,
           runtimeMinutes: item.runtimeMinutes,
@@ -253,10 +311,11 @@ async function ingestOneTheater(
           posterUrl: item.posterUrl,
           officialSiteUrl: item.sourceUrl,
           genresText: config.theaterName,
+          preferTitle: item.preferMovieTitleForDisplay,
         })
       } else {
         movie = await upsertLocalMovie({
-          title: canonicalTitle,
+          title: fallbackMovieTitle,
           releaseYear: item.releaseYear,
           runtimeMinutes: item.runtimeMinutes,
           overview: item.overview,
@@ -268,7 +327,7 @@ async function ingestOneTheater(
       }
     } else {
       movie = await upsertLocalMovie({
-        title: canonicalTitle,
+        title: fallbackMovieTitle,
         releaseYear: item.releaseYear,
         runtimeMinutes: item.runtimeMinutes,
         overview: item.overview,
@@ -295,6 +354,7 @@ async function ingestOneTheater(
       startTime: parsedStart,
       runtimeMinutes: item.runtimeMinutes,
       ticketUrl: item.ticketUrl,
+      shownTitle: item.shownTitle,
       sourceUrl: item.sourceUrl,
       sourceShowtimeId: item.sourceShowtimeId,
       fingerprint,

@@ -24,7 +24,10 @@ export type FallbackMovieData = {
   posterUrl?: string
   officialSiteUrl?: string
   genresText?: string
+  preferTitle?: boolean
 }
+
+let showtimeShownTitleColumnSupportPromise: Promise<boolean> | null = null
 
 function normalizeWhitespace(input?: string | null): string {
   return (input || '').replace(/\s+/g, ' ').replace(/\u00a0/g, ' ').trim()
@@ -73,12 +76,33 @@ function choosePosterUrl(params: {
   return fallbackGood || existingGood || undefined
 }
 
+async function supportsShowtimeShownTitleColumn(): Promise<boolean> {
+  if (!showtimeShownTitleColumnSupportPromise) {
+    showtimeShownTitleColumnSupportPromise = prisma
+      .$queryRawUnsafe<Array<{ exists: boolean }>>(
+        `select exists (
+          select 1
+          from information_schema.columns
+          where table_schema = 'public'
+            and table_name = 'Showtime'
+            and column_name = 'shownTitle'
+        ) as "exists"`
+      )
+      .then((rows) => Boolean(rows[0]?.exists))
+      .catch(() => false)
+  }
+
+  return showtimeShownTitleColumnSupportPromise
+}
+
 export function normalizeFormat(raw?: string | null): string {
   const s = normalizeWhitespace(raw).toLowerCase()
 
   if (!s) return 'Standard'
   if (s.includes('70mm')) return '70mm'
   if (s.includes('35mm')) return '35mm'
+  if (s.includes('16mm')) return '16mm'
+  if (s.includes('super-8') || s.includes('super 8')) return 'Super 8'
   if (s.includes('imax')) return 'IMAX'
   if (s.includes('3d')) return '3D'
   if (s.includes('dolby')) return 'Dolby'
@@ -387,12 +411,14 @@ export async function upsertLocalMovie(fallback: FallbackMovieData) {
 export async function upsertMovie(tmdb: TmdbMovie, fallback?: FallbackMovieData) {
   const fallbackTitle = canonicalizeTitle(fallback?.title || tmdb.title || 'Untitled')
   const fallbackReleaseDate = releaseYearToDate(fallback?.releaseYear)
+  const preferredTitle =
+    fallback?.preferTitle && fallbackTitle ? fallbackTitle : tmdb.title || fallbackTitle
 
   if (tmdb.tmdbId) {
     return prisma.movie.upsert({
       where: { tmdbId: tmdb.tmdbId },
       update: {
-        title: tmdb.title || fallbackTitle,
+        title: preferredTitle,
         originalTitle: tmdb.originalTitle,
         releaseDate: tmdb.releaseDate || fallbackReleaseDate,
         runtimeMinutes: tmdb.runtimeMinutes || fallback?.runtimeMinutes,
@@ -410,7 +436,7 @@ export async function upsertMovie(tmdb: TmdbMovie, fallback?: FallbackMovieData)
       },
       create: {
         tmdbId: tmdb.tmdbId,
-        title: tmdb.title || fallbackTitle,
+        title: preferredTitle,
         originalTitle: tmdb.originalTitle,
         releaseDate: tmdb.releaseDate || fallbackReleaseDate,
         runtimeMinutes: tmdb.runtimeMinutes || fallback?.runtimeMinutes,
@@ -490,38 +516,45 @@ export async function upsertShowtime(params: {
   startTime: Date
   runtimeMinutes?: number
   ticketUrl?: string
+  shownTitle?: string
   sourceUrl?: string
   sourceShowtimeId?: string
   fingerprint: string
   sourceName: string
 }) {
+  const shownTitleSupported = await supportsShowtimeShownTitleColumn()
+  const updateData = {
+    runtimeMinutes: params.runtimeMinutes,
+    ticketUrl: params.ticketUrl,
+    sourceUrl: params.sourceUrl,
+    sourceName: params.sourceName,
+    sourceShowtimeId: params.sourceShowtimeId,
+    formatId: params.formatId,
+    startTime: params.startTime,
+    status: 'SCHEDULED' as const,
+    lastVerifiedAt: new Date(),
+    ...(shownTitleSupported ? { shownTitle: params.shownTitle } : {}),
+  }
+  const createData = {
+    movieId: params.movieId,
+    theaterId: params.theaterId,
+    formatId: params.formatId,
+    startTime: params.startTime,
+    runtimeMinutes: params.runtimeMinutes,
+    ticketUrl: params.ticketUrl,
+    sourceUrl: params.sourceUrl,
+    sourceName: params.sourceName,
+    sourceShowtimeId: params.sourceShowtimeId,
+    fingerprint: params.fingerprint,
+    status: 'SCHEDULED' as const,
+    lastVerifiedAt: new Date(),
+    ...(shownTitleSupported ? { shownTitle: params.shownTitle } : {}),
+  }
+
   return prisma.showtime.upsert({
     where: { fingerprint: params.fingerprint },
-    update: {
-      runtimeMinutes: params.runtimeMinutes,
-      ticketUrl: params.ticketUrl,
-      sourceUrl: params.sourceUrl,
-      sourceName: params.sourceName,
-      sourceShowtimeId: params.sourceShowtimeId,
-      formatId: params.formatId,
-      startTime: params.startTime,
-      status: 'SCHEDULED',
-      lastVerifiedAt: new Date(),
-    },
-    create: {
-      movieId: params.movieId,
-      theaterId: params.theaterId,
-      formatId: params.formatId,
-      startTime: params.startTime,
-      runtimeMinutes: params.runtimeMinutes,
-      ticketUrl: params.ticketUrl,
-      sourceUrl: params.sourceUrl,
-      sourceName: params.sourceName,
-      sourceShowtimeId: params.sourceShowtimeId,
-      fingerprint: params.fingerprint,
-      status: 'SCHEDULED',
-      lastVerifiedAt: new Date(),
-    },
+    update: updateData,
+    create: createData,
   })
 }
 

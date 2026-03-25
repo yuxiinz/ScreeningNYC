@@ -43,12 +43,17 @@ export function parseRuntimeMinutes(value?: string | null): number | undefined {
   const cleaned = normalizeWhitespace(value)
 
   const minuteMatch =
-    cleaned.match(/(\d+)\s*minutes?\b/i) ||
-    cleaned.match(/(\d+)\s*mins?\b/i) ||
-    cleaned.match(/(\d+)\s*min\.?\b/i) ||
-    cleaned.match(/^\s*(\d+)\s*m\s*$/i)
+    cleaned.match(/(\d+(?:\.\d+)?)\s*minutes?\b/i) ||
+    cleaned.match(/(\d+(?:\.\d+)?)\s*mins?\b/i) ||
+    cleaned.match(/(\d+(?:\.\d+)?)\s*min\.?\b/i) ||
+    cleaned.match(/^\s*(\d+(?:\.\d+)?)\s*m\s*$/i)
 
-  return minuteMatch ? Number(minuteMatch[1]) : undefined
+  if (!minuteMatch) return undefined
+
+  const runtime = Number(minuteMatch[1])
+  if (!Number.isFinite(runtime)) return undefined
+
+  return Math.round(runtime)
 }
 
 export function parseFormat(value?: string | null): string | undefined {

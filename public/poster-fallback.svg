@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1200" role="img" aria-labelledby="title desc">
+  <title id="title">Fallback poster</title>
+  <desc id="desc">Generic fallback poster used when no valid poster image is available.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e7ecef" />
+      <stop offset="100%" stop-color="#c8d0d7" />
+    </linearGradient>
+  </defs>
+  <rect width="800" height="1200" fill="url(#bg)" />
+  <rect x="52" y="52" width="696" height="1096" fill="none" stroke="#1b1e21" stroke-width="8" />
+  <rect x="112" y="128" width="576" height="404" rx="18" fill="#1b1e21" />
+  <circle cx="270" cy="262" r="54" fill="#c8d0d7" />
+  <path d="M168 470 L314 322 L402 406 L498 286 L632 470 Z" fill="#c8d0d7" />
+  <text x="400" y="706" fill="#1b1e21" font-size="70" font-family="Georgia, 'Times New Roman', serif" text-anchor="middle" letter-spacing="6">
+    NO POSTER
+  </text>
+  <text x="400" y="790" fill="#1b1e21" font-size="34" font-family="'Courier New', monospace" text-anchor="middle" letter-spacing="5">
+    IMAGE UNAVAILABLE
+  </text>
+  <text x="400" y="1034" fill="#1b1e21" font-size="24" font-family="'Courier New', monospace" text-anchor="middle" letter-spacing="4">
+    FALLBACK ARTWORK
+  </text>
+</svg>

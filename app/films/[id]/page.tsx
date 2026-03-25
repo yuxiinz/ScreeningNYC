@@ -20,7 +20,7 @@ import {
 export const dynamic = 'force-dynamic'
 
 const SHOWTIME_ROW_CLASS =
-  'flex flex-wrap items-center justify-between gap-4 rounded-panel border border-border-default bg-card-bg px-5 py-[15px]'
+  'flex flex-wrap items-start justify-between gap-4 rounded-panel border border-border-default bg-card-bg px-5 py-[15px]'
 const SHOWTIME_META_CLASS = 'flex flex-wrap items-baseline gap-5'
 
 function getPosterImageClass(posterIsTmdb: boolean) {
@@ -28,6 +28,17 @@ function getPosterImageClass(posterIsTmdb: boolean) {
     'block h-full w-full bg-card-bg',
     posterIsTmdb ? 'object-cover' : 'object-contain',
   ].join(' ')
+}
+
+function getShowtimeDisplayTitle(shownTitle?: string | null, movieTitle?: string | null) {
+  const shown = (shownTitle || '').replace(/\s+/g, ' ').trim()
+  const movie = (movieTitle || '').replace(/\s+/g, ' ').trim()
+
+  if (!shown) return ''
+  if (!movie) return shown
+  if (shown.toLowerCase() === movie.toLowerCase()) return ''
+
+  return shown
 }
 
 function extractMetaFromOverview(input?: string | null) {
@@ -89,7 +100,12 @@ export default async function MovieDetailPage({
     where: { id: parseInt(id, 10) },
     include: {
       showtimes: {
-        include: {
+        select: {
+          id: true,
+          startTime: true,
+          runtimeMinutes: true,
+          ticketUrl: true,
+          shownTitle: true,
           theater: true,
           format: true,
         },
@@ -186,26 +202,35 @@ export default async function MovieDetailPage({
                 <div className="flex flex-col gap-2.5">
                   {showtimes.map(showtime => (
                     <div key={showtime.id} className={SHOWTIME_ROW_CLASS}>
-                      <div className={SHOWTIME_META_CLASS}>
-                        <span className="font-mono text-[1.2rem] font-bold">
-                          {formatTimeInAppTimezone(showtime.startTime)}
-                        </span>
-
-                        <span className="text-[0.9rem] text-text-muted">
-                          {showtime.theater.name.toUpperCase()}
-                        </span>
-
-                        {(showtime.runtimeMinutes || movie.runtimeMinutes) && (
-                          <span className="text-[0.85rem] text-text-dim">
-                            {showtime.runtimeMinutes || movie.runtimeMinutes} MIN
-                          </span>
+                      <div className="min-w-0 flex-1">
+                        {getShowtimeDisplayTitle(showtime.shownTitle, movie.title) && (
+                          <p className="mb-1 text-[0.82rem] leading-[1.4] text-text-soft">
+                            {getShowtimeDisplayTitle(showtime.shownTitle, movie.title)}
+                          </p>
                         )}
 
-                        {(showtime.format?.name || displayFormat) && (
-                          <span className="text-[0.85rem] text-text-dim">
-                            {(showtime.format?.name || displayFormat).toUpperCase()}
+                        <div className={SHOWTIME_META_CLASS}>
+                          <span className="font-mono text-[1.2rem] font-bold">
+                            {formatTimeInAppTimezone(showtime.startTime)}
                           </span>
-                        )}
+
+                          <span className="text-[0.9rem] text-text-muted">
+                            {showtime.theater.name.toUpperCase()}
+                          </span>
+
+                          {(showtime.runtimeMinutes || movie.runtimeMinutes) && (
+                            <span className="text-[0.85rem] text-text-dim">
+                              {showtime.runtimeMinutes || movie.runtimeMinutes} MIN
+                            </span>
+                          )}
+
+                          {(showtime.format?.name || displayFormat) && (
+                            <span className="text-[0.85rem] text-text-dim">
+                              {(showtime.format?.name || displayFormat).toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+
                       </div>
 
                       {showtime.ticketUrl ? (

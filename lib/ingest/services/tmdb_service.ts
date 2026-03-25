@@ -21,10 +21,12 @@ export type TmdbMovie = {
   genresText?: string
   directorText?: string
   castText?: string
+  matchedQueryTitle?: string
 }
 
 type SearchTmdbParams = {
   title: string
+  titleCandidates?: string[]
   directorText?: string
   releaseYear?: number
   runtimeMinutes?: number
@@ -189,81 +191,92 @@ export async function searchTmdbMovie(params: SearchTmdbParams): Promise<TmdbMov
     return buildFallbackOnly(params)
   }
 
-  const query = canonicalizeTitle(params.title)
-  if (!query) {
-    return buildFallbackOnly(params)
-  }
+  const candidateQueries = [
+    canonicalizeTitle(params.title),
+    ...(params.titleCandidates || []).map((candidate) => canonicalizeTitle(candidate)),
+  ]
+    .map((candidate) => normalizeWhitespace(candidate))
+    .filter(Boolean)
+    .filter((candidate, index, arr) => arr.indexOf(candidate) === index)
+    .slice(0, 6)
 
-  const searchRes = await axios.get<TmdbSearchMovieResponse>(
-    'https://api.themoviedb.org/3/search/movie',
-    {
-      timeout: 20000,
-      params: {
-        api_key: params.tmdbApiKey,
-        query,
-        include_adult: false,
-      },
-    }
-  )
-
-  const results = searchRes.data?.results || []
-  if (!results.length) {
+  if (!candidateQueries.length) {
     return buildFallbackOnly(params)
   }
 
   let best: {
     detail: TmdbMovieDetailResponse
     credits: TmdbCreditsResponse
+    matchedQuery: string
   } | null = null
   let bestScore = Number.NEGATIVE_INFINITY
 
-  for (const candidate of results.slice(0, 6)) {
-    const movieId = candidate.id
-
-    try {
-      const [detailRes, creditsRes] = await Promise.all([
-        axios.get<TmdbMovieDetailResponse>(
-          `https://api.themoviedb.org/3/movie/${movieId}`,
-          {
-          timeout: 20000,
-          params: { api_key: params.tmdbApiKey },
-          }
-        ),
-        axios.get<TmdbCreditsResponse>(
-          `https://api.themoviedb.org/3/movie/${movieId}/credits`,
-          {
-          timeout: 20000,
-          params: { api_key: params.tmdbApiKey },
-          }
-        ),
-      ])
-
-      const detail = detailRes.data
-      const credits = creditsRes.data
-
-      const director = (credits.crew || []).find((p) => p.job === 'Director')?.name
-      const year = detail?.release_date
-        ? Number(String(detail.release_date).slice(0, 4))
-        : undefined
-
-      const score = scoreCandidate({
-        scrapedTitle: query,
-        scrapedDirector: params.directorText,
-        scrapedYear: params.releaseYear,
-        scrapedRuntime: params.runtimeMinutes,
-        candidateTitle: detail.title,
-        candidateOriginalTitle: detail.original_title,
-        candidateYear: year,
-        candidateDirector: director,
-        candidateRuntime: detail.runtime,
-      })
-
-      if (score > bestScore) {
-        bestScore = score
-        best = { detail, credits }
+  for (const query of candidateQueries) {
+    const searchRes = await axios.get<TmdbSearchMovieResponse>(
+      'https://api.themoviedb.org/3/search/movie',
+      {
+        timeout: 20000,
+        params: {
+          api_key: params.tmdbApiKey,
+          query,
+          include_adult: false,
+        },
       }
-    } catch {
+    )
+
+    const results = searchRes.data?.results || []
+    if (!results.length) {
       continue
+    }
+
+    for (const candidate of results.slice(0, 6)) {
+      const movieId = candidate.id
+
+      try {
+        const [detailRes, creditsRes] = await Promise.all([
+          axios.get<TmdbMovieDetailResponse>(
+            `https://api.themoviedb.org/3/movie/${movieId}`,
+            {
+              timeout: 20000,
+              params: { api_key: params.tmdbApiKey },
+            }
+          ),
+          axios.get<TmdbCreditsResponse>(
+            `https://api.themoviedb.org/3/movie/${movieId}/credits`,
+            {
+              timeout: 20000,
+              params: { api_key: params.tmdbApiKey },
+            }
+          ),
+        ])
+
+        const detail = detailRes.data
+        const credits = creditsRes.data
+
+        const director = (credits.crew || []).find((p) => p.job === 'Director')?.name
+        const year = detail?.release_date
+          ? Number(String(detail.release_date).slice(0, 4))
+          : undefined
+
+        const score = scoreCandidate({
+          scrapedTitle: query,
+          scrapedDirector: params.directorText,
+          scrapedYear: params.releaseYear,
+          scrapedRuntime: params.runtimeMinutes,
+          candidateTitle: detail.title,
+          candidateOriginalTitle: detail.original_title,
+          candidateYear: year,
+          candidateDirector: director,
+          candidateRuntime: detail.runtime,
+        })
+
+        if (score > bestScore) {
+          bestScore = score
+          best = { detail, credits, matchedQuery: query }
+        }
+      } catch {
+        continue
+      }
     }
   }
 
@@ -303,7 +316,7 @@ export async function searchTmdbMovie(params: SearchTmdbParams): Promise<TmdbMov
 
   return {
     tmdbId: detail.id,
-    title: detail.title || query,
+    title: detail.title || best.matchedQuery,
     originalTitle: detail.original_title || undefined,
     releaseDate: detail.release_date ? new Date(detail.release_date) : undefined,
     runtimeMinutes: detail.runtime || params.runtimeMinutes,
@@ -319,5 +332,6 @@ export async function searchTmdbMovie(params: SearchTmdbParams): Promise<TmdbMov
     genresText: genres || undefined,
     directorText: directors || params.directorText,
     castText: cast || undefined,
+    matchedQueryTitle: best.matchedQuery,
   }
 }

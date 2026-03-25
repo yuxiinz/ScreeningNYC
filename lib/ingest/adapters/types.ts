@@ -2,6 +2,7 @@
 
 export type ScrapedShowtime = {
   movieTitle: string
+  shownTitle?: string
   startTimeRaw: string
   ticketUrl?: string
   sourceUrl?: string
@@ -12,6 +13,9 @@ export type ScrapedShowtime = {
   runtimeMinutes?: number
   overview?: string
   posterUrl?: string
+  tmdbTitleCandidates?: string[]
+  preferMovieTitleForDisplay?: boolean
+  matchedMovieTitleHint?: string
 }
 
 export type TheaterAdapterConfig = {

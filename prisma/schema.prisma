@@ -77,6 +77,7 @@ model Showtime {
   endTime          DateTime?
   runtimeMinutes   Int?
   ticketUrl        String?
+  shownTitle       String?
 
   sourceName       String?
   sourceUrl        String?
