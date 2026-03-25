@@ -1,25 +1,19 @@
 // components/FilmSearchBox.tsx
 
-"use client";
+'use client'
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-
-type MovieResult = {
-  id: number;
-  title: string;
-  year?: number | null;
-  status: "NOW_SHOWING" | "UPCOMING" | "NONE";
-};
+import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import type { MovieSearchResult } from '@/lib/movie/search'
 
 export default function FilmSearchBox() {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<MovieResult[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<MovieSearchResult[]>([])
+  const [loading, setLoading] = useState(false)
+  const [open, setOpen] = useState(false)
 
-  const router = useRouter();
-  const wrapperRef = useRef<HTMLDivElement>(null);
+  const router = useRouter()
+  const wrapperRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -27,153 +21,109 @@ export default function FilmSearchBox() {
         wrapperRef.current &&
         !wrapperRef.current.contains(event.target as Node)
       ) {
-        setOpen(false);
+        setOpen(false)
       }
     }
 
     function handleEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOpen(false);
+      if (event.key === 'Escape') {
+        setOpen(false)
       }
     }
 
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleEscape);
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
 
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, []);
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [])
 
   useEffect(() => {
-    const trimmed = query.trim();
+    const trimmed = query.trim()
 
     if (trimmed.length < 2) {
-      setResults([]);
-      setLoading(false);
-      setOpen(false);
-      return;
+      setResults([])
+      setLoading(false)
+      setOpen(false)
+      return
     }
 
     const timer = setTimeout(async () => {
-      setLoading(true);
+      setLoading(true)
 
       try {
         const res = await fetch(
           `/api/movies/search?q=${encodeURIComponent(trimmed)}`
-        );
+        )
 
         if (!res.ok) {
-          const text = await res.text();
-          console.error("Search API returned non OK response:", text);
-          setResults([]);
-          setOpen(true);
-          return;
+          const text = await res.text()
+          console.error('Search API returned non OK response:', text)
+          setResults([])
+          setOpen(true)
+          return
         }
 
-        const data = await res.json();
+        const data = await res.json()
 
         if (Array.isArray(data)) {
-          setResults(data);
+          setResults(data)
         } else {
-          console.error("Search API did not return an array:", data);
-          setResults([]);
+          console.error('Search API did not return an array:', data)
+          setResults([])
         }
 
-        setOpen(true);
+        setOpen(true)
       } catch (error) {
-        console.error("Search request failed:", error);
-        setResults([]);
-        setOpen(true);
+        console.error('Search request failed:', error)
+        setResults([])
+        setOpen(true)
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    }, 300);
+    }, 300)
 
-    return () => clearTimeout(timer);
-  }, [query]);
+    return () => clearTimeout(timer)
+  }, [query])
 
   function handleSelect(movieId: number) {
-    setOpen(false);
-    setQuery("");
-    router.push(`/films/${movieId}`);
+    setOpen(false)
+    setQuery('')
+    router.push(`/films/${movieId}`)
   }
 
-  function getStatusLabel(status: MovieResult["status"]) {
-    if (status === "NOW_SHOWING") return "Now showing";
-    if (status === "UPCOMING") return "Upcoming";
-    return "No current showtimes";
+  function getStatusLabel(status: MovieSearchResult['status']) {
+    if (status === 'NOW_SHOWING') return 'Now showing'
+    return 'No current showtimes'
   }
 
   return (
-    <div
-      ref={wrapperRef}
-      style={{
-        position: "relative",
-        width: "320px",
-      }}
-    >
+    <div ref={wrapperRef} className="relative w-80">
       <input
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onFocus={() => {
           if (query.trim().length >= 2) {
-            setOpen(true);
+            setOpen(true)
           }
         }}
         placeholder="Search all films, including not now showing"
-        style={{
-          width: "100%",
-          backgroundColor: "#0a0a0a",
-          color: "#fff",
-          border: "1px solid #464646",
-          padding: "10px 14px",
-          borderRadius: "4px",
-          fontSize: "0.95rem",
-          outline: "none",
-          boxSizing: "border-box",
-        }}
+        className="box-border w-full rounded-[4px] border border-border-input bg-page-bg px-[14px] py-2.5 text-[0.95rem] text-text-primary outline-none placeholder:text-text-dim"
       />
 
       {open && (
-        <div
-          style={{
-            position: "absolute",
-            top: "calc(100% + 8px)",
-            left: 0,
-            width: "100%",
-            backgroundColor: "#0a0a0a",
-            border: "1px solid #333",
-            borderRadius: "6px",
-            overflow: "hidden",
-            zIndex: 1000,
-            maxHeight: "360px",
-            overflowY: "auto",
-            boxShadow: "0 8px 24px rgba(0, 0, 0, 0.35)",
-          }}
-        >
+        <div className="absolute left-0 top-[calc(100%+8px)] z-[1000] max-h-[360px] w-full overflow-y-auto rounded-panel border border-border-strong bg-page-bg shadow-popover">
           {loading && (
-            <div
-              style={{
-                padding: "12px 14px",
-                color: "#aaa",
-                fontSize: "0.9rem",
-              }}
-            >
+            <div className="px-[14px] py-3 text-[0.9rem] text-text-muted">
               Searching...
             </div>
           )}
 
           {!loading && results.length === 0 && (
-            <div
-              style={{
-                padding: "12px 14px",
-                color: "#777",
-                fontSize: "0.9rem",
-              }}
-            >
+            <div className="px-[14px] py-3 text-[0.9rem] text-text-disabled">
               No films found
             </div>
           )}
@@ -184,36 +134,19 @@ export default function FilmSearchBox() {
                 key={movie.id}
                 type="button"
                 onClick={() => handleSelect(movie.id)}
-                style={{
-                  width: "100%",
-                  textAlign: "left",
-                  background: "transparent",
-                  border: "none",
-                  borderBottom:
-                    index === results.length - 1 ? "none" : "1px solid #1f1f1f",
-                  padding: "12px 14px",
-                  cursor: "pointer",
-                  color: "#fff",
-                }}
+                className={[
+                  'w-full cursor-pointer bg-transparent px-[14px] py-3 text-left text-text-primary transition-colors hover:bg-card-bg',
+                  index === results.length - 1
+                    ? 'border-none'
+                    : 'border-b border-border-subtle',
+                ].join(' ')}
               >
-                <div
-                  style={{
-                    fontSize: "0.95rem",
-                    marginBottom: "4px",
-                    lineHeight: 1.3,
-                  }}
-                >
+                <div className="mb-1 text-[0.95rem] leading-[1.3]">
                   {movie.title}
-                  {movie.year ? ` (${movie.year})` : ""}
+                  {movie.year ? ` (${movie.year})` : ''}
                 </div>
 
-                <div
-                  style={{
-                    fontSize: "0.8rem",
-                    color: "#888",
-                    lineHeight: 1.2,
-                  }}
-                >
+                <div className="text-[0.8rem] leading-[1.2] text-text-dim">
                   {getStatusLabel(movie.status)}
                 </div>
               </button>
@@ -221,5 +154,5 @@ export default function FilmSearchBox() {
         </div>
       )}
     </div>
-  );
+  )
 }

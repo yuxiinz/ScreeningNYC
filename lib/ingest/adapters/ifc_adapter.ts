@@ -1,7 +1,7 @@
 // lib/ingest/adapters/ifc_adapter.ts
 
 import * as cheerio from 'cheerio'
-import type { ScrapedShowtime, TheaterAdapterConfig } from './types'
+import type { ScrapedShowtime } from './types'
 import { fetchHtml } from '../core/http'
 import {
   cleanText,
@@ -364,9 +364,7 @@ async function scrapeIfcRaw(): Promise<IfcIngestResult> {
   }
 }
 
-export async function scrapeIfcCenter(
-  _config: TheaterAdapterConfig
-): Promise<ScrapedShowtime[]> {
+export async function scrapeIfcCenter(): Promise<ScrapedShowtime[]> {
   const { movies, showtimes } = await scrapeIfcRaw()
 
   const movieByDetailUrl = new Map(movies.map((m) => [m.detailUrl, m]))

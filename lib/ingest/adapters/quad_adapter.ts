@@ -241,7 +241,7 @@ export async function scrapeQuadCinemaShowtimes(
         const detailHtml = await fetchHtml(item.filmUrl)
         detail = parseDetailPage(detailHtml, item.filmUrl, item.movieTitle)
         detailCache.set(item.filmUrl, detail)
-      } catch (error) {
+      } catch {
         detail = {
           sourceMovieId: safeSlugFromFilmUrl(item.filmUrl),
           title: item.movieTitle,

@@ -1,206 +1,156 @@
-# 🎬 ScreeningNYC
+# Screening NYC
 
-**ScreeningNYC** is a full-stack web application that aggregates film screenings from independent theaters across New York City, helping users discover showtimes, explore films, and navigate cinema experiences in one place.
+Screening NYC is a Next.js application that aggregates screenings from independent movie theaters in New York City. It ingests showtimes, normalizes movie and theater data into PostgreSQL, and serves browsing pages for films, dates, and theater locations.
 
----
+## Live
 
-## ✨ Features
+- https://www.screeningnyc.com/
 
-* 🎥 **Film Aggregation**
+## Features
 
-  * Collects real-time showtimes from NYC independent theaters (Metrograph, Film Forum, IFC Center, Quad, MoMA)
-  * Normalizes data into a unified format
+- Film aggregation from Metrograph, Film Forum, IFC Center, Quad Cinema, and MoMA
+- Browse all currently scheduled films
+- Browse screenings by date with theater filters
+- Map view for theater locations and quick theater-specific lookup
+- Film detail pages with grouped showtimes
+- Search across films, including titles without active showtimes
+- TMDB-backed metadata enrichment when `TMDB_API_KEY` is available
 
-* 📅 **Date-based Browsing**
+## Stack
 
-  * View all screenings for a selected date
-  * Quickly switch between days
+- Next.js 16 App Router
+- React 19
+- TypeScript
+- Tailwind CSS v4 with shared design tokens in `app/globals.css`
+- Prisma ORM
+- PostgreSQL
+- Luxon for timezone-aware date handling
+- Leaflet / React Leaflet for the map
+- Cheerio / Axios / fetch-based ingestion adapters
 
-* 🎭 **Theater Filtering**
+## Project Structure
 
-  * Filter showtimes by selected theaters
-  * Dynamic UI filtering without reload
-
-* 🗺️ **Map View**
-
-  * Interactive map showing theater locations
-  * Click a theater → view filtered screenings
-
-* 🎞️ **Movie Detail Pages**
-
-  * Show film metadata and all available showtimes
-  * Future: TMDB enrichment (poster, cast, rating)
-
-* ⚡ **Performance Optimized**
-
-  * Cached queries and efficient Prisma relations
-  * Sub-150ms response time (target)
-
----
-
-## 🏗️ Tech Stack
-
-### Frontend
-
-* **Next.js (App Router)**
-* React (Client + Server Components)
-* TypeScript
-
-### Backend
-
-* Next.js API Routes
-* Prisma ORM
-
-### Database
-
-* PostgreSQL
-
-### Data Ingestion
-
-* Custom scrapers (Cheerio / Fetch)
-* Scheduled ingestion pipeline (cron / queue)
-
-### External APIs 
-
-* TMDB API for movie metadata enrichment
-
----
-
-## 📂 Project Structure
-
-```
+```text
 screeningnyc/
 ├── app/
-│   ├── page.tsx                # Homepage (films)
-│   ├── date/                   # Date-based browsing
-│   ├── map/                    # Map view
-│   └── movie/[id]/             # Movie detail page
-│
+│   ├── (browse)/              # Route group for /, /date, /map
+│   │   ├── layout.tsx         # Shared browse shell + header
+│   │   ├── page.tsx           # Homepage
+│   │   ├── date/page.tsx      # Date-based browsing
+│   │   └── map/page.tsx       # Map page
+│   ├── films/[id]/page.tsx    # Film detail page
+│   ├── api/movies/search/route.ts
+│   ├── globals.css
+│   └── layout.tsx
 ├── components/
 │   ├── Header.tsx
-│   ├── DateSelector.tsx
+│   ├── FilmSearchBox.tsx
 │   ├── TheaterFilter.tsx
-│   └── MapClientWrapper.tsx
-│
+│   ├── DateSelector.tsx
+│   ├── BackButton.tsx
+│   ├── movie/
+│   │   ├── MovieExternalLinks.tsx
+│   │   └── PosterImage.tsx
+│   └── map/
 ├── lib/
 │   ├── prisma.ts
+│   ├── timezone.ts
+│   ├── movie/
+│   │   ├── display.ts
+│   │   └── search.ts
 │   └── ingest/
-│       ├── adapters/           # Theater-specific scrapers
-│       ├── config/             # Theater metadata (lat/lng)
-│       └── utils/              # Shared parsing logic
-│
-├── scripts/
-│   └── ingest_theater.ts       # Run ingestion pipeline
-│
+│       ├── adapters/          # Theater-specific scrapers
+│       ├── config/            # Theater metadata
+│       ├── core/              # Shared ingest parsing utilities
+│       └── services/          # TMDB + persistence services
 ├── prisma/
 │   └── schema.prisma
-│
-└── .env
+├── scripts/
+│   └── ingest_theater.ts
+└── .github/workflows/
+    ├── ci.yml
+    └── daily_ingest.yml
 ```
 
----
+## Data Model
 
-## ⚙️ Setup & Installation
+- `Movie`: canonical movie record plus enriched metadata and external links
+- `Theater`: theater identity, source metadata, and coordinates
+- `Showtime`: scheduled screening tied to a movie and theater
+- `Format`: normalized format labels such as `35mm`, `70mm`, `DCP`, `IMAX`
 
-### 1. Clone the repo
+## Timezone
 
-```bash
-git clone https://github.com/your-username/screeningnyc.git
-cd screeningnyc
+The app treats `America/New_York` as the canonical application timezone for date browsing, grouped showtimes, and ingest parsing. Shared helpers live in `lib/timezone.ts`.
+
+## Setup
+
+Requirements:
+
+- Node.js 20
+- PostgreSQL
+
+Create `.env`:
+
+```env
+DATABASE_URL="postgresql://..."
+TMDB_API_KEY="..."
 ```
 
-### 2. Install dependencies
+`TMDB_API_KEY` is optional.
+
+Run locally:
 
 ```bash
 npm install
+npx prisma generate
+npm run dev
 ```
 
-### 3. Configure environment variables
+Open `http://localhost:3000`.
 
-Create a `.env` file:
+## Ingestion
 
-```env
-DATABASE_URL="your_postgres_url"
-```
-
----
-
-### 4. Setup database
-
-```bash
-npx prisma migrate dev
-```
-
----
-
-### 5. Run ingestion (fetch theater data)
+Run the theater ingest manually:
 
 ```bash
 npm run ingest:theater
 ```
 
----
-
-### 6. Start development server
+You can also pass theater slugs as arguments to limit the run:
 
 ```bash
-npm run dev
+npm run ingest:theater -- metrograph filmforum
 ```
 
-Open:
+## Quality Checks
 
+Typecheck:
+
+```bash
+npm run typecheck
 ```
-http://localhost:3000
+
+Lint:
+
+```bash
+npm run lint
 ```
 
----
+Production build:
 
-## 🔄 Data Pipeline
+```bash
+npm run build
+```
 
-1. Scrapers fetch showtimes from theater websites
-2. Data is parsed and normalized
-3. Stored via Prisma into PostgreSQL
-4. Frontend queries database for rendering
+## Deployment and Automation
 
----
+- Vercel handles application deployment on push.
+- GitHub Actions `ci.yml` runs install, Prisma client generation, Next route type generation, typecheck, lint, and build.
+- GitHub Actions `daily_ingest.yml` runs the daily ingest job and expects `DATABASE_URL` and `TMDB_API_KEY` secrets.
 
-## 🧠 Design Highlights
+## Notes
 
-* **Modular Scraper Architecture**
-
-  * Each theater has its own adapter
-  * Easy to extend for new theaters
-
-* **Separation of Concerns**
-
-  * Scraping, parsing, storage, and UI clearly separated
-
-* **Scalable Data Model**
-
-  * Movie ↔ Showtime ↔ Theater relational design
-
----
-
-## 🚀 Roadmap
-
-* [ ] TMDB integration (poster, ratings, cast)
-* [ ] User accounts & favorites
-* [ ] Ticket linking / price tracking
-* [ ] Background job queue (Redis + workers)
-* [ ] Real-time updates / caching layer
-* [ ] Mobile UI optimization
-
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Feel free to open issues or submit pull requests.
-
----
-
-## 💡 Inspiration
-
-Independent theaters in NYC often have fragmented information across different websites.
-ScreeningNYC aims to unify and simplify the discovery experience for film lovers.
-
+- The route group `app/(browse)` is an internal App Router grouping. It does not change public URLs.
+- The only public API route currently used by the frontend is `/api/movies/search`.
+- Poster images are stored as remote URLs from TMDB and theater sites.

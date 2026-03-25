@@ -1,23 +1,40 @@
 // app/(browse)/date/page.tsx
 
-import { prisma } from '@/lib/prisma'
 import Link from 'next/link'
+
 import DateSelector from '@/components/DateSelector'
+import PosterImage from '@/components/movie/PosterImage'
 import TheaterFilter from '@/components/TheaterFilter'
-import { DateTime } from 'luxon'
 import MovieExternalLinks from '@/components/movie/MovieExternalLinks'
 import {
   cleanDirectorText,
   isTmdbPoster,
 } from '@/lib/movie/display'
+import { prisma } from '@/lib/prisma'
 import {
   APP_TIMEZONE,
   formatTimeInAppTimezone,
   getTodayInAppTimezone,
 } from '@/lib/timezone'
+import { DateTime } from 'luxon'
+
+const SHOWTIME_ROW_CLASS =
+  'flex flex-wrap items-center justify-between gap-4 rounded-panel border border-border-default bg-card-bg px-5 py-[15px]'
+const SHOWTIME_META_CLASS = 'flex flex-wrap items-baseline gap-5'
+const POSTER_CARD_CLASS =
+  'flex aspect-[2/3] w-40 shrink-0 items-center justify-center overflow-hidden rounded-card border border-border-subtle bg-card-bg shadow-poster'
 
 function formatReadableDate(targetDate: string) {
-  return DateTime.fromISO(targetDate, { zone: APP_TIMEZONE }).toFormat('LLLL d, yyyy')
+  return DateTime.fromISO(targetDate, { zone: APP_TIMEZONE }).toFormat(
+    'LLLL d, yyyy'
+  )
+}
+
+function getPosterImageClass(posterIsTmdb: boolean) {
+  return [
+    'block h-full w-full bg-card-bg',
+    posterIsTmdb ? 'object-cover' : 'object-contain',
+  ].join(' ')
 }
 
 export default async function DatePage({
@@ -36,8 +53,12 @@ export default async function DatePage({
   const today = getTodayInAppTimezone(nowNy.toJSDate())
   const targetDate = selectedDateStr || today
 
-  const startOfDayNy = DateTime.fromISO(targetDate, { zone: APP_TIMEZONE }).startOf('day')
-  const endOfDayNy = DateTime.fromISO(targetDate, { zone: APP_TIMEZONE }).endOf('day')
+  const startOfDayNy = DateTime.fromISO(targetDate, {
+    zone: APP_TIMEZONE,
+  }).startOf('day')
+  const endOfDayNy = DateTime.fromISO(targetDate, {
+    zone: APP_TIMEZONE,
+  }).endOf('day')
 
   const queryStartNy = startOfDayNy < nowNy ? nowNy : startOfDayNy
 
@@ -55,13 +76,16 @@ export default async function DatePage({
     },
   })
 
-  const selectedTheaterNames = allTheaters
-    .filter(
-      (
-        t: (typeof allTheaters)[number]
-      ) => t.slug !== null && selectedTheaterSlugs.includes(t.slug)
-    )
-    .map((t: (typeof allTheaters)[number]) => t.name)
+  const theatersWithSlug = allTheaters.filter(
+    (
+      theater: (typeof allTheaters)[number]
+    ): theater is (typeof allTheaters)[number] & { slug: string } =>
+      theater.slug !== null
+  )
+
+  const selectedTheaterNames = theatersWithSlug
+    .filter(theater => selectedTheaterSlugs.includes(theater.slug))
+    .map(theater => theater.name)
 
   const showtimes = await prisma.showtime.findMany({
     where: {
@@ -91,34 +115,35 @@ export default async function DatePage({
   })
 
   type ShowtimeItem = typeof showtimes[number]
-
-  type GroupedMovie = ShowtimeItem["movie"] & {
+  type GroupedMovie = ShowtimeItem['movie'] & {
     showtimes: ShowtimeItem[]
   }
 
   const groupedByMovie: Record<number, GroupedMovie> = {}
 
-  showtimes.forEach((st: ShowtimeItem) => {
-    if (!groupedByMovie[st.movieId]) {
-      groupedByMovie[st.movieId] = {
-        ...st.movie,
+  showtimes.forEach((showtime: ShowtimeItem) => {
+    if (!groupedByMovie[showtime.movieId]) {
+      groupedByMovie[showtime.movieId] = {
+        ...showtime.movie,
         showtimes: [],
       }
     }
 
-    groupedByMovie[st.movieId].showtimes.push(st)
+    groupedByMovie[showtime.movieId].showtimes.push(showtime)
   })
 
   const moviesOnDate: GroupedMovie[] = Object.values(groupedByMovie)
-    .map((movie) => ({
+    .map(movie => ({
       ...movie,
       showtimes: [...movie.showtimes].sort(
         (a, b) => a.startTime.getTime() - b.startTime.getTime()
       ),
     }))
     .sort((a, b) => {
-      const aFirst = a.showtimes[0]?.startTime.getTime() ?? Number.MAX_SAFE_INTEGER
-      const bFirst = b.showtimes[0]?.startTime.getTime() ?? Number.MAX_SAFE_INTEGER
+      const aFirst =
+        a.showtimes[0]?.startTime.getTime() ?? Number.MAX_SAFE_INTEGER
+      const bFirst =
+        b.showtimes[0]?.startTime.getTime() ?? Number.MAX_SAFE_INTEGER
       return aFirst - bFirst
     })
 
@@ -130,121 +155,67 @@ export default async function DatePage({
         ? `There are ${filmCount} film${filmCount === 1 ? '' : 's'} you can watch today at ${selectedTheaterNames.join(', ')}!`
         : `There are ${filmCount} film${filmCount === 1 ? '' : 's'} you can watch today!`
       : selectedTheaterNames.length > 0
-      ? `There are ${filmCount} film${filmCount === 1 ? '' : 's'} you can watch on ${formatReadableDate(targetDate)} at ${selectedTheaterNames.join(', ')}!`
-      : `There are ${filmCount} film${filmCount === 1 ? '' : 's'} you can watch on ${formatReadableDate(targetDate)}!`
+        ? `There are ${filmCount} film${filmCount === 1 ? '' : 's'} you can watch on ${formatReadableDate(targetDate)} at ${selectedTheaterNames.join(', ')}!`
+        : `There are ${filmCount} film${filmCount === 1 ? '' : 's'} you can watch on ${formatReadableDate(targetDate)}!`
 
   return (
     <>
-      <main style={{ maxWidth: '1200px', margin: '0 auto' }}>
+      <main className="mx-auto max-w-[var(--container-main)]">
         <DateSelector currentSafeDate={targetDate} />
 
         <TheaterFilter
-          theaters={allTheaters
-            .filter((t: (typeof allTheaters)[number]) => t.slug !== null)
-            .map((t: (typeof allTheaters)[number]) => ({
-              slug: t.slug as string,
-              name: t.name,
-            }))}
+          theaters={theatersWithSlug.map(theater => ({
+            slug: theater.slug,
+            name: theater.name,
+          }))}
           selectedTheaters={selectedTheaterSlugs}
         />
 
-        <p
-          style={{
-            color: '#ffffff',
-            fontSize: '0.98rem',
-            lineHeight: 1.5,
-            margin: '0 0 18px 0',
-          }}
-        >
+        <p className="mb-[18px] text-[0.98rem] leading-[1.5] text-text-primary">
           {subtitle}
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '60px' }}>
+        <div className="flex flex-col gap-[60px]">
           {moviesOnDate.length > 0 ? (
-            moviesOnDate.map((movie) => {
+            moviesOnDate.map(movie => {
               const posterIsTmdb = isTmdbPoster(movie.posterUrl)
               const director = cleanDirectorText(movie.directorText, 'UNKNOWN')
 
               return (
                 <section
                   key={movie.id}
-                  style={{
-                    display: 'flex',
-                    gap: '40px',
-                    borderBottom: '1px solid #222',
-                    paddingBottom: '50px',
-                    alignItems: 'flex-start',
-                    flexWrap: 'wrap',
-                  }}
+                  className="flex flex-wrap items-start gap-10 border-b border-border-default pb-[50px]"
                 >
                   <Link
                     href={`/films/${movie.id}`}
-                    style={{ textDecoration: 'none', color: 'inherit' }}
+                    className="shrink-0 text-inherit no-underline"
                   >
-                    <div
-                      style={{
-                        width: '160px',
-                        aspectRatio: '2 / 3',
-                        borderRadius: '8px',
-                        overflow: 'hidden',
-                        boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
-                        border: '1px solid #1f1f1f',
-                        backgroundColor: '#111',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
+                    <div className={POSTER_CARD_CLASS}>
                       {movie.posterUrl ? (
-                        <img
+                        <PosterImage
                           src={movie.posterUrl}
                           alt={movie.title}
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: posterIsTmdb ? 'cover' : 'contain',
-                            backgroundColor: '#111',
-                            display: 'block',
-                          }}
+                          className={getPosterImageClass(posterIsTmdb)}
                         />
                       ) : (
-                        <div
-                          style={{
-                            color: '#666',
-                            fontSize: '0.9rem',
-                          }}
-                        >
+                        <div className="text-[0.9rem] text-text-empty">
                           No Poster
                         </div>
                       )}
                     </div>
                   </Link>
 
-                  <div style={{ flex: 1, minWidth: '280px' }}>
-                    <h2
-                      style={{
-                        fontSize: '2rem',
-                        fontWeight: '900',
-                        margin: '0 0 8px 0',
-                        lineHeight: '1.1',
-                      }}
-                    >
+                  <div className="min-w-[280px] flex-1">
+                    <h2 className="m-0 mb-2 text-[2rem] font-black leading-[1.1]">
                       <Link
                         href={`/films/${movie.id}`}
-                        style={{ color: '#fff', textDecoration: 'none' }}
+                        className="text-text-primary no-underline"
                       >
                         {movie.title.toUpperCase()}
                       </Link>
                     </h2>
 
-                    <p
-                      style={{
-                        color: '#888',
-                        fontSize: '1rem',
-                        marginBottom: '20px',
-                      }}
-                    >
+                    <p className="mb-5 text-base text-text-dim">
                       DIRECTED BY {director}
                     </p>
 
@@ -254,112 +225,46 @@ export default async function DatePage({
                       letterboxdUrl={movie.letterboxdUrl}
                       size="sm"
                       showExternalIndicator
-                      style={{
-                        gap: '12px',
-                        marginBottom: '30px',
-                        fontSize: '11px',
-                        fontWeight: 'bold',
-                      }}
+                      className="mb-[30px] gap-3 text-[11px] font-bold"
                     />
 
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '12px',
-                      }}
-                    >
-                      {movie.showtimes.map((st) => (
-                        <div
-                          key={st.id}
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            backgroundColor: '#111',
-                            padding: '15px 20px',
-                            borderRadius: '6px',
-                            border: '1px solid #222',
-                            gap: '16px',
-                            flexWrap: 'wrap',
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'baseline',
-                              gap: '20px',
-                              flexWrap: 'wrap',
-                            }}
-                          >
-                            <span
-                              style={{
-                                fontSize: '1.2rem',
-                                fontWeight: 'bold',
-                                fontFamily: 'monospace',
-                              }}
-                            >
-                              {formatTimeInAppTimezone(st.startTime)}
+                    <div className="flex flex-col gap-3">
+                      {movie.showtimes.map(showtime => (
+                        <div key={showtime.id} className={SHOWTIME_ROW_CLASS}>
+                          <div className={SHOWTIME_META_CLASS}>
+                            <span className="font-mono text-[1.2rem] font-bold">
+                              {formatTimeInAppTimezone(showtime.startTime)}
                             </span>
 
-                            <span
-                              style={{
-                                color: '#aaa',
-                                fontSize: '0.9rem',
-                                letterSpacing: '0.5px',
-                              }}
-                            >
-                              {st.theater.name.toUpperCase()}
+                            <span className="text-[0.9rem] tracking-[0.5px] text-text-muted">
+                              {showtime.theater.name.toUpperCase()}
                             </span>
 
-                            {(st.runtimeMinutes || movie.runtimeMinutes) && (
-                              <span
-                                style={{
-                                  color: '#888',
-                                  fontSize: '0.85rem',
-                                }}
-                              >
-                                {st.runtimeMinutes || movie.runtimeMinutes} MIN
+                            {(showtime.runtimeMinutes || movie.runtimeMinutes) && (
+                              <span className="text-[0.85rem] text-text-dim">
+                                {showtime.runtimeMinutes || movie.runtimeMinutes}{' '}
+                                MIN
                               </span>
                             )}
 
-                            {st.format?.name && (
-                              <span
-                                style={{
-                                  color: '#888',
-                                  fontSize: '0.85rem',
-                                }}
-                              >
-                                {st.format.name.toUpperCase()}
+                            {showtime.format?.name && (
+                              <span className="text-[0.85rem] text-text-dim">
+                                {showtime.format.name.toUpperCase()}
                               </span>
                             )}
                           </div>
 
-                          {st.ticketUrl ? (
+                          {showtime.ticketUrl ? (
                             <a
-                              href={st.ticketUrl}
+                              href={showtime.ticketUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              style={{
-                                color: '#fff',
-                                fontSize: '0.8rem',
-                                opacity: 0.75,
-                                textDecoration: 'none',
-                                borderBottom: '1px solid #fff',
-                                paddingBottom: '2px',
-                                whiteSpace: 'nowrap',
-                              }}
+                              className="whitespace-nowrap border-b border-text-primary pb-0.5 text-[0.8rem] text-text-primary opacity-75 no-underline"
                             >
                               TICKETS ↗
                             </a>
                           ) : (
-                            <span
-                              style={{
-                                color: '#777',
-                                fontSize: '0.8rem',
-                                whiteSpace: 'nowrap',
-                              }}
-                            >
+                            <span className="whitespace-nowrap text-[0.8rem] text-text-disabled">
                               SOLD OUT
                             </span>
                           )}
@@ -371,22 +276,14 @@ export default async function DatePage({
               )
             })
           ) : (
-            <div
-              style={{
-                color: '#444',
-                textAlign: 'center',
-                marginTop: '100px',
-                fontSize: '1.2rem',
-                letterSpacing: '1px',
-              }}
-            >
+            <div className="mt-[100px] text-center text-[1.2rem] tracking-[1px] text-text-faded">
               NO SCREENINGS FOUND FOR THIS DATE.
             </div>
           )}
         </div>
       </main>
 
-      <footer style={{ height: '100px' }} />
+      <footer className="h-[100px]" />
     </>
   )
 }

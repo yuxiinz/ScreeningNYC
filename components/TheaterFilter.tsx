@@ -81,114 +81,50 @@ export default function TheaterFilter({
       : `THEATER: ${selectedTheaters.length} SELECTED`
 
   return (
-    <div
-      ref={containerRef}
-      style={{
-        position: 'relative',
-        marginBottom: '12px',
-      }}
-    >
+    <div ref={containerRef} className="relative mb-3">
       <button
         type="button"
         onClick={() => setOpen(prev => !prev)}
-        style={{
-          backgroundColor: '#111',
-          color: '#fff',
-          border: '1px solid #222',
-          borderRadius: '6px',
-          padding: '12px 16px',
-          fontSize: '0.95rem',
-          fontWeight: 700,
-          letterSpacing: '0.5px',
-          cursor: 'pointer',
-          minWidth: '220px',
-          textAlign: 'left',
-        }}
+        className="min-w-[220px] cursor-pointer rounded-panel border border-border-default bg-card-bg px-4 py-3 text-left text-[0.95rem] font-bold tracking-[0.5px] text-text-primary transition-colors hover:border-border-strong"
       >
         {buttonLabel} ▼
       </button>
 
       {open && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 'calc(100% + 8px)',
-            left: 0,
-            zIndex: 30,
-            width: '320px',
-            maxHeight: '360px',
-            overflowY: 'auto',
-            backgroundColor: '#111',
-            border: '1px solid #222',
-            borderRadius: '8px',
-            boxShadow: '0 12px 30px rgba(0,0,0,0.45)',
-            padding: '10px',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '10px',
-              paddingBottom: '10px',
-              borderBottom: '1px solid #222',
-            }}
-          >
-            <span
-              style={{
-                fontSize: '0.85rem',
-                color: '#aaa',
-                letterSpacing: '0.5px',
-              }}
-            >
+        <div className="absolute left-0 top-[calc(100%+8px)] z-30 max-h-[360px] w-80 overflow-y-auto rounded-card border border-border-default bg-card-bg p-2.5 shadow-dropdown">
+          <div className="mb-2.5 flex items-center justify-between border-b border-border-default pb-2.5">
+            <span className="text-[0.85rem] tracking-[0.5px] text-text-muted">
               FILTER THEATERS
             </span>
 
             <button
               type="button"
               onClick={clearAll}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#888',
-                cursor: 'pointer',
-                fontSize: '0.8rem',
-              }}
+              className="cursor-pointer border-none bg-transparent text-[0.8rem] text-text-dim transition-colors hover:text-text-primary"
             >
               ALL
             </button>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          <div className="flex flex-col gap-1.5">
             {theaters.map(theater => {
               const checked = selectedSet.has(theater.slug)
 
               return (
                 <label
                   key={theater.slug}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    padding: '8px 10px',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    backgroundColor: checked ? '#1a1a1a' : 'transparent',
-                  }}
+                  className={[
+                    'flex cursor-pointer items-center gap-2.5 rounded-panel px-2.5 py-2 transition-colors hover:bg-panel-bg',
+                    checked ? 'bg-panel-bg' : 'bg-transparent',
+                  ].join(' ')}
                 >
                   <input
                     type="checkbox"
                     checked={checked}
                     onChange={() => toggleTheater(theater.slug)}
-                    style={{ cursor: 'pointer' }}
+                    className="cursor-pointer accent-white"
                   />
-                  <span
-                    style={{
-                      color: '#fff',
-                      fontSize: '0.92rem',
-                    }}
-                  >
+                  <span className="text-[0.92rem] text-text-primary">
                     {theater.name}
                   </span>
                 </label>

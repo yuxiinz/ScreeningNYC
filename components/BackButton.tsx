@@ -10,14 +10,7 @@ export default function BackButton() {
   return (
     <button
       onClick={() => router.back()}
-      style={{
-        background: 'none',
-        border: 'none',
-        color: '#ffffff',
-        fontSize: '1rem',
-        cursor: 'pointer',
-        padding: 0,
-      }}
+      className="cursor-pointer border-none bg-transparent p-0 text-base text-text-primary"
     >
       ← BACK
     </button>

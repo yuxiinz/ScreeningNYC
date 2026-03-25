@@ -1,26 +1,76 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --font-geist-sans: "Helvetica Neue", Arial, sans-serif;
+  --font-geist-mono: "SFMono-Regular", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+  --app-page-bg: #0a0a0a;
+  --app-card-bg: #111111;
+  --app-panel-bg: #1a1a1a;
+  --app-text-primary: #ffffff;
+  --app-text-body: #cccccc;
+  --app-text-secondary: #bcbcbc;
+  --app-text-tertiary: #b0b0b0;
+  --app-text-muted: #aaaaaa;
+  --app-text-dim: #888888;
+  --app-text-detail-meta: #8f8f8f;
+  --app-text-soft: #7d7d7d;
+  --app-text-disabled: #777777;
+  --app-text-empty: #666666;
+  --app-text-faded: #444444;
+  --app-border-subtle: #1f1f1f;
+  --app-border-default: #222222;
+  --app-border-strong: #333333;
+  --app-border-input: #464646;
+  --app-accent-positive: #00b51d;
+  --app-accent-imdb: #f5c518;
+  --app-accent-douban: #00b51d;
+  --app-accent-letterboxd: #ff8000;
+  --app-shadow-card: 0 6px 18px rgba(0, 0, 0, 0.45);
+  --app-shadow-poster: 0 10px 30px rgba(0, 0, 0, 0.5);
+  --app-shadow-dropdown: 0 12px 30px rgba(0, 0, 0, 0.45);
+  --app-shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --app-radius-card: 0.5rem;
+  --app-radius-panel: 0.375rem;
+  --container-wide: 1600px;
+  --container-main: 1200px;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-page-bg: var(--app-page-bg);
+  --color-card-bg: var(--app-card-bg);
+  --color-panel-bg: var(--app-panel-bg);
+  --color-text-primary: var(--app-text-primary);
+  --color-text-body: var(--app-text-body);
+  --color-text-secondary: var(--app-text-secondary);
+  --color-text-tertiary: var(--app-text-tertiary);
+  --color-text-muted: var(--app-text-muted);
+  --color-text-dim: var(--app-text-dim);
+  --color-text-detail-meta: var(--app-text-detail-meta);
+  --color-text-soft: var(--app-text-soft);
+  --color-text-disabled: var(--app-text-disabled);
+  --color-text-empty: var(--app-text-empty);
+  --color-text-faded: var(--app-text-faded);
+  --color-border-subtle: var(--app-border-subtle);
+  --color-border-default: var(--app-border-default);
+  --color-border-strong: var(--app-border-strong);
+  --color-border-input: var(--app-border-input);
+  --color-accent-positive: var(--app-accent-positive);
+  --color-accent-imdb: var(--app-accent-imdb);
+  --color-accent-douban: var(--app-accent-douban);
+  --color-accent-letterboxd: var(--app-accent-letterboxd);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --shadow-card: var(--app-shadow-card);
+  --shadow-poster: var(--app-shadow-poster);
+  --shadow-dropdown: var(--app-shadow-dropdown);
+  --shadow-popover: var(--app-shadow-popover);
+  --radius-card: var(--app-radius-card);
+  --radius-panel: var(--app-radius-panel);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--app-page-bg);
+  color: var(--app-text-primary);
+  font-family: var(--font-geist-sans), sans-serif;
+  color-scheme: dark;
 }

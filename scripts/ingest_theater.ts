@@ -23,11 +23,10 @@ import {
 } from '../lib/ingest/services/persist_service'
 
 type KnownTheaterSlug = keyof typeof THEATER_META
-type TheaterSlug = KnownTheaterSlug | string
 
 type TheaterIngestConfig = {
   theaterName: string
-  theaterSlug: TheaterSlug
+  theaterSlug: KnownTheaterSlug
   sourceName: string
   sourceUrl: string
   officialSiteUrl?: string
@@ -155,17 +154,7 @@ async function ingestOneTheater(
   console.log(`\n========== Start ingesting ${config.theaterName} ==========`)
 
   const scraper = getShowtimeScraper(config.theaterSlug)
-
-  const theaterMeta =
-    config.theaterSlug in THEATER_META
-      ? THEATER_META[config.theaterSlug as KnownTheaterSlug]
-      : undefined
-
-  if (!theaterMeta) {
-    console.warn(
-      `[${config.theaterSlug}] Missing theater meta, address and coordinates may be empty`
-    )
-  }
+  const theaterMeta = THEATER_META[config.theaterSlug]
 
   const theater = await upsertTheater({
     theaterName: config.theaterName,

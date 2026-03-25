@@ -3,7 +3,7 @@
 import axios from 'axios'
 import * as cheerio from 'cheerio'
 import type { AnyNode } from 'domhandler'
-import type { ScrapedShowtime, TheaterAdapter, TheaterAdapterConfig } from './types'
+import type { ScrapedShowtime, TheaterAdapterConfig } from './types'
 import { fetchHtml } from '../core/http'
 import { formatShowtimeRaw, parseShowtime } from '../core/datetime'
 import { parseFormat, parseRuntimeMinutes, parseYear } from '../core/meta'

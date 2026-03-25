@@ -1,53 +1,42 @@
-import type { CSSProperties } from 'react'
-
 type MovieExternalLinksProps = {
   imdbUrl?: string | null
   doubanUrl?: string | null
   letterboxdUrl?: string | null
   size?: 'sm' | 'md'
   showExternalIndicator?: boolean
-  style?: CSSProperties
+  className?: string
 }
 
 type ExternalLink = {
   href: string
   label: string
-  style: CSSProperties
+  className: string
 }
 
-const COLORS = {
-  imdb: '#f5c518',
-  douban: '#00b51d',
-  letterboxd: '#ff8000',
+const LINK_CLASSES = {
+  imdb: 'border-accent-imdb text-accent-imdb',
+  douban: 'border-accent-douban text-accent-douban',
+  letterboxd: 'border-accent-letterboxd text-accent-letterboxd',
 } as const
-
-function buildLinkStyle(
-  color: string,
-  size: 'sm' | 'md'
-): CSSProperties {
-  if (size === 'sm') {
-    return {
-      color,
-      textDecoration: 'none',
-      border: `1px solid ${color}`,
-      padding: '3px 8px',
-      borderRadius: '4px',
-      minWidth: '38px',
-      textAlign: 'center',
-    }
-  }
-
-  return {
-    color,
-    textDecoration: 'none',
-    border: `1px solid ${color}`,
-    padding: '6px 10px',
-    borderRadius: '6px',
-  }
-}
 
 function renderLabel(label: string, showExternalIndicator: boolean): string {
   return showExternalIndicator ? `${label} ↗` : label
+}
+
+function buildLinkClass(
+  colorClassName: string,
+  size: 'sm' | 'md'
+): string {
+  const sizeClassName =
+    size === 'sm'
+      ? 'min-w-[38px] rounded-[4px] px-2 py-[3px]'
+      : 'rounded-panel px-2.5 py-1.5'
+
+  return [
+    'inline-flex items-center justify-center border no-underline transition-opacity hover:opacity-100',
+    sizeClassName,
+    colorClassName,
+  ].join(' ')
 }
 
 export default function MovieExternalLinks({
@@ -56,28 +45,28 @@ export default function MovieExternalLinks({
   letterboxdUrl,
   size = 'sm',
   showExternalIndicator = false,
-  style,
+  className,
 }: MovieExternalLinksProps) {
   const links: ExternalLink[] = [
     imdbUrl
       ? {
           href: imdbUrl,
           label: renderLabel('IMDb', showExternalIndicator),
-          style: buildLinkStyle(COLORS.imdb, size),
+          className: buildLinkClass(LINK_CLASSES.imdb, size),
         }
       : null,
     doubanUrl
       ? {
           href: doubanUrl,
           label: renderLabel('豆瓣', showExternalIndicator),
-          style: buildLinkStyle(COLORS.douban, size),
+          className: buildLinkClass(LINK_CLASSES.douban, size),
         }
       : null,
     letterboxdUrl
       ? {
           href: letterboxdUrl,
           label: renderLabel('LB', showExternalIndicator),
-          style: buildLinkStyle(COLORS.letterboxd, size),
+          className: buildLinkClass(LINK_CLASSES.letterboxd, size),
         }
       : null,
   ].filter((link): link is ExternalLink => link !== null)
@@ -86,12 +75,11 @@ export default function MovieExternalLinks({
 
   return (
     <div
-      style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: size === 'sm' ? '8px' : '12px',
-        ...style,
-      }}
+      className={[
+        'flex flex-wrap',
+        size === 'sm' ? 'gap-2' : 'gap-3',
+        className ?? '',
+      ].join(' ')}
     >
       {links.map((link) => (
         <a
@@ -99,7 +87,7 @@ export default function MovieExternalLinks({
           href={link.href}
           target="_blank"
           rel="noopener noreferrer"
-          style={link.style}
+          className={link.className}
         >
           {link.label}
         </a>

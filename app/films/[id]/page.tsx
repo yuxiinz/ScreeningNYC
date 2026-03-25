@@ -1,14 +1,16 @@
 // app/films/[id]/page.tsx
 
-import { prisma } from '@/lib/prisma'
 import { notFound } from 'next/navigation'
+
 import BackButton from '@/components/BackButton'
 import MovieExternalLinks from '@/components/movie/MovieExternalLinks'
+import PosterImage from '@/components/movie/PosterImage'
 import {
   cleanDirectorText,
   getReleaseYear,
   isTmdbPoster,
 } from '@/lib/movie/display'
+import { prisma } from '@/lib/prisma'
 import {
   formatDateKeyInAppTimezone,
   formatTimeInAppTimezone,
@@ -16,6 +18,17 @@ import {
 } from '@/lib/timezone'
 
 export const dynamic = 'force-dynamic'
+
+const SHOWTIME_ROW_CLASS =
+  'flex flex-wrap items-center justify-between gap-4 rounded-panel border border-border-default bg-card-bg px-5 py-[15px]'
+const SHOWTIME_META_CLASS = 'flex flex-wrap items-baseline gap-5'
+
+function getPosterImageClass(posterIsTmdb: boolean) {
+  return [
+    'block h-full w-full bg-card-bg',
+    posterIsTmdb ? 'object-cover' : 'object-contain',
+  ].join(' ')
+}
 
 function extractMetaFromOverview(input?: string | null) {
   const text = (input || '').replace(/\s+/g, ' ').trim()
@@ -73,7 +86,7 @@ export default async function MovieDetailPage({
   const { id } = await params
 
   const movie = await prisma.movie.findUnique({
-    where: { id: parseInt(id) },
+    where: { id: parseInt(id, 10) },
     include: {
       showtimes: {
         include: {
@@ -94,10 +107,11 @@ export default async function MovieDetailPage({
   if (!movie) return notFound()
 
   const groupedByDate: Record<string, typeof movie.showtimes> = {}
-  movie.showtimes.forEach((st: (typeof movie.showtimes)[number]) => {
-    const date = getDateKeyInAppTimezone(st.startTime)
+
+  movie.showtimes.forEach(showtime => {
+    const date = getDateKeyInAppTimezone(showtime.startTime)
     if (!groupedByDate[date]) groupedByDate[date] = []
-    groupedByDate[date].push(st)
+    groupedByDate[date].push(showtime)
   })
 
   const posterIsTmdb = isTmdbPoster(movie.posterUrl)
@@ -107,106 +121,36 @@ export default async function MovieDetailPage({
   const displayFormat = overviewMeta.inferredFormat || ''
 
   return (
-    <div
-      style={{
-        backgroundColor: '#0a0a0a',
-        color: '#fff',
-        minHeight: '100vh',
-        padding: '40px 20px',
-      }}
-    >
-      <main style={{ maxWidth: '1200px', margin: '0 auto' }}>
+    <div className="min-h-screen px-5 py-10">
+      <main className="mx-auto max-w-[var(--container-main)]">
         <BackButton />
 
-        <section
-          style={{
-            display: 'flex',
-            gap: '40px',
-            marginTop: '30px',
-            marginBottom: '60px',
-            alignItems: 'flex-start',
-            flexWrap: 'wrap',
-          }}
-        >
-          <div
-            style={{
-              width: '320px',
-              aspectRatio: '2 / 3',
-              flexShrink: 0,
-              borderRadius: '12px',
-              overflow: 'hidden',
-              backgroundColor: '#111',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
-              border: '1px solid #1f1f1f',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
+        <section className="mb-[60px] mt-[30px] flex flex-wrap items-start gap-10">
+          <div className="flex aspect-[2/3] w-[320px] shrink-0 items-center justify-center overflow-hidden rounded-[12px] border border-border-subtle bg-card-bg shadow-poster">
             {movie.posterUrl ? (
-              <img
+              <PosterImage
                 src={movie.posterUrl}
                 alt={movie.title}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'block',
-                  objectFit: posterIsTmdb ? 'cover' : 'contain',
-                  backgroundColor: '#111',
-                }}
+                className={getPosterImageClass(posterIsTmdb)}
               />
             ) : (
-              <div
-                style={{
-                  color: '#666',
-                  fontSize: '0.9rem',
-                  textAlign: 'center',
-                  padding: '20px',
-                }}
-              >
+              <div className="px-5 text-center text-[0.9rem] text-text-empty">
                 No Poster
               </div>
             )}
           </div>
 
-          <div
-            style={{
-              flex: 1,
-              minWidth: '320px',
-            }}
-          >
-            <h1
-              style={{
-                fontSize: 'clamp(2.4rem, 6vw, 4.2rem)',
-                fontWeight: 900,
-                margin: '0 0 18px 0',
-                lineHeight: 1.05,
-                letterSpacing: '0.5px',
-              }}
-            >
+          <div className="min-w-[320px] flex-1">
+            <h1 className="m-0 mb-[18px] text-[clamp(2.4rem,6vw,4.2rem)] font-black leading-[1.05] tracking-[0.5px]">
               {movie.title.toUpperCase()}
             </h1>
 
-            <p
-              style={{
-                color: '#bcbcbc',
-                fontSize: '1.1rem',
-                margin: '0 0 10px 0',
-                lineHeight: 1.5,
-              }}
-            >
+            <p className="m-0 mb-2.5 text-[1.1rem] leading-[1.5] text-text-secondary">
               Directed by {director}
             </p>
 
             {(year || movie.runtimeMinutes || displayFormat) && (
-              <p
-                style={{
-                  color: '#8f8f8f',
-                  fontSize: '1.02rem',
-                  margin: '0 0 24px 0',
-                  lineHeight: 1.5,
-                }}
-              >
+              <p className="m-0 mb-6 text-[1.02rem] leading-[1.5] text-text-detail-meta">
                 {[year, movie.runtimeMinutes ? `${movie.runtimeMinutes}min` : '', displayFormat]
                   .filter(Boolean)
                   .join(' / ')}
@@ -218,149 +162,63 @@ export default async function MovieDetailPage({
               doubanUrl={movie.doubanUrl}
               letterboxdUrl={movie.letterboxdUrl}
               size="md"
-              style={{
-                marginBottom: '28px',
-                fontSize: '0.85rem',
-                fontWeight: 'bold',
-              }}
+              className="mb-7 text-[0.85rem] font-bold"
             />
 
-            <p
-              style={{
-                lineHeight: 1.75,
-                color: '#ccc',
-                fontSize: '1rem',
-                margin: 0,
-                whiteSpace: 'pre-line',
-              }}
-            >
+            <p className="m-0 whitespace-pre-line text-base leading-[1.75] text-text-body">
               {overviewMeta.body || movie.overview || 'No overview available.'}
             </p>
           </div>
         </section>
 
         <section>
-          <h2
-            style={{
-              fontSize: '1.5rem',
-              borderBottom: '1px solid #333',
-              paddingBottom: '10px',
-              marginBottom: '30px',
-            }}
-          >
+          <h2 className="mb-[30px] border-b border-border-strong pb-2.5 text-[1.5rem]">
             SHOWTIMES
           </h2>
 
           {Object.keys(groupedByDate).length > 0 ? (
-            Object.entries(groupedByDate).map(([date, times]) => (
-              <div key={date} style={{ marginBottom: '40px' }}>
-                <h3
-                  style={{
-                    color: '#00b51d',
-                    fontSize: '1.1rem',
-                    marginBottom: '20px',
-                    letterSpacing: '1px',
-                  }}
-                >
+            Object.entries(groupedByDate).map(([date, showtimes]) => (
+              <div key={date} className="mb-10">
+                <h3 className="mb-5 text-[1.1rem] tracking-[1px] text-accent-positive">
                   {formatDateKeyInAppTimezone(date)}
                 </h3>
 
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '10px',
-                  }}
-                >
-                  {times.map((st: (typeof movie.showtimes)[number]) => (
-                    <div
-                      key={st.id}
-                      style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        backgroundColor: '#111',
-                        padding: '15px 20px',
-                        borderRadius: '6px',
-                        border: '1px solid #222',
-                        gap: '16px',
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'baseline',
-                          gap: '20px',
-                          flexWrap: 'wrap',
-                        }}
-                      >
-                        <span
-                          style={{
-                            fontSize: '1.2rem',
-                            fontWeight: 'bold',
-                            fontFamily: 'monospace',
-                          }}
-                        >
-                          {formatTimeInAppTimezone(st.startTime)}
+                <div className="flex flex-col gap-2.5">
+                  {showtimes.map(showtime => (
+                    <div key={showtime.id} className={SHOWTIME_ROW_CLASS}>
+                      <div className={SHOWTIME_META_CLASS}>
+                        <span className="font-mono text-[1.2rem] font-bold">
+                          {formatTimeInAppTimezone(showtime.startTime)}
                         </span>
 
-                        <span
-                          style={{
-                            color: '#aaa',
-                            fontSize: '0.9rem',
-                          }}
-                        >
-                          {st.theater.name.toUpperCase()}
+                        <span className="text-[0.9rem] text-text-muted">
+                          {showtime.theater.name.toUpperCase()}
                         </span>
 
-                        {(st.runtimeMinutes || movie.runtimeMinutes) && (
-                          <span
-                            style={{
-                              color: '#888',
-                              fontSize: '0.85rem',
-                            }}
-                          >
-                            {st.runtimeMinutes || movie.runtimeMinutes} MIN
+                        {(showtime.runtimeMinutes || movie.runtimeMinutes) && (
+                          <span className="text-[0.85rem] text-text-dim">
+                            {showtime.runtimeMinutes || movie.runtimeMinutes} MIN
                           </span>
                         )}
 
-                        {(st.format?.name || displayFormat) && (
-                          <span
-                            style={{
-                              color: '#888',
-                              fontSize: '0.85rem',
-                            }}
-                          >
-                            {(st.format?.name || displayFormat).toUpperCase()}
+                        {(showtime.format?.name || displayFormat) && (
+                          <span className="text-[0.85rem] text-text-dim">
+                            {(showtime.format?.name || displayFormat).toUpperCase()}
                           </span>
                         )}
                       </div>
 
-                      {st.ticketUrl ? (
+                      {showtime.ticketUrl ? (
                         <a
-                          href={st.ticketUrl}
+                          href={showtime.ticketUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{
-                            color: '#fff',
-                            fontSize: '0.8rem',
-                            opacity: 0.75,
-                            textDecoration: 'none',
-                            borderBottom: '1px solid #fff',
-                            whiteSpace: 'nowrap',
-                          }}
+                          className="whitespace-nowrap border-b border-text-primary text-[0.8rem] text-text-primary opacity-75 no-underline"
                         >
                           TICKETS ↗
                         </a>
                       ) : (
-                        <span
-                          style={{
-                            color: '#777',
-                            fontSize: '0.8rem',
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
+                        <span className="whitespace-nowrap text-[0.8rem] text-text-disabled">
                           SOLD OUT
                         </span>
                       )}
@@ -370,9 +228,7 @@ export default async function MovieDetailPage({
               </div>
             ))
           ) : (
-            <p style={{ color: '#666', fontStyle: 'italic' }}>
-              No upcoming showtimes scheduled.
-            </p>
+            <p className="text-text-empty">No upcoming showtimes available.</p>
           )}
         </section>
       </main>

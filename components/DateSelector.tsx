@@ -20,23 +20,14 @@ export default function DateSelector({
   }
 
   return (
-    <div style={{ marginBottom: '40px' }}>
+    <div className="mb-10">
       <input
         type="date"
         value={currentSafeDate}
         onChange={(e) => {
           updateDate(e.target.value)
         }}
-        style={{
-          backgroundColor: '#1a1a1a',
-          color: '#fff',
-          border: '1px solid #333',
-          padding: '10px 15px',
-          borderRadius: '4px',
-          fontSize: '1rem',
-          outline: 'none',
-          cursor: 'pointer'
-        }}
+        className="cursor-pointer rounded-[4px] border border-border-strong bg-panel-bg px-[15px] py-2.5 text-base text-text-primary outline-none"
       />
     </div>
   )

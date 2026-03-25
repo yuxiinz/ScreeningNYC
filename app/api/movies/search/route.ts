@@ -1,16 +1,17 @@
-import { prisma } from "@/lib/prisma";
-import { getReleaseYear } from "@/lib/movie/display";
-import { NextResponse } from "next/server";
+import { getReleaseYear } from '@/lib/movie/display'
+import type { MovieSearchResult, MovieSearchStatus } from '@/lib/movie/search'
+import { prisma } from '@/lib/prisma'
+import { NextResponse } from 'next/server'
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const q = searchParams.get("q")?.trim();
+  const { searchParams } = new URL(req.url)
+  const q = searchParams.get('q')?.trim()
 
   if (!q || q.length < 2) {
-    return NextResponse.json([]);
+    return NextResponse.json([])
   }
 
-  const now = new Date();
+  const now = new Date()
 
   const movies = await prisma.movie.findMany({
     where: {
@@ -18,13 +19,13 @@ export async function GET(req: Request) {
         {
           title: {
             contains: q,
-            mode: "insensitive",
+            mode: 'insensitive',
           },
         },
         {
           originalTitle: {
             contains: q,
-            mode: "insensitive",
+            mode: 'insensitive',
           },
         },
       ],
@@ -35,31 +36,31 @@ export async function GET(req: Request) {
           startTime: {
             gt: now,
           },
-          status: "SCHEDULED",
+          status: 'SCHEDULED',
         },
         take: 1,
       },
     },
     take: 8,
     orderBy: {
-      updatedAt: "desc",
+      updatedAt: 'desc',
     },
-  });
+  })
 
-  const result = movies.map((m: (typeof movies)[number]) => {
-    let status: "NOW_SHOWING" | "UPCOMING" | "NONE" = "NONE";
+  const result: MovieSearchResult[] = movies.map((movie) => {
+    let status: MovieSearchStatus = 'NONE'
 
-    if (m.showtimes.length > 0) {
-      status = "NOW_SHOWING";
+    if (movie.showtimes.length > 0) {
+      status = 'NOW_SHOWING'
     }
 
     return {
-      id: m.id,
-      title: m.title,
-      year: getReleaseYear(m.releaseDate),
+      id: movie.id,
+      title: movie.title,
+      year: getReleaseYear(movie.releaseDate),
       status,
-    };
-  });
+    }
+  })
 
-  return NextResponse.json(result);
+  return NextResponse.json(result)
 }

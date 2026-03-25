@@ -6,14 +6,7 @@ export default function BrowseLayout({
   children: React.ReactNode
 }>) {
   return (
-    <div
-      style={{
-        backgroundColor: '#0a0a0a',
-        color: '#fff',
-        minHeight: '100vh',
-        padding: '40px 20px',
-      }}
-    >
+    <div className="min-h-screen bg-page-bg px-5 py-10 text-text-primary">
       <Header />
       {children}
     </div>
