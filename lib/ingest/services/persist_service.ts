@@ -50,6 +50,8 @@ function isBadPosterUrl(url?: string | null): boolean {
   if (!s) return true
 
   return (
+    s.includes('ticketing.uswest.veezi.com/media/poster') ||
+    s.includes('ticketing.us.veezi.com/media/poster') ||
     s.includes('cropped-logo_metrograph') ||
     s.includes('/logo_metrograph') ||
     s.includes('metrographred.png')

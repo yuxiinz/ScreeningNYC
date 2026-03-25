@@ -7,6 +7,8 @@ import { scrapeQuadCinemaShowtimes } from './quad_adapter'
 import { scrapeMomaShowtimes } from './moma_adapter'
 import { scrapeAnthologyShowtimes } from './anthology_adapter'
 import { scrapeAngelikaShowtimes } from './angelika_adapter'
+import { scrapeMomiShowtimes } from './momi_adapter'
+import { scrapeBamShowtimes } from './bam_adapter'
 
 export function getShowtimeScraper(theaterSlug: string) {
   switch (theaterSlug) {
@@ -20,8 +22,12 @@ export function getShowtimeScraper(theaterSlug: string) {
       return scrapeQuadCinemaShowtimes
     case 'moma':
       return scrapeMomaShowtimes
+    case 'momi':
+      return scrapeMomiShowtimes
     case 'anthology':
       return scrapeAnthologyShowtimes
+    case 'bam':
+      return scrapeBamShowtimes
     case 'angelikaNYC':
     case 'angelikaEV':
     case 'angelika123':

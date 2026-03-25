@@ -907,9 +907,6 @@ function parseVeeziFilmBlock(
   const normalizedMovieTitle =
     stripEpisodeSuffix(movieTitle) || movieTitle || shownTitle
 
-  const posterUrl = normalizePosterUrl(
-    absoluteVeeziUrl(film.find('img.poster').first().attr('src'))
-  )
   const sourceUrl = buildShowingSourceUrl(
     pageUrl,
     filmId || normalizedMovieTitle
@@ -948,7 +945,6 @@ function parseVeeziFilmBlock(
         releaseYear: meta.releaseYear,
         runtimeMinutes: meta.runtimeMinutes,
         overview,
-        posterUrl,
         tmdbTitleCandidates,
         preferMovieTitleForDisplay: normalizedMovieTitle !== shownTitle,
         matchedMovieTitleHint: normalizedMovieTitle,

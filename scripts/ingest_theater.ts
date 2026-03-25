@@ -96,6 +96,16 @@ const THEATER_CONFIGS: TheaterIngestConfig[] = [
     officialSiteUrl: process.env.MOMA_OFFICIAL_URL || 'https://www.moma.org',
   },
   {
+    theaterName: 'Museum of the Moving Image',
+    theaterSlug: 'momi',
+    sourceName: 'momi',
+    sourceUrl:
+      process.env.MOMI_SHOWTIMES_URL ||
+      'https://movingimage.org/events/category/screening/',
+    officialSiteUrl:
+      process.env.MOMI_OFFICIAL_URL || 'https://movingimage.org/',
+  },
+  {
     theaterName: 'Anthology Film Archives',
     theaterSlug: 'anthology',
     sourceName: 'anthology',
@@ -105,6 +115,13 @@ const THEATER_CONFIGS: TheaterIngestConfig[] = [
     officialSiteUrl:
       process.env.ANTHOLOGY_OFFICIAL_URL ||
       'https://www.anthologyfilmarchives.org',
+  },
+  {
+    theaterName: 'BAM',
+    theaterSlug: 'bam',
+    sourceName: 'bam',
+    sourceUrl: process.env.BAM_SHOWTIMES_URL || 'https://www.bam.org/film/',
+    officialSiteUrl: process.env.BAM_OFFICIAL_URL || 'https://www.bam.org/',
   },
   {
     theaterName: 'Angelika New York',

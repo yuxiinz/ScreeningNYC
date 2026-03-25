@@ -26,10 +26,20 @@ export const THEATER_META = {
     longitude: -73.9776,
     address: '11 West 53 Street, New York, NY',
   },
+  momi: {
+    latitude: 40.7563252,
+    longitude: -73.9238983,
+    address: '36-01 35 Ave, Astoria, NY 11106',
+  },
   anthology: {
     latitude: 40.7247,
     longitude: -73.9901,
     address: '32 Second Avenue, New York, NY 10003',
+  },
+  bam: {
+    latitude: 40.686462,
+    longitude: -73.977705,
+    address: '30 Lafayette Ave, Brooklyn, NY 11217',
   },
   angelikaNYC: {
     latitude: 40.7257247,

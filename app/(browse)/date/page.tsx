@@ -11,6 +11,7 @@ import {
   isTmdbPoster,
 } from '@/lib/movie/display'
 import { prisma } from '@/lib/prisma'
+import { isFreeTicketValue } from '@/lib/showtime/ticket'
 import {
   APP_TIMEZONE,
   formatTimeInAppTimezone,
@@ -280,7 +281,11 @@ export default async function DatePage({
 
                           </div>
 
-                          {showtime.ticketUrl ? (
+                          {isFreeTicketValue(showtime.ticketUrl) ? (
+                            <span className="whitespace-nowrap text-[0.8rem] font-bold text-accent-positive">
+                              FREE
+                            </span>
+                          ) : showtime.ticketUrl ? (
                             <a
                               href={showtime.ticketUrl}
                               target="_blank"
