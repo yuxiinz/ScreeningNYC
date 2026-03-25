@@ -167,6 +167,22 @@ function extractTimesFromPiece(piece: string): string[] {
   return matches ? matches.map((x) => normalizeWhitespace(x)) : []
 }
 
+function normalizeFilmForumTimeText(timeText: string): string {
+  const cleaned = normalizeWhitespace(timeText).replace(/[*†‡]+$/g, '').trim()
+  if (!cleaned || /\b(?:AM|PM)\b/i.test(cleaned)) return cleaned
+
+  const match = cleaned.match(/^(\d{1,2}):(\d{2})$/)
+  if (!match) return cleaned
+
+  const hour = Number(match[1])
+  if (hour < 1 || hour > 12) return cleaned
+
+  // Film Forum publishes unlabeled 12-hour times on its public pages.
+  // Treat 1-9 as afternoon/evening, 10-11 as morning, and 12 as noon.
+  const meridiem = hour >= 10 && hour <= 11 ? 'AM' : 'PM'
+  return `${cleaned} ${meridiem}`
+}
+
 function normalizeFallbackText(detailsText: string): string[] {
   return detailsText
     .replace(/\u00a0/g, ' ')
@@ -180,16 +196,17 @@ function normalizeFallbackText(detailsText: string): string[] {
 }
 
 function buildFilmForumStartTimeRaw(dateText: string, timeText: string): string {
+  const normalizedTimeText = normalizeFilmForumTimeText(timeText)
   const parsed = parseShowtime({
     dateText,
-    timeText,
+    timeText: normalizedTimeText,
   })
 
   if (parsed) {
     return formatShowtimeRaw(parsed)
   }
 
-  return `${normalizeWhitespace(dateText)} ${normalizeWhitespace(timeText)}`.trim()
+  return `${normalizeWhitespace(dateText)} ${normalizedTimeText}`.trim()
 }
 
 function parseFallbackDetailsText(detailsText: string): {
