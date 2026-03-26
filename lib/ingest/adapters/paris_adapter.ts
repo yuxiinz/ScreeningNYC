@@ -211,11 +211,13 @@ function parseFilmEvents(eventsChunk?: string): ParisEventRow[] {
 
   const rows: ParisEventRow[] = []
   const eventRe =
-    /"EventDate":"(?<eventDate>\d{4}-\d{2}-\d{2})"[\s\S]*?"EventTime":"(?<eventTime>[^"]+?)"(?:[\s\S]*?"TicketLink":"(?<ticketUrl>[^"]+?)")?/g
+    /"EventDate":"(\d{4}-\d{2}-\d{2})"[\s\S]*?"EventTime":"([^"]+?)"(?:[\s\S]*?"TicketLink":"([^"]+?)")?/g
 
   let matched: RegExpExecArray | null
   while ((matched = eventRe.exec(eventsChunk)) !== null) {
-    const { eventDate, eventTime, ticketUrl } = matched.groups || {}
+    const eventDate = matched[1]
+    const eventTime = matched[2]
+    const ticketUrl = matched[3]
     if (!eventDate || !eventTime) continue
 
     rows.push({
@@ -235,11 +237,13 @@ function extractFilmsFromScripts(
   const films: ParisFilm[] = []
 
   const filmBlockRe =
-    /"FilmName":"(?<filmName>[^"]+?)"[\s\S]*?"Slug":"(?<slug>[^"]+?)"[\s\S]*?"events":\{"data":\[(?<events>[\s\S]*?)\]\}/g
+    /"FilmName":"([^"]+?)"[\s\S]*?"Slug":"([^"]+?)"[\s\S]*?"events":\{"data":\[([\s\S]*?)\]\}/g
 
   let matched: RegExpExecArray | null
   while ((matched = filmBlockRe.exec(scripts)) !== null) {
-    const { filmName, slug, events } = matched.groups || {}
+    const filmName = matched[1]
+    const slug = matched[2]
+    const events = matched[3]
     if (!filmName || !slug) continue
 
     const block = matched[0]
@@ -296,11 +300,11 @@ function extractFilmsFromScripts(
 function extractSeriesSlugs(scripts: string): string[] {
   const slugs: string[] = []
   const seriesRe =
-    /"SeriesName":"[^"]+?"[\s\S]{0,3000}?"Slug":"(?<slug>[a-z0-9-]+)"/g
+    /"SeriesName":"[^"]+?"[\s\S]{0,3000}?"Slug":"([a-z0-9-]+)"/g
 
   let matched: RegExpExecArray | null
   while ((matched = seriesRe.exec(scripts)) !== null) {
-    const slug = matched.groups?.slug
+    const slug = matched[1]
     if (slug) slugs.push(slug)
   }
 
@@ -310,11 +314,11 @@ function extractSeriesSlugs(scripts: string): string[] {
 function extractEventSlugs(scripts: string): string[] {
   const slugs: string[] = []
   const eventRe =
-    /"EventName":"[^"]+?"[\s\S]{0,3000}?"Slug":"(?<slug>[a-z0-9-]+)"/g
+    /"EventName":"[^"]+?"[\s\S]{0,3000}?"Slug":"([a-z0-9-]+)"/g
 
   let matched: RegExpExecArray | null
   while ((matched = eventRe.exec(scripts)) !== null) {
-    const slug = matched.groups?.slug
+    const slug = matched[1]
     if (slug) slugs.push(slug)
   }
 
@@ -324,11 +328,15 @@ function extractEventSlugs(scripts: string): string[] {
 function extractStandaloneEvents(scripts: string): ParisStandaloneEvent[] {
   const events: ParisStandaloneEvent[] = []
   const eventRe =
-    /"EventName":"(?<eventName>[^"]+?)"[\s\S]{0,1500}?"EventDate":"(?<eventDate>\d{4}-\d{2}-\d{2})"[\s\S]{0,800}?"EventTime":"(?<eventTime>[^"]+?)"(?:[\s\S]{0,1500}?"TicketLink":"(?<ticketUrl>[^"]+?)")?(?:[\s\S]{0,1500}?"Slug":"(?<slug>[a-z0-9-]+)")?/g
+    /"EventName":"([^"]+?)"[\s\S]{0,1500}?"EventDate":"(\d{4}-\d{2}-\d{2})"[\s\S]{0,800}?"EventTime":"([^"]+?)"(?:[\s\S]{0,1500}?"TicketLink":"([^"]+?)")?(?:[\s\S]{0,1500}?"Slug":"([a-z0-9-]+)")?/g
 
   let matched: RegExpExecArray | null
   while ((matched = eventRe.exec(scripts)) !== null) {
-    const { eventName, eventDate, eventTime, ticketUrl, slug } = matched.groups || {}
+    const eventName = matched[1]
+    const eventDate = matched[2]
+    const eventTime = matched[3]
+    const ticketUrl = matched[4]
+    const slug = matched[5]
     if (!eventName || !eventDate || !eventTime) continue
 
     events.push({
