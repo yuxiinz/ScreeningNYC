@@ -15,6 +15,8 @@ Screening NYC is a Next.js application that aggregates screenings from independe
 - Film detail pages with grouped showtimes
 - Search across films, including titles without active showtimes
 - TMDB-backed metadata enrichment when `TMDB_API_KEY` is available
+- Email/password, magic link, and Google sign-in
+- User dashboard with account state and watchlist reminder toggle
 
 ## Stack
 
@@ -95,9 +97,17 @@ Create `.env`:
 ```env
 DATABASE_URL="postgresql://..."
 TMDB_API_KEY="..."
+AUTH_SECRET="..."
+APP_BASE_URL="http://localhost:3000"
+EMAIL_FROM="auth@example.com"
+RESEND_API_KEY="..."
+GOOGLE_CLIENT_ID="..."
+GOOGLE_CLIENT_SECRET="..."
 ```
 
 `TMDB_API_KEY` is optional.
+`AUTH_SECRET`, `EMAIL_FROM`, and `RESEND_API_KEY` are required for auth email flows.
+`GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are required for Google SSO.
 
 Run locally:
 

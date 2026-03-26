@@ -9,56 +9,132 @@ datasource db {
   // url      = env("DATABASE_URL")
 }
 
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  passwordHash  String?
+  name          String?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts                Account[]
+  sessions                Session[]
+  settings                UserSettings?
+  emailVerificationTokens EmailVerificationToken[]
+  watchlistItems          WatchlistItem[]
+  watchedMovies           UserMovieWatch[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model EmailVerificationToken {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model UserSettings {
+  userId                String   @id
+  watchlistEmailEnabled Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
 model Movie {
-  id              Int        @id @default(autoincrement())
-  tmdbId          Int?       @unique 
-  title           String     
-  originalTitle   String?
-  releaseDate     DateTime?
-  runtimeMinutes  Int?
-  overview        String?
-  posterUrl       String?
-  backdropUrl     String?
-  
+  id             Int       @id @default(autoincrement())
+  tmdbId         Int?      @unique
+  title          String
+  originalTitle  String?
+  releaseDate    DateTime?
+  runtimeMinutes Int?
+  overview       String?
+  posterUrl      String?
+  backdropUrl    String?
 
   imdbUrl         String?
   doubanUrl       String?
   letterboxdUrl   String?
   officialSiteUrl String?
 
+  genresText   String?
+  directorText String?
+  castText     String?
 
-  genresText      String?
-  directorText    String?
-  castText        String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  showtimes        Showtime[]
+  watchlistItems   WatchlistItem[]
+  userMovieWatches UserMovieWatch[]
 
-  showtimes       Showtime[]
-
-  @@index([title]) 
+  @@index([title])
 }
 
 model Theater {
-  id              Int        @id @default(autoincrement())
-  name            String
-  slug            String    @unique 
-  
-  sourceName      String?    
-  sourceTheaterId String?    @unique 
-  
-  address         String?
+  id   Int    @id @default(autoincrement())
+  name String
+  slug String @unique
 
-  latitude        Decimal?   @db.Decimal(10, 8)
-  longitude       Decimal?   @db.Decimal(11, 8)
-  
-  borough         String?    
+  sourceName      String?
+  sourceTheaterId String? @unique
+
+  address String?
+
+  latitude  Decimal? @db.Decimal(10, 8)
+  longitude Decimal? @db.Decimal(11, 8)
+
+  borough         String?
   officialSiteUrl String?
 
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  showtimes       Showtime[]
+  showtimes Showtime[]
 }
 
 model Format {
@@ -68,35 +144,84 @@ model Format {
 }
 
 model Showtime {
-  id               Int            @id @default(autoincrement())
-  movieId          Int
-  theaterId        Int
-  formatId         Int?
+  id        Int  @id @default(autoincrement())
+  movieId   Int
+  theaterId Int
+  formatId  Int?
 
-  startTime        DateTime
-  endTime          DateTime?
-  runtimeMinutes   Int?
-  ticketUrl        String?
-  shownTitle       String?
+  startTime      DateTime
+  endTime        DateTime?
+  runtimeMinutes Int?
+  ticketUrl      String?
+  shownTitle     String?
 
   sourceName       String?
   sourceUrl        String?
   sourceShowtimeId String?
 
-  fingerprint      String?        @unique
+  fingerprint String? @unique
 
-  status           ShowtimeStatus @default(SCHEDULED)
-  lastVerifiedAt   DateTime?
+  status         ShowtimeStatus @default(SCHEDULED)
+  lastVerifiedAt DateTime?
 
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  movie            Movie          @relation(fields: [movieId], references: [id], onDelete: Cascade)
-  theater          Theater        @relation(fields: [theaterId], references: [id], onDelete: Cascade)
-  format           Format?        @relation(fields: [formatId], references: [id])
+  movie                  Movie                           @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  theater                Theater                         @relation(fields: [theaterId], references: [id], onDelete: Cascade)
+  format                 Format?                         @relation(fields: [formatId], references: [id])
+  notificationDeliveries WatchlistNotificationDelivery[]
 
   @@index([startTime])
   @@index([theaterId, startTime])
+}
+
+model WatchlistItem {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  movieId   Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user                   User                            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movie                  Movie                           @relation(fields: [movieId], references: [id], onDelete: Cascade)
+  notificationDeliveries WatchlistNotificationDelivery[]
+
+  @@unique([userId, movieId])
+  @@index([movieId])
+}
+
+model UserMovieWatch {
+  id              Int      @id @default(autoincrement())
+  userId          String
+  movieId         Int
+  rating          Int?
+  reviewText      String?
+  reviewWordCount Int      @default(0)
+  watchedAt       DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  movie Movie @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, movieId])
+  @@index([movieId, watchedAt])
+}
+
+model WatchlistNotificationDelivery {
+  id              Int      @id @default(autoincrement())
+  watchlistItemId Int
+  showtimeId      Int
+  resendMessageId String?
+  sentToEmail     String
+  sentAt          DateTime @default(now())
+
+  watchlistItem WatchlistItem @relation(fields: [watchlistItemId], references: [id], onDelete: Cascade)
+  showtime      Showtime      @relation(fields: [showtimeId], references: [id], onDelete: Cascade)
+
+  @@unique([watchlistItemId, showtimeId])
+  @@index([showtimeId])
 }
 
 enum ShowtimeStatus {
