@@ -25,6 +25,11 @@ const SHOWTIME_META_CLASS = 'flex flex-wrap items-baseline gap-5'
 const POSTER_CARD_CLASS =
   'flex aspect-[2/3] w-40 shrink-0 items-center justify-center overflow-hidden rounded-card border border-border-subtle bg-card-bg shadow-poster'
 
+type DatePageSearchParams = {
+  date?: string | string[]
+  theaters?: string | string[]
+}
+
 function formatReadableDate(targetDate: string) {
   return DateTime.fromISO(targetDate, { zone: APP_TIMEZONE }).toFormat(
     'LLLL d, yyyy'
@@ -49,21 +54,44 @@ function getShowtimeDisplayTitle(shownTitle?: string | null, movieTitle?: string
   return shown
 }
 
+function getFirstSearchParamValue(value?: string | string[]) {
+  return Array.isArray(value) ? value[0] : value
+}
+
+function parseTheaterSlugs(value?: string | string[]) {
+  const rawValues = Array.isArray(value) ? value : value ? [value] : []
+
+  return rawValues
+    .flatMap((item) => item.split(','))
+    .map((slug) => slug.trim())
+    .filter(Boolean)
+}
+
+function resolveSafeDate(value: string | string[] | undefined, fallbackDate: string) {
+  const rawDate = getFirstSearchParamValue(value)?.trim()
+  if (!rawDate) {
+    return fallbackDate
+  }
+
+  const parsedDate = DateTime.fromISO(rawDate, { zone: APP_TIMEZONE })
+  if (!parsedDate.isValid) {
+    return fallbackDate
+  }
+
+  return parsedDate.toFormat('yyyy-MM-dd')
+}
+
 export default async function DatePage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string; theaters?: string }>
+  searchParams: Promise<DatePageSearchParams>
 }) {
   const params = await searchParams
-  const selectedDateStr = params.date
-  const selectedTheaterSlugs = (params.theaters || '')
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean)
 
   const nowNy = DateTime.now().setZone(APP_TIMEZONE)
   const today = getTodayInAppTimezone(nowNy.toJSDate())
-  const targetDate = selectedDateStr || today
+  const targetDate = resolveSafeDate(params.date, today)
+  const selectedTheaterSlugs = parseTheaterSlugs(params.theaters)
 
   const startOfDayNy = DateTime.fromISO(targetDate, {
     zone: APP_TIMEZONE,

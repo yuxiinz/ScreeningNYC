@@ -56,4 +56,19 @@ export const THEATER_META = {
     longitude: -73.9659658,
     address: '1001 3rd Ave, New York, NY 10022',
   },
+  paris: {
+    latitude: 40.7638,
+    longitude: -73.976,
+    address: '4 W 58th St, New York, NY 10019',
+  },
+  nitehawkwilliamsburg: {
+    latitude: 40.7146,
+    longitude: -73.9634,
+    address: '136 Metropolitan Ave, Brooklyn, NY 11249',
+  },
+  nitehawkprospectpark: {
+    latitude: 40.6614,
+    longitude: -73.9808,
+    address: '188 Prospect Park W, Brooklyn, NY 11215',
+  },
 } as const

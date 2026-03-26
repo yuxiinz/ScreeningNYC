@@ -9,6 +9,8 @@ import { scrapeAnthologyShowtimes } from './anthology_adapter'
 import { scrapeAngelikaShowtimes } from './angelika_adapter'
 import { scrapeMomiShowtimes } from './momi_adapter'
 import { scrapeBamShowtimes } from './bam_adapter'
+import { scrapeParisShowtimes } from './paris_adapter'
+import { scrapeNitehawkShowtimes } from './nitehawk_adapter'
 
 export function getShowtimeScraper(theaterSlug: string) {
   switch (theaterSlug) {
@@ -32,6 +34,11 @@ export function getShowtimeScraper(theaterSlug: string) {
     case 'angelikaEV':
     case 'angelika123':
       return scrapeAngelikaShowtimes
+    case 'paris':
+      return scrapeParisShowtimes
+    case 'nitehawkwilliamsburg':
+    case 'nitehawkprospectpark':
+      return scrapeNitehawkShowtimes
     default:
       throw new Error(`Unsupported theater: ${theaterSlug}`)
   }

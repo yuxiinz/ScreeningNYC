@@ -48,6 +48,7 @@ type TheaterRunStats = {
 const TMDB_API_KEY = process.env.TMDB_API_KEY || ''
 const THEATER_SLUG_GROUPS: Record<string, string[]> = {
   angelika: ['angelikanyc', 'angelikaev', 'angelika123'],
+  nitehawk: ['nitehawkwilliamsburg', 'nitehawkprospectpark'],
 }
 
 const THEATER_CONFIGS: TheaterIngestConfig[] = [
@@ -155,6 +156,37 @@ const THEATER_CONFIGS: TheaterIngestConfig[] = [
     officialSiteUrl:
       process.env.ANGELIKA_123_OFFICIAL_URL ||
       'https://angelikafilmcenter.com/cinemas123/',
+  },
+  {
+    theaterName: 'Paris Theater',
+    theaterSlug: 'paris',
+    sourceName: 'paris',
+    sourceUrl:
+      process.env.PARIS_SHOWTIMES_URL || 'https://www.paristheaternyc.com/',
+    officialSiteUrl:
+      process.env.PARIS_OFFICIAL_URL || 'https://www.paristheaternyc.com/',
+  },
+  {
+    theaterName: 'Nitehawk Williamsburg',
+    theaterSlug: 'nitehawkwilliamsburg',
+    sourceName: 'nitehawk',
+    sourceUrl:
+      process.env.NITEHAWK_WILLIAMSBURG_SHOWTIMES_URL ||
+      'https://nitehawkcinema.com/williamsburg/',
+    officialSiteUrl:
+      process.env.NITEHAWK_WILLIAMSBURG_OFFICIAL_URL ||
+      'https://nitehawkcinema.com/williamsburg/',
+  },
+  {
+    theaterName: 'Nitehawk Prospect Park',
+    theaterSlug: 'nitehawkprospectpark',
+    sourceName: 'nitehawk',
+    sourceUrl:
+      process.env.NITEHAWK_PROSPECTPARK_SHOWTIMES_URL ||
+      'https://nitehawkcinema.com/prospectpark/',
+    officialSiteUrl:
+      process.env.NITEHAWK_PROSPECTPARK_OFFICIAL_URL ||
+      'https://nitehawkcinema.com/prospectpark/',
   },
 ]
 
