@@ -101,7 +101,7 @@ const THEATER_CONFIGS: TheaterIngestConfig[] = [
     sourceName: 'momi',
     sourceUrl:
       process.env.MOMI_SHOWTIMES_URL ||
-      'https://movingimage.org/events/category/screening/',
+      'https://movingimage.org/events/list/?tribe_filterbar_category_custom%5B0%5D=253&tribe_filterbar_category_custom%5B1%5D=230',
     officialSiteUrl:
       process.env.MOMI_OFFICIAL_URL || 'https://movingimage.org/',
   },
@@ -182,6 +182,7 @@ function isProgramContent(input: {
     t.includes('tribute') ||
     t.includes('program') ||
     t.includes('shorts') ||
+    t.includes('double feature') ||
     t.includes('episodes') ||
     t.includes('panel') ||
     t.includes('secret screening') ||
