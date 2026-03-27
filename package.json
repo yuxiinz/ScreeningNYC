@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit",
     "build:clean": "rm -rf .next && next build",
     "lint": "eslint",
-    "ingest:theater": "tsx scripts/ingest_theater.ts"
+    "ingest:theater": "tsx scripts/ingest_theater.ts",
+    "cleanup:showtimes": "tsx scripts/cleanup_expired_showtimes.ts",
+    "backfill:showtime-end-times": "tsx scripts/backfill_showtime_end_times.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",

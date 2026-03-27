@@ -521,6 +521,7 @@ export async function upsertShowtime(params: {
   theaterId: number
   formatId?: number
   startTime: Date
+  endTime?: Date
   runtimeMinutes?: number
   ticketUrl?: string
   shownTitle?: string
@@ -532,6 +533,7 @@ export async function upsertShowtime(params: {
   const shownTitleSupported = await supportsShowtimeShownTitleColumn()
   const updateData = {
     runtimeMinutes: params.runtimeMinutes,
+    endTime: params.endTime,
     ticketUrl: params.ticketUrl,
     sourceUrl: params.sourceUrl,
     sourceName: params.sourceName,
@@ -547,6 +549,7 @@ export async function upsertShowtime(params: {
     theaterId: params.theaterId,
     formatId: params.formatId,
     startTime: params.startTime,
+    endTime: params.endTime,
     runtimeMinutes: params.runtimeMinutes,
     ticketUrl: params.ticketUrl,
     sourceUrl: params.sourceUrl,
@@ -586,6 +589,101 @@ export async function markMissingShowtimesAsCanceled(
       lastVerifiedAt: new Date(),
     },
   })
+}
+
+export async function backfillMissingShowtimeEndTimesBatch(batchSize = 500): Promise<number> {
+  const rows = await prisma.showtime.findMany({
+    where: {
+      endTime: null,
+      OR: [
+        {
+          runtimeMinutes: {
+            gt: 0,
+          },
+        },
+        {
+          movie: {
+            runtimeMinutes: {
+              gt: 0,
+            },
+          },
+        },
+      ],
+    },
+    select: {
+      id: true,
+      startTime: true,
+      runtimeMinutes: true,
+      movie: {
+        select: {
+          runtimeMinutes: true,
+        },
+      },
+    },
+    orderBy: {
+      id: 'asc',
+    },
+    take: batchSize,
+  })
+
+  if (rows.length === 0) return 0
+
+  let updatedCount = 0
+
+  for (const row of rows) {
+    const runtimeMinutes = row.runtimeMinutes ?? row.movie.runtimeMinutes
+    if (!runtimeMinutes || runtimeMinutes <= 0) continue
+
+    const endTime = new Date(row.startTime.getTime() + runtimeMinutes * 60 * 1000)
+    await prisma.showtime.update({
+      where: { id: row.id },
+      data: { endTime },
+    })
+    updatedCount += 1
+  }
+
+  return updatedCount
+}
+
+export async function deleteExpiredShowtimesBatch(batchSize = 1000): Promise<number> {
+  const now = new Date()
+
+  const rows = await prisma.showtime.findMany({
+    where: {
+      OR: [
+        {
+          endTime: {
+            lt: now,
+          },
+        },
+        {
+          endTime: null,
+          startTime: {
+            lt: now,
+          },
+        },
+      ],
+    },
+    select: {
+      id: true,
+    },
+    orderBy: {
+      startTime: 'asc',
+    },
+    take: batchSize,
+  })
+
+  if (rows.length === 0) return 0
+
+  const deleted = await prisma.showtime.deleteMany({
+    where: {
+      id: {
+        in: rows.map((row) => row.id),
+      },
+    },
+  })
+
+  return deleted.count
 }
 
 export async function disconnectPrisma() {

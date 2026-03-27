@@ -241,6 +241,11 @@ function formatLocalTime(date: Date): string {
     .toFormat('yyyy-MM-dd HH:mm')
 }
 
+function computeEndTime(startTime: Date, runtimeMinutes?: number): Date | undefined {
+  if (!runtimeMinutes || runtimeMinutes <= 0) return undefined
+  return new Date(startTime.getTime() + runtimeMinutes * 60 * 1000)
+}
+
 async function ingestOneTheater(
   config: TheaterIngestConfig
 ): Promise<TheaterRunStats> {
@@ -395,6 +400,9 @@ async function ingestOneTheater(
       formatName,
     })
 
+    const effectiveRuntimeMinutes = item.runtimeMinutes ?? movie.runtimeMinutes ?? undefined
+    const endTime = computeEndTime(parsedStart, effectiveRuntimeMinutes)
+
     fingerprintsForCancel.push(fingerprint)
 
     await upsertShowtime({
@@ -402,6 +410,7 @@ async function ingestOneTheater(
       theaterId: theater.id,
       formatId: format.id,
       startTime: parsedStart,
+      endTime,
       runtimeMinutes: item.runtimeMinutes,
       ticketUrl: item.ticketUrl,
       shownTitle: item.shownTitle,

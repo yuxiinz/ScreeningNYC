@@ -17,6 +17,7 @@ Over-engineering is not permitted; maintain the shortest possible implementation
 - Adapters return `ScrapedShowtime[]` (see `lib/ingest/adapters/types.ts`): required `movieTitle`, `startTimeRaw`; optional metadata such as `ticketUrl`, `directorText`, `releaseYear`, `runtimeMinutes`, `posterUrl`, `rawFormat`, `tmdbTitleCandidates`, `sourceShowtimeId`.
 - Times: Provide local (NYC) strings; parsing is handled by `parseStartTime` in `lib/ingest/services/persist_service.ts` using `APP_TIMEZONE = America/New_York`.
 - Dedup: Fingerprint is `theaterSlug | canonical movie title | UTC start time | format`. Duplicates are skipped; missing fingerprints for the next 30 days are marked `CANCELED`.
+- Retention: expired showtimes are periodically hard-deleted by `scripts/cleanup_expired_showtimes.ts`; `scripts/backfill_showtime_end_times.ts` can backfill `endTime` once during rollout.
 - Programs vs features: `isProgramContent` flags festival/series language; program items skip TMDB and are stored via `upsertLocalMovie` with `genresText: 'Program'`.
 - Formats are normalized by `normalizeFormat`; unknown values fall back to `Standard`.
 

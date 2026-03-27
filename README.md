@@ -127,6 +127,18 @@ Run the theater ingest manually:
 npm run ingest:theater
 ```
 
+Clean up expired showtimes (keeps `Showtime` operationally future-only):
+
+```bash
+npm run cleanup:showtimes
+```
+
+Backfill missing `endTime` values and then clean expired showtimes (one-time rollout helper):
+
+```bash
+npm run backfill:showtime-end-times
+```
+
 You can also pass theater slugs as arguments to limit the run:
 
 ```bash
@@ -158,6 +170,7 @@ npm run build
 - Vercel handles application deployment on push.
 - GitHub Actions `ci.yml` runs install, Prisma client generation, Next route type generation, typecheck, lint, and build.
 - GitHub Actions `daily_ingest.yml` runs the daily ingest job and expects `DATABASE_URL` and `TMDB_API_KEY` secrets.
+- GitHub Actions `cleanup_showtimes.yml` runs every 15 minutes and deletes expired showtimes from `Showtime`.
 
 ## Notes
 
