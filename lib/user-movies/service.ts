@@ -1,4 +1,8 @@
 import { prisma } from '@/lib/prisma'
+import {
+  getReviewWordCount,
+  normalizeReviewText,
+} from '@/lib/user-movies/review'
 
 export type MovieCollectionState = {
   inWant: boolean
@@ -10,18 +14,6 @@ export class WantRemovalConfirmationRequiredError extends Error {
     super(message)
     this.name = 'WantRemovalConfirmationRequiredError'
   }
-}
-
-export function getReviewWordCount(reviewText?: string | null) {
-  return (reviewText || '')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean).length
-}
-
-function normalizeReviewText(reviewText?: string | null) {
-  const normalizedReviewText = (reviewText || '').trim()
-  return normalizedReviewText || null
 }
 
 function getUniqueMovieIds(movieIds: number[]) {
@@ -131,6 +123,7 @@ export async function removeWant(userId: string, movieId: number) {
 
 type MarkWatchedInput = {
   confirmRemoveWant?: boolean
+  preserveWatchedAt?: boolean
   rating?: number | null
   reviewText?: string | null
 }
@@ -140,34 +133,51 @@ export async function markWatched(
   movieId: number,
   input: MarkWatchedInput = {}
 ) {
-  const watchedAt = new Date()
   const reviewText = normalizeReviewText(input.reviewText)
   const reviewWordCount = getReviewWordCount(reviewText)
 
   return prisma.$transaction(async (tx) => {
-    const watchlistItem = await tx.watchlistItem.findUnique({
-      where: {
-        userId_movieId: {
-          userId,
-          movieId,
+    const [watchlistItem, existingWatchedMovie] = await Promise.all([
+      tx.watchlistItem.findUnique({
+        where: {
+          userId_movieId: {
+            userId,
+            movieId,
+          },
         },
-      },
-      select: {
-        id: true,
-      },
-    })
+        select: {
+          id: true,
+        },
+      }),
+      tx.userMovieWatch.findUnique({
+        where: {
+          userId_movieId: {
+            userId,
+            movieId,
+          },
+        },
+        select: {
+          watchedAt: true,
+        },
+      }),
+    ])
 
-    if (watchlistItem && !input.confirmRemoveWant) {
+    if (watchlistItem && !existingWatchedMovie && !input.confirmRemoveWant) {
       throw new WantRemovalConfirmationRequiredError()
     }
 
-    if (watchlistItem) {
+    if (watchlistItem && input.confirmRemoveWant) {
       await tx.watchlistItem.delete({
         where: {
           id: watchlistItem.id,
         },
       })
     }
+
+    const watchedAt =
+      input.preserveWatchedAt && existingWatchedMovie?.watchedAt
+        ? existingWatchedMovie.watchedAt
+        : new Date()
 
     const watchedMovie = await tx.userMovieWatch.upsert({
       where: {
@@ -200,7 +210,7 @@ export async function markWatched(
     return {
       movieId,
       inWatched: true,
-      removedFromWant: Boolean(watchlistItem),
+      removedFromWant: Boolean(watchlistItem && input.confirmRemoveWant),
       watchedAt: watchedMovie.watchedAt.toISOString(),
       rating: watchedMovie.rating,
       reviewText: watchedMovie.reviewText,

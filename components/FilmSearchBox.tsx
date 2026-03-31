@@ -4,13 +4,38 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import type { MovieSearchResult } from '@/lib/movie/search'
+import type {
+  MeMovieSearchExternalResult,
+  MeMovieSearchLocalResult,
+  MeMovieSearchResponse,
+  MovieSearchResult,
+} from '@/lib/movie/search'
 
-export default function FilmSearchBox() {
+type FilmSearchBoxProps = {
+  isAuthenticated?: boolean
+}
+
+type SearchResultsState = {
+  localResults: MeMovieSearchLocalResult[]
+  externalResults: MeMovieSearchExternalResult[]
+}
+
+function getEmptyResults(): SearchResultsState {
+  return {
+    localResults: [],
+    externalResults: [],
+  }
+}
+
+export default function FilmSearchBox({
+  isAuthenticated = false,
+}: FilmSearchBoxProps) {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<MovieSearchResult[]>([])
+  const [results, setResults] = useState<SearchResultsState>(getEmptyResults)
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
+  const [pendingResolveTmdbId, setPendingResolveTmdbId] = useState<number | null>(null)
+  const [error, setError] = useState('')
 
   const router = useRouter()
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -44,41 +69,68 @@ export default function FilmSearchBox() {
     const trimmed = query.trim()
 
     if (trimmed.length < 2) {
-      setResults([])
+      setResults(getEmptyResults())
       setLoading(false)
       setOpen(false)
+      setError('')
       return
     }
 
     const timer = setTimeout(async () => {
       setLoading(true)
+      setError('')
 
       try {
-        const res = await fetch(
-          `/api/movies/search?q=${encodeURIComponent(trimmed)}`
-        )
+        const endpoint = isAuthenticated
+          ? `/api/me/movies/search?q=${encodeURIComponent(trimmed)}`
+          : `/api/movies/search?q=${encodeURIComponent(trimmed)}`
+        const res = await fetch(endpoint)
 
         if (!res.ok) {
           const text = await res.text()
           console.error('Search API returned non OK response:', text)
-          setResults([])
+          setResults(getEmptyResults())
+          setError('Could not search films right now.')
           setOpen(true)
           return
         }
 
         const data = await res.json()
 
-        if (Array.isArray(data)) {
-          setResults(data)
+        if (isAuthenticated) {
+          const authenticatedResults = data as Partial<MeMovieSearchResponse>
+
+          if (
+            Array.isArray(authenticatedResults.localResults) &&
+            Array.isArray(authenticatedResults.externalResults)
+          ) {
+            setResults({
+              localResults: authenticatedResults.localResults,
+              externalResults: authenticatedResults.externalResults,
+            })
+          } else {
+            console.error('Authenticated search API returned invalid payload:', data)
+            setResults(getEmptyResults())
+          }
+        } else if (Array.isArray(data)) {
+          setResults({
+            localResults: data.map((movie: MovieSearchResult) => ({
+              ...movie,
+              inWant: false,
+              inWatched: false,
+            })),
+            externalResults: [],
+          })
         } else {
           console.error('Search API did not return an array:', data)
-          setResults([])
+          setResults(getEmptyResults())
         }
 
         setOpen(true)
       } catch (error) {
         console.error('Search request failed:', error)
-        setResults([])
+        setResults(getEmptyResults())
+        setError('Could not search films right now.')
         setOpen(true)
       } finally {
         setLoading(false)
@@ -86,18 +138,77 @@ export default function FilmSearchBox() {
     }, 300)
 
     return () => clearTimeout(timer)
-  }, [query])
+  }, [isAuthenticated, query])
 
   function handleSelect(movieId: number) {
     setOpen(false)
     setQuery('')
+    setError('')
     router.push(`/films/${movieId}`)
+  }
+
+  async function handleExternalSelect(movie: MeMovieSearchExternalResult) {
+    setPendingResolveTmdbId(movie.tmdbId)
+    setError('')
+
+    try {
+      const response = await fetch('/api/me/movies/resolve', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          tmdbId: movie.tmdbId,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Could not create a film page right now.')
+      }
+
+      const data = (await response.json()) as { movieId?: number }
+
+      if (!data.movieId) {
+        throw new Error('Resolved film did not return a movie id.')
+      }
+
+      setOpen(false)
+      setQuery('')
+      router.push(`/films/${data.movieId}`)
+    } catch (nextError) {
+      console.error('Resolve request failed:', nextError)
+      setError(
+        nextError instanceof Error
+          ? nextError.message
+          : 'Could not create a film page right now.'
+      )
+      setOpen(true)
+    } finally {
+      setPendingResolveTmdbId(null)
+    }
   }
 
   function getStatusLabel(status: MovieSearchResult['status']) {
     if (status === 'NOW_SHOWING') return 'Now showing'
     return 'No current showtimes'
   }
+
+  function getLocalMeta(movie: MeMovieSearchLocalResult) {
+    const parts = [getStatusLabel(movie.status)]
+
+    if (movie.inWant) {
+      parts.push('In want list')
+    }
+
+    if (movie.inWatched) {
+      parts.push('Watched')
+    }
+
+    return parts.join(' · ')
+  }
+
+  const hasAnyResults =
+    results.localResults.length > 0 || results.externalResults.length > 0
 
   return (
     <div ref={wrapperRef} className="relative w-80">
@@ -122,21 +233,30 @@ export default function FilmSearchBox() {
             </div>
           )}
 
-          {!loading && results.length === 0 && (
+          {!loading && error && (
+            <div className="px-[14px] py-3 text-[0.9rem] text-[#ffb3b3]">
+              {error}
+            </div>
+          )}
+
+          {!loading && !error && !hasAnyResults && (
             <div className="px-[14px] py-3 text-[0.9rem] text-text-disabled">
-              No films found
+              {isAuthenticated
+                ? 'No films found in Screening NYC or TMDB.'
+                : 'No films found'}
             </div>
           )}
 
           {!loading &&
-            results.map((movie, index) => (
+            results.localResults.map((movie, index) => (
               <button
                 key={movie.id}
                 type="button"
                 onClick={() => handleSelect(movie.id)}
                 className={[
                   'w-full cursor-pointer bg-transparent px-[14px] py-3 text-left text-text-primary transition-colors hover:bg-card-bg',
-                  index === results.length - 1
+                  index === results.localResults.length - 1 &&
+                  results.externalResults.length === 0
                     ? 'border-none'
                     : 'border-b border-border-subtle',
                 ].join(' ')}
@@ -147,7 +267,43 @@ export default function FilmSearchBox() {
                 </div>
 
                 <div className="text-[0.8rem] leading-[1.2] text-text-dim">
-                  {getStatusLabel(movie.status)}
+                  {getLocalMeta(movie)}
+                </div>
+              </button>
+            ))}
+
+          {!loading &&
+            results.externalResults.map((movie, index) => (
+              <button
+                key={movie.tmdbId}
+                type="button"
+                onClick={() => {
+                  if (pendingResolveTmdbId === null) {
+                    void handleExternalSelect(movie)
+                  }
+                }}
+                disabled={pendingResolveTmdbId !== null}
+                className={[
+                  'w-full cursor-pointer bg-transparent px-[14px] py-3 text-left text-text-primary transition-colors hover:bg-card-bg disabled:cursor-not-allowed disabled:opacity-60',
+                  index === results.externalResults.length - 1
+                    ? 'border-none'
+                    : 'border-b border-border-subtle',
+                ].join(' ')}
+              >
+                <div className="mb-1 flex items-center justify-between gap-3 text-[0.95rem] leading-[1.3]">
+                  <span>
+                    {movie.title}
+                    {movie.year ? ` (${movie.year})` : ''}
+                  </span>
+                  <span className="rounded-[4px] border border-border-input px-2 py-0.5 text-[0.68rem] font-semibold tracking-[0.08em] text-text-dim">
+                    TMDB
+                  </span>
+                </div>
+
+                <div className="text-[0.8rem] leading-[1.2] text-text-dim">
+                  {pendingResolveTmdbId === movie.tmdbId
+                    ? 'Creating film page...'
+                    : 'Create film page and open details'}
                 </div>
               </button>
             ))}

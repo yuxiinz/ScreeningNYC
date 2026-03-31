@@ -107,7 +107,7 @@ export default async function HomePage({
   return (
     <>
       <div className="mx-auto mb-5 flex max-w-[var(--container-wide)] justify-end">
-        <FilmSearchBox />
+        <FilmSearchBox isAuthenticated={Boolean(currentUserId)} />
       </div>
 
       <main className="mx-auto max-w-[var(--container-wide)]">

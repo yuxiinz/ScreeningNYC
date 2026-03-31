@@ -1,6 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+
+import RatingChain from '@/components/movie/RatingChain'
+import { getReviewWordCount } from '@/lib/user-movies/review'
 
 type MovieListActionsProps = {
   movieId: number
@@ -15,8 +19,6 @@ type PendingAction = 'want' | 'watched' | null
 type MutationErrorPayload = {
   message?: string
 }
-
-const RATING_OPTIONS: Array<number | null> = [null, 1, 2, 3, 4, 5]
 
 function buildButtonClass(
   isActive: boolean,
@@ -45,13 +47,6 @@ async function getErrorMessage(response: Response, fallbackMessage: string) {
   }
 }
 
-function getReviewWordCount(reviewText: string) {
-  return reviewText
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean).length
-}
-
 export default function MovieListActions({
   movieId,
   initialInWant,
@@ -59,6 +54,8 @@ export default function MovieListActions({
   compact = false,
   className,
 }: MovieListActionsProps) {
+  const router = useRouter()
+  const pathname = usePathname()
   const [inWant, setInWant] = useState(initialInWant)
   const [inWatched, setInWatched] = useState(initialInWatched)
   const [pendingAction, setPendingAction] = useState<PendingAction>(null)
@@ -85,6 +82,10 @@ export default function MovieListActions({
       }
 
       setInWant(!inWant)
+
+      if (inWant && pathname === '/me/want-list') {
+        router.refresh()
+      }
     } catch (nextError) {
       setError(
         nextError instanceof Error
@@ -120,6 +121,10 @@ export default function MovieListActions({
       }
 
       setInWatched(false)
+
+      if (pathname === '/me/watched') {
+        router.refresh()
+      }
     } catch (nextError) {
       setError(
         nextError instanceof Error
@@ -166,6 +171,10 @@ export default function MovieListActions({
       }
 
       setWatchedDialogOpen(false)
+
+      if (pathname === '/me/want-list') {
+        router.refresh()
+      }
     } catch (nextError) {
       setError(
         nextError instanceof Error
@@ -234,23 +243,7 @@ export default function MovieListActions({
               <p className="mb-3 text-[0.78rem] font-semibold tracking-[0.08em] text-text-dim">
                 RATING
               </p>
-              <div className="flex flex-wrap gap-2">
-                {RATING_OPTIONS.map((option) => (
-                  <button
-                    key={option === null ? 'none' : option}
-                    type="button"
-                    onClick={() => setRating(option)}
-                    className={[
-                      'rounded-panel border px-3 py-2 text-[0.82rem] font-semibold transition-colors',
-                      rating === option
-                        ? 'border-text-primary bg-text-primary text-page-bg'
-                        : 'border-border-input text-text-secondary hover:border-text-primary hover:text-text-primary',
-                    ].join(' ')}
-                  >
-                    {option === null ? 'No rating' : `${option}/5`}
-                  </button>
-                ))}
-              </div>
+              <RatingChain value={rating} onChange={setRating} disabled={pendingAction !== null} />
             </div>
 
             <div className="mb-6">

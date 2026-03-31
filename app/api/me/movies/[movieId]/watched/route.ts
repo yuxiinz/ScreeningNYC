@@ -2,11 +2,11 @@ import { NextResponse } from 'next/server'
 
 import { AuthRequiredError, requireUserId } from '@/lib/auth/require-user-id'
 import {
-  getReviewWordCount,
   markWatched,
   removeWatched,
   WantRemovalConfirmationRequiredError,
 } from '@/lib/user-movies/service'
+import { getReviewWordCount } from '@/lib/user-movies/review'
 
 async function getMovieId(params: Promise<{ movieId: string }>) {
   const { movieId } = await params
@@ -59,6 +59,8 @@ export async function PUT(
 
   const confirmRemoveWant = (body as { confirmRemoveWant?: unknown })
     ?.confirmRemoveWant
+  const preserveWatchedAt = (body as { preserveWatchedAt?: unknown })
+    ?.preserveWatchedAt
   const ratingInput = (body as { rating?: unknown })?.rating
   const reviewTextInput = (body as { reviewText?: unknown })?.reviewText
 
@@ -76,17 +78,30 @@ export async function PUT(
   }
 
   if (
+    typeof preserveWatchedAt !== 'undefined' &&
+    typeof preserveWatchedAt !== 'boolean'
+  ) {
+    return NextResponse.json(
+      {
+        code: 'INVALID_PRESERVE_WATCHED_AT',
+        message: 'preserveWatchedAt must be a boolean.',
+      },
+      { status: 400 }
+    )
+  }
+
+  if (
     typeof ratingInput !== 'undefined' &&
     ratingInput !== null &&
     (typeof ratingInput !== 'number' ||
       !Number.isInteger(ratingInput) ||
-      ratingInput < 1 ||
+      ratingInput < 0 ||
       ratingInput > 5)
   ) {
     return NextResponse.json(
       {
         code: 'INVALID_RATING',
-        message: 'rating must be null or an integer from 1 to 5.',
+        message: 'rating must be null or an integer from 0 to 5.',
       },
       { status: 400 }
     )
@@ -131,6 +146,7 @@ export async function PUT(
 
     const result = await markWatched(userId, movieId, {
       confirmRemoveWant,
+      preserveWatchedAt,
       rating,
       reviewText,
     })

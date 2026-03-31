@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import MovieListActions from '@/components/movie/MovieListActions'
 import MovieExternalLinks from '@/components/movie/MovieExternalLinks'
 import PosterImage from '@/components/movie/PosterImage'
+import WatchedReviewEditor from '@/components/movie/WatchedReviewEditor'
 import { getCurrentUserId } from '@/lib/auth/require-user-id'
 import {
   cleanDirectorText,
@@ -73,78 +74,75 @@ export default async function WatchedPage() {
             return (
               <article
                 key={item.movie.id}
-                className="flex flex-wrap items-start gap-6 rounded-panel border border-border-default bg-card-bg p-5 shadow-card"
+                className="flex flex-wrap items-start gap-6 rounded-panel border border-border-default bg-card-bg p-5 shadow-card xl:flex-nowrap"
               >
-                <Link
-                  href={`/films/${item.movie.id}`}
-                  className="shrink-0 text-inherit no-underline"
-                >
-                  <div className={POSTER_CARD_CLASS}>
-                    {item.movie.posterUrl ? (
-                      <PosterImage
-                        src={item.movie.posterUrl}
-                        alt={item.movie.title}
-                        className={getPosterImageClass(posterIsTmdb)}
-                      />
-                    ) : (
-                      <div className="px-3 text-center text-[0.82rem] text-text-empty">
-                        No Poster
-                      </div>
-                    )}
+                <div className="flex min-w-[320px] flex-1 flex-wrap items-start gap-6">
+                  <Link
+                    href={`/films/${item.movie.id}`}
+                    className="shrink-0 text-inherit no-underline"
+                  >
+                    <div className={POSTER_CARD_CLASS}>
+                      {item.movie.posterUrl ? (
+                        <PosterImage
+                          src={item.movie.posterUrl}
+                          alt={item.movie.title}
+                          className={getPosterImageClass(posterIsTmdb)}
+                        />
+                      ) : (
+                        <div className="px-3 text-center text-[0.82rem] text-text-empty">
+                          No Poster
+                        </div>
+                      )}
+                    </div>
+                  </Link>
+
+                  <div className="min-w-[260px] flex-1">
+                    <h2 className="mb-2 text-[1.7rem] font-black leading-[1.08]">
+                      <Link
+                        href={`/films/${item.movie.id}`}
+                        className="text-text-primary no-underline"
+                      >
+                        {item.movie.title.toUpperCase()}
+                      </Link>
+                    </h2>
+
+                    <p className="mb-2 text-[0.95rem] leading-[1.5] text-text-secondary">
+                      Directed by {director}
+                    </p>
+
+                    <p className="mb-4 text-[0.84rem] leading-[1.5] text-text-dim">
+                      {[year, item.movie.runtimeMinutes ? `${item.movie.runtimeMinutes}min` : '']
+                        .filter(Boolean)
+                        .join(' / ')}
+                    </p>
+
+                    <p className="mb-4 text-[0.88rem] leading-[1.6] text-text-body">
+                      Marked watched on {formatDate(item.watchedAt)}.
+                    </p>
+
+                    <MovieListActions
+                      movieId={item.movie.id}
+                      initialInWant={movieState.inWant}
+                      initialInWatched={movieState.inWatched}
+                      className="mb-4"
+                    />
+
+                    <MovieExternalLinks
+                      imdbUrl={item.movie.imdbUrl}
+                      doubanUrl={item.movie.doubanUrl}
+                      letterboxdUrl={item.movie.letterboxdUrl}
+                      size="sm"
+                      className="text-[0.68rem] font-bold"
+                    />
                   </div>
-                </Link>
-
-                <div className="min-w-[260px] flex-1">
-                  <h2 className="mb-2 text-[1.7rem] font-black leading-[1.08]">
-                    <Link
-                      href={`/films/${item.movie.id}`}
-                      className="text-text-primary no-underline"
-                    >
-                      {item.movie.title.toUpperCase()}
-                    </Link>
-                  </h2>
-
-                  <p className="mb-2 text-[0.95rem] leading-[1.5] text-text-secondary">
-                    Directed by {director}
-                  </p>
-
-                  <p className="mb-4 text-[0.84rem] leading-[1.5] text-text-dim">
-                    {[year, item.movie.runtimeMinutes ? `${item.movie.runtimeMinutes}min` : '']
-                      .filter(Boolean)
-                      .join(' / ')}
-                  </p>
-
-                  <p className="mb-4 text-[0.88rem] leading-[1.6] text-text-body">
-                    Marked watched on {formatDate(item.watchedAt)}.
-                  </p>
-
-                  {item.rating ? (
-                    <p className="mb-2 text-[0.88rem] leading-[1.6] text-text-body">
-                      Rated {item.rating}/5.
-                    </p>
-                  ) : null}
-
-                  {item.reviewText ? (
-                    <p className="mb-4 whitespace-pre-line text-[0.88rem] leading-[1.7] text-text-secondary">
-                      {item.reviewText}
-                    </p>
-                  ) : null}
-
-                  <MovieListActions
-                    movieId={item.movie.id}
-                    initialInWant={movieState.inWant}
-                    initialInWatched={movieState.inWatched}
-                    className="mb-4"
-                  />
-
-                  <MovieExternalLinks
-                    imdbUrl={item.movie.imdbUrl}
-                    doubanUrl={item.movie.doubanUrl}
-                    letterboxdUrl={item.movie.letterboxdUrl}
-                    size="sm"
-                    className="text-[0.68rem] font-bold"
-                  />
                 </div>
+
+                <WatchedReviewEditor
+                  movieId={item.movie.id}
+                  initialRating={item.rating}
+                  initialReviewText={item.reviewText}
+                  className="xl:w-[420px]"
+                />
               </article>
             )
           })}
