@@ -42,8 +42,8 @@ export default function EmailReminderToggle({
 
   return (
     <div>
-      <label className="flex items-center justify-between gap-4 rounded-panel border border-border-default bg-page-bg px-4 py-3">
-        <div>
+      <label className="flex items-start justify-between gap-4 rounded-panel border border-border-default bg-page-bg px-4 py-3">
+        <div className="min-w-0 flex-1">
           <p className="mb-1 text-[0.92rem] font-semibold">Want list email reminders</p>
           <p className="m-0 text-[0.82rem] leading-[1.5] text-text-secondary">
             Sends an email when a wanted film is currently showing or gets new showtimes later.
@@ -59,15 +59,15 @@ export default function EmailReminderToggle({
           }}
           aria-pressed={enabled}
           className={[
-            'relative h-7 w-13 rounded-full transition-colors',
+            'relative mt-0.5 h-7 w-13 shrink-0 self-start rounded-full transition-colors',
             enabled ? 'bg-[#2050ff]' : 'bg-border-strong',
             pending ? 'opacity-60' : '',
           ].join(' ')}
         >
           <span
             className={[
-              'absolute top-1 h-5 w-5 rounded-full bg-white transition-transform',
-              enabled ? 'translate-x-7' : 'translate-x-1',
+              'absolute top-1 left-1 h-5 w-5 rounded-full bg-white transition-transform',
+              enabled ? 'translate-x-6' : 'translate-x-0',
             ].join(' ')}
           />
         </button>
