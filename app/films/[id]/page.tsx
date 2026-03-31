@@ -3,8 +3,10 @@
 import { notFound } from 'next/navigation'
 
 import BackButton from '@/components/BackButton'
+import MovieListActions from '@/components/movie/MovieListActions'
 import MovieExternalLinks from '@/components/movie/MovieExternalLinks'
 import PosterImage from '@/components/movie/PosterImage'
+import { getCurrentUserId } from '@/lib/auth/require-user-id'
 import {
   cleanDirectorText,
   getReleaseYear,
@@ -12,6 +14,7 @@ import {
 } from '@/lib/movie/display'
 import { prisma } from '@/lib/prisma'
 import { isFreeTicketValue } from '@/lib/showtime/ticket'
+import { getMovieStatesForUser } from '@/lib/user-movies/service'
 import {
   formatDateKeyInAppTimezone,
   formatTimeInAppTimezone,
@@ -96,6 +99,7 @@ export default async function MovieDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
+  const currentUserIdPromise = getCurrentUserId()
 
   const movie = await prisma.movie.findUnique({
     where: { id: parseInt(id, 10) },
@@ -122,6 +126,13 @@ export default async function MovieDetailPage({
   })
 
   if (!movie) return notFound()
+
+  const currentUserId = await currentUserIdPromise
+  const movieStates = await getMovieStatesForUser(currentUserId, [movie.id])
+  const movieState = movieStates.get(movie.id) || {
+    inWant: false,
+    inWatched: false,
+  }
 
   const groupedByDate: Record<string, typeof movie.showtimes> = {}
 
@@ -181,6 +192,15 @@ export default async function MovieDetailPage({
               size="md"
               className="mb-7 text-[0.85rem] font-bold"
             />
+
+            {currentUserId ? (
+              <MovieListActions
+                movieId={movie.id}
+                initialInWant={movieState.inWant}
+                initialInWatched={movieState.inWatched}
+                className="mb-7"
+              />
+            ) : null}
 
             <p className="m-0 whitespace-pre-line text-base leading-[1.75] text-text-body">
               {overviewMeta.body || movie.overview || 'No overview available.'}

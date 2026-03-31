@@ -3,15 +3,18 @@
 import Link from 'next/link'
 
 import FilmSearchBox from '@/components/FilmSearchBox'
+import MovieListActions from '@/components/movie/MovieListActions'
 import PosterImage from '@/components/movie/PosterImage'
 import TheaterFilter from '@/components/TheaterFilter'
 import MovieExternalLinks from '@/components/movie/MovieExternalLinks'
+import { getCurrentUserId } from '@/lib/auth/require-user-id'
 import {
   cleanDirectorText,
   getReleaseYear,
   isTmdbPoster,
 } from '@/lib/movie/display'
 import { prisma } from '@/lib/prisma'
+import { getMovieStatesForUser } from '@/lib/user-movies/service'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,17 +44,43 @@ export default async function HomePage({
     .filter(Boolean)
 
   const now = new Date()
-
-  const allTheaters = await prisma.theater.findMany({
-    orderBy: {
-      name: 'asc',
-    },
-    select: {
-      id: true,
-      slug: true,
-      name: true,
-    },
-  })
+  const [currentUserId, allTheaters, movies] = await Promise.all([
+    getCurrentUserId(),
+    prisma.theater.findMany({
+      orderBy: {
+        name: 'asc',
+      },
+      select: {
+        id: true,
+        slug: true,
+        name: true,
+      },
+    }),
+    prisma.movie.findMany({
+      where: {
+        showtimes: {
+          some: {
+            startTime: {
+              gt: now,
+            },
+            status: 'SCHEDULED',
+            ...(selectedTheaterSlugs.length > 0
+              ? {
+                  theater: {
+                    slug: {
+                      in: selectedTheaterSlugs,
+                    },
+                  },
+                }
+              : {}),
+          },
+        },
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+    }),
+  ])
 
   const theatersWithSlug = allTheaters.filter(
     (
@@ -63,31 +92,10 @@ export default async function HomePage({
   const selectedTheaterNames = theatersWithSlug
     .filter(theater => selectedTheaterSlugs.includes(theater.slug))
     .map(theater => theater.name)
-
-  const movies = await prisma.movie.findMany({
-    where: {
-      showtimes: {
-        some: {
-          startTime: {
-            gt: now,
-          },
-          status: 'SCHEDULED',
-          ...(selectedTheaterSlugs.length > 0
-            ? {
-                theater: {
-                  slug: {
-                    in: selectedTheaterSlugs,
-                  },
-                },
-              }
-            : {}),
-        },
-      },
-    },
-    orderBy: {
-      updatedAt: 'desc',
-    },
-  })
+  const movieStates = await getMovieStatesForUser(
+    currentUserId,
+    movies.map((movie) => movie.id)
+  )
 
   const filmCount = movies.length
 
@@ -125,9 +133,13 @@ export default async function HomePage({
               movie.directorText,
               'UNKNOWN DIRECTOR'
             )
+            const movieState = movieStates.get(movie.id) || {
+              inWant: false,
+              inWatched: false,
+            }
 
             return (
-              <div key={movie.id} className="flex flex-col">
+              <article key={movie.id} className="flex flex-col">
                 <Link
                   href={`/films/${movie.id}`}
                   className="block text-inherit no-underline"
@@ -157,6 +169,16 @@ export default async function HomePage({
                   </div>
                 </Link>
 
+                {currentUserId ? (
+                  <MovieListActions
+                    movieId={movie.id}
+                    initialInWant={movieState.inWant}
+                    initialInWatched={movieState.inWatched}
+                    compact
+                    className="mt-3 px-0.5"
+                  />
+                ) : null}
+
                 <MovieExternalLinks
                   imdbUrl={movie.imdbUrl}
                   doubanUrl={movie.doubanUrl}
@@ -164,7 +186,7 @@ export default async function HomePage({
                   size="sm"
                   className="mt-3 px-0.5 text-[0.68rem] font-bold"
                 />
-              </div>
+              </article>
             )
           })}
         </div>
