@@ -455,6 +455,8 @@ export async function upsertLocalMovie(fallback: FallbackMovieData) {
     directorText: fallback.directorText,
     releaseYear: fallback.releaseYear,
     imdbId: fallback.imdbUrl,
+    doubanUrl: fallback.doubanUrl,
+    letterboxdUrl: fallback.letterboxdUrl,
   })
   const releaseDate = getFallbackReleaseDate(fallback)
 
@@ -512,6 +514,8 @@ export async function upsertMovie(tmdb: TmdbMovie, fallback?: FallbackMovieData)
     directorText: fallback?.directorText || tmdb.directorText,
     releaseYear,
     imdbId: fallback?.imdbUrl || tmdb.imdbUrl,
+    doubanUrl: fallback?.doubanUrl,
+    letterboxdUrl: fallback?.letterboxdUrl,
   }
 
   const movie = await prisma.$transaction(async (tx) => {

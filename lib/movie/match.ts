@@ -12,6 +12,8 @@ export type MovieMatchInput = {
   releaseYear?: number
   tmdbId?: number
   imdbId?: string
+  doubanUrl?: string
+  letterboxdUrl?: string
 }
 
 export function normalizeMovieName(input?: string | null): string {
@@ -39,6 +41,23 @@ export function normalizeDirectorName(input?: string | null): string {
 export function extractImdbIdFromUrl(input?: string | null): string | null {
   const match = (input || '').match(/tt\d{7,10}/i)
   return match?.[0]?.toLowerCase() || null
+}
+
+function normalizeResourceUrl(input?: string | null): string | null {
+  const trimmed = (input || '').trim()
+
+  if (!trimmed) {
+    return null
+  }
+
+  try {
+    const url = new URL(trimmed)
+    url.hash = ''
+
+    return url.toString().replace(/\/+$/, '')
+  } catch {
+    return trimmed.replace(/\/+$/, '')
+  }
 }
 
 function getTitleCandidates(input: MovieMatchInput) {
@@ -89,7 +108,10 @@ function yearMatches(inputYear?: number, movie?: Pick<Movie, 'releaseDate'> | nu
   return movieYear === inputYear
 }
 
-function scoreMovieCandidate(movie: Pick<Movie, 'title' | 'originalTitle' | 'directorText' | 'releaseDate' | 'tmdbId'>, input: MovieMatchInput) {
+function scoreMovieCandidate(
+  movie: Pick<Movie, 'title' | 'originalTitle' | 'directorText' | 'releaseDate' | 'tmdbId' | 'posterUrl'>,
+  input: MovieMatchInput
+) {
   const normalizedTitles = getTitleCandidates(input).map((candidate) =>
     normalizeMovieName(candidate)
   )
@@ -141,7 +163,107 @@ function scoreMovieCandidate(movie: Pick<Movie, 'title' | 'originalTitle' | 'dir
     score += 5
   }
 
+  if (movie.posterUrl) {
+    score += 5
+  }
+
   return score
+}
+
+function pickBestMovieMatch(
+  movies: Movie[],
+  input: MovieMatchInput,
+  minScore: number
+) {
+  let bestMatch: Movie | null = null
+  let bestScore = Number.NEGATIVE_INFINITY
+
+  movies.forEach((movie) => {
+    if (!directorMatches(input.directorText, movie.directorText)) {
+      return
+    }
+
+    if (!yearMatches(input.releaseYear, movie)) {
+      return
+    }
+
+    const score = scoreMovieCandidate(movie, input)
+
+    if (score > bestScore) {
+      bestScore = score
+      bestMatch = movie
+    }
+  })
+
+  return bestScore >= minScore ? bestMatch : null
+}
+
+async function findMoviesByExactTitleCandidates(
+  titleCandidates: string[],
+  db: DbClient
+) {
+  const titleFilters = titleCandidates.flatMap((candidate) => [
+    {
+      title: {
+        equals: candidate,
+        mode: 'insensitive' as const,
+      },
+    },
+    {
+      originalTitle: {
+        equals: candidate,
+        mode: 'insensitive' as const,
+      },
+    },
+  ])
+
+  return db.movie.findMany({
+    where: {
+      OR: titleFilters,
+    },
+    orderBy: {
+      id: 'asc',
+    },
+  })
+}
+
+async function findMoviesByLooseTitleCandidates(
+  titleCandidates: string[],
+  db: DbClient
+) {
+  const looseCandidates = titleCandidates.filter((candidate) => {
+    const normalized = normalizeMovieName(candidate)
+    return normalized.length >= 4 || candidate.includes(' ')
+  })
+
+  if (looseCandidates.length === 0) {
+    return []
+  }
+
+  const titleFilters = looseCandidates.flatMap((candidate) => [
+    {
+      title: {
+        contains: candidate,
+        mode: 'insensitive' as const,
+      },
+    },
+    {
+      originalTitle: {
+        contains: candidate,
+        mode: 'insensitive' as const,
+      },
+    },
+  ])
+
+  return db.movie.findMany({
+    where: {
+      OR: titleFilters,
+    },
+    orderBy: {
+      id: 'asc',
+    },
+    take: 25,
+  })
 }
 
 export async function findLocalMovieByImportMatch(
@@ -177,55 +299,53 @@ export async function findLocalMovieByImportMatch(
     }
   }
 
+  const doubanUrl = normalizeResourceUrl(input.doubanUrl)
+
+  if (doubanUrl) {
+    const movie = await db.movie.findFirst({
+      where: {
+        doubanUrl: {
+          startsWith: doubanUrl,
+          mode: 'insensitive',
+        },
+      },
+    })
+
+    if (movie) {
+      return movie
+    }
+  }
+
+  const letterboxdUrl = normalizeResourceUrl(input.letterboxdUrl)
+
+  if (letterboxdUrl) {
+    const movie = await db.movie.findFirst({
+      where: {
+        letterboxdUrl: {
+          startsWith: letterboxdUrl,
+          mode: 'insensitive',
+        },
+      },
+    })
+
+    if (movie) {
+      return movie
+    }
+  }
+
   const titleCandidates = getTitleCandidates(input)
 
   if (titleCandidates.length === 0) {
     return null
   }
 
-  const titleFilters = titleCandidates.flatMap((candidate) => [
-    {
-      title: {
-        equals: candidate,
-        mode: 'insensitive' as const,
-      },
-    },
-    {
-      originalTitle: {
-        equals: candidate,
-        mode: 'insensitive' as const,
-      },
-    },
-  ])
+  const exactMatches = await findMoviesByExactTitleCandidates(titleCandidates, db)
+  const exactBestMatch = pickBestMovieMatch(exactMatches, input, 90)
 
-  const movies = await db.movie.findMany({
-    where: {
-      OR: titleFilters,
-    },
-    orderBy: {
-      id: 'asc',
-    },
-  })
+  if (exactBestMatch) {
+    return exactBestMatch
+  }
 
-  let bestMatch: Movie | null = null
-  let bestScore = Number.NEGATIVE_INFINITY
-
-  movies.forEach((movie) => {
-    if (!directorMatches(input.directorText, movie.directorText)) {
-      return
-    }
-
-    if (!yearMatches(input.releaseYear, movie)) {
-      return
-    }
-
-    const score = scoreMovieCandidate(movie, input)
-
-    if (score > bestScore) {
-      bestScore = score
-      bestMatch = movie
-    }
-  })
-
-  return bestScore >= 90 ? bestMatch : null
+  const looseMatches = await findMoviesByLooseTitleCandidates(titleCandidates, db)
+  return pickBestMovieMatch(looseMatches, input, 60)
 }

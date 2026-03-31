@@ -86,7 +86,7 @@ export default function RatingChain({
                   >
                     <div
                       className={[
-                        'h-3 w-3 rounded-full border transition-colors',
+                        'h-2.5 w-2.5 rounded-full border transition-colors',
                         isActive
                           ? 'border-accent-positive bg-accent-positive'
                           : 'border-border-input bg-card-bg',
@@ -98,7 +98,7 @@ export default function RatingChain({
 
               <div
                 className={[
-                  'absolute top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border shadow-[0_0_0_4px_rgba(18,54,26,0.35)] transition-colors',
+                  'absolute top-1/2 h-[18px] w-[18px] -translate-x-1/2 -translate-y-1/2 rounded-[4px] border shadow-[0_0_0_3px_rgba(18,54,26,0.28)] transition-colors',
                   value === null
                     ? 'border-border-input bg-card-bg'
                     : 'border-accent-positive bg-accent-positive',

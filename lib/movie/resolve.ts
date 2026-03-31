@@ -272,6 +272,8 @@ export async function resolveMovieFromImportInput(
     directorText: input.directorText,
     releaseYear: input.releaseYear,
     imdbId: input.imdbId,
+    doubanUrl: input.doubanUrl,
+    letterboxdUrl: input.letterboxdUrl,
   })
 
   if (localMovie) {
