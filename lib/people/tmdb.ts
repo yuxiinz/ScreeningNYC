@@ -46,9 +46,9 @@ function getReleaseYear(value?: string | null) {
 
 export function mapTmdbMovieCreditsToPeople(
   credits: TmdbMovieCreditsResponse,
-  { directorLimit = 3, castLimit = 8 }: { directorLimit?: number; castLimit?: number } = {}
+  { directorLimit = 3 }: { directorLimit?: number } = {}
 ): MoviePersonSyncInput[] {
-  const directors = (credits.crew || [])
+  return (credits.crew || [])
     .filter((person) => person.job === 'Director' && person.id && person.name)
     .slice(0, directorLimit)
     .map((person, index) => ({
@@ -58,29 +58,6 @@ export function mapTmdbMovieCreditsToPeople(
       kind: 'DIRECTOR' as const,
       billingOrder: index,
     }))
-
-  const cast = (credits.cast || [])
-    .filter((person) => person.id && person.name)
-    .slice(0, castLimit)
-    .map((person) => ({
-      tmdbId: person.id,
-      name: person.name || 'Unknown',
-      gender: person.gender ?? null,
-      kind: 'CAST' as const,
-      billingOrder: person.order,
-    }))
-
-  const seen = new Set<string>()
-
-  return [...directors, ...cast].filter((person) => {
-    const key = `${person.kind}:${person.tmdbId ?? person.name.toLowerCase()}`
-    if (seen.has(key)) {
-      return false
-    }
-
-    seen.add(key)
-    return true
-  })
 }
 
 export async function fetchTmdbMoviePeople(
@@ -101,7 +78,7 @@ export async function fetchTmdbMoviePeople(
   return mapTmdbMovieCreditsToPeople(response.data)
 }
 
-export async function fetchTmdbPersonFilmography(
+export async function fetchTmdbDirectorFilmography(
   tmdbPersonId: number,
   { take = 10 }: { take?: number } = {}
 ): Promise<ExternalPersonMovie[]> {
@@ -119,30 +96,27 @@ export async function fetchTmdbPersonFilmography(
 
   const credits = response.data
 
-  const combined = [
-    ...(credits.cast || []),
-    ...(credits.crew || []).filter((credit) => credit.job === 'Director'),
-  ]
-
   const deduped = new Map<number, TmdbPersonMovieCredit>()
 
-  combined.forEach((credit) => {
-    if (!credit.id) return
+  ;(credits.crew || [])
+    .filter((credit) => credit.job === 'Director')
+    .forEach((credit) => {
+      if (!credit.id) return
 
-    const existing = deduped.get(credit.id)
+      const existing = deduped.get(credit.id)
 
-    if (!existing) {
-      deduped.set(credit.id, credit)
-      return
-    }
+      if (!existing) {
+        deduped.set(credit.id, credit)
+        return
+      }
 
-    const existingPopularity = existing.popularity ?? Number.NEGATIVE_INFINITY
-    const nextPopularity = credit.popularity ?? Number.NEGATIVE_INFINITY
+      const existingPopularity = existing.popularity ?? Number.NEGATIVE_INFINITY
+      const nextPopularity = credit.popularity ?? Number.NEGATIVE_INFINITY
 
-    if (nextPopularity > existingPopularity) {
-      deduped.set(credit.id, credit)
-    }
-  })
+      if (nextPopularity > existingPopularity) {
+        deduped.set(credit.id, credit)
+      }
+    })
 
   return [...deduped.values()]
     .sort((a, b) => {

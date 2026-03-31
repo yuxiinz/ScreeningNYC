@@ -1,8 +1,6 @@
 import 'dotenv/config'
 
 import {
-  buildDirectorPeopleInputsFromText,
-  syncMoviePeople,
   syncMoviePeopleFromTmdbId,
   syncMovieTags,
 } from '@/lib/movie/relations'
@@ -22,20 +20,13 @@ async function main() {
           },
         },
         {
-          OR: [
-            {
-              tmdbId: {
-                not: null,
-              },
-            },
-            {
-              directorText: {
-                not: null,
-              },
-            },
-          ],
+          tmdbId: {
+            not: null,
+          },
           peopleLinks: {
-            none: {},
+            none: {
+              kind: 'DIRECTOR',
+            },
           },
         },
       ],
@@ -44,7 +35,6 @@ async function main() {
       id: true,
       title: true,
       tmdbId: true,
-      directorText: true,
       genresText: true,
     },
     orderBy: {
@@ -61,14 +51,6 @@ async function main() {
 
       if (movie.tmdbId) {
         await syncMoviePeopleFromTmdbId(movie.id, movie.tmdbId)
-      } else if (movie.directorText) {
-        await syncMoviePeople(
-          movie.id,
-          buildDirectorPeopleInputsFromText(movie.directorText),
-          {
-            replaceKinds: ['DIRECTOR'],
-          }
-        )
       }
 
       syncedCount += 1

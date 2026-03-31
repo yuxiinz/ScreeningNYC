@@ -8,8 +8,7 @@ import {
   getReleaseYear,
   isTmdbPoster,
 } from '@/lib/movie/display'
-import { getPersonProfessionLabel } from '@/lib/people/display'
-import { fetchTmdbPersonFilmography } from '@/lib/people/tmdb'
+import { fetchTmdbDirectorFilmography } from '@/lib/people/tmdb'
 import { prisma } from '@/lib/prisma'
 import { TmdbApiKeyMissingError } from '@/lib/tmdb/client'
 
@@ -44,13 +43,7 @@ export default async function PersonDetailPage({
     select: {
       id: true,
       name: true,
-      gender: true,
       tmdbId: true,
-      movieLinks: {
-        select: {
-          kind: true,
-        },
-      },
     },
   })
 
@@ -63,6 +56,7 @@ export default async function PersonDetailPage({
       peopleLinks: {
         some: {
           personId: person.id,
+          kind: 'DIRECTOR',
         },
       },
     },
@@ -85,11 +79,11 @@ export default async function PersonDetailPage({
   })
 
   let tmdbUnavailable = false
-  let externalMovies: Awaited<ReturnType<typeof fetchTmdbPersonFilmography>> = []
+  let externalMovies: Awaited<ReturnType<typeof fetchTmdbDirectorFilmography>> = []
 
   if (person.tmdbId) {
     try {
-      externalMovies = await fetchTmdbPersonFilmography(person.tmdbId)
+      externalMovies = await fetchTmdbDirectorFilmography(person.tmdbId)
     } catch (error) {
       if (error instanceof TmdbApiKeyMissingError) {
         tmdbUnavailable = true
@@ -109,11 +103,6 @@ export default async function PersonDetailPage({
     (movie) => !localTmdbIds.has(movie.tmdbId)
   )
 
-  const profession = getPersonProfessionLabel({
-    kinds: person.movieLinks.map((link) => link.kind),
-    gender: person.gender,
-  })
-
   return (
     <main className="mx-auto max-w-[var(--container-wide)]">
       <BackButton />
@@ -124,11 +113,12 @@ export default async function PersonDetailPage({
         </h1>
 
         <p className="m-0 text-[1rem] leading-[1.5] text-text-secondary">
-          {profession}
+          Director
         </p>
 
         <p className="m-0 mt-3 text-[0.95rem] leading-[1.5] text-text-muted">
-          {localMovies.length} film{localMovies.length === 1 ? '' : 's'} in database
+          {localMovies.length} directed film{localMovies.length === 1 ? '' : 's'} in
+          database
           {tmdbOnlyMovies.length > 0 ? `, plus ${tmdbOnlyMovies.length} from TMDB.` : '.'}
         </p>
 
@@ -194,7 +184,7 @@ export default async function PersonDetailPage({
       {tmdbOnlyMovies.length > 0 ? (
         <section>
           <h2 className="mb-5 border-b border-border-strong pb-2.5 text-[1.15rem] font-bold tracking-[0.5px] text-text-primary">
-            MORE FROM TMDB
+            MORE DIRECTED FILMS FROM TMDB
           </h2>
 
           <div className="grid gap-7 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">

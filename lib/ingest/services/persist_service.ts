@@ -5,7 +5,6 @@ import { APP_TIMEZONE } from '../../timezone'
 import type { TmdbMovie } from './tmdb_service'
 import { canonicalizeTitle } from './tmdb_service'
 import {
-  buildDirectorPeopleInputsFromText,
   syncMoviePeople,
   syncMovieTags,
 } from '@/lib/movie/relations'
@@ -404,13 +403,9 @@ export async function upsertLocalMovie(fallback: FallbackMovieData) {
     })
 
     await syncMovieTags(movie.id, movie.genresText)
-    await syncMoviePeople(
-      movie.id,
-      buildDirectorPeopleInputsFromText(movie.directorText || fallback.directorText),
-      {
-        replaceKinds: ['DIRECTOR'],
-      }
-    )
+    await syncMoviePeople(movie.id, [], {
+      replaceKinds: ['DIRECTOR'],
+    })
 
     return movie
   }
@@ -431,13 +426,9 @@ export async function upsertLocalMovie(fallback: FallbackMovieData) {
   })
 
   await syncMovieTags(movie.id, movie.genresText)
-  await syncMoviePeople(
-    movie.id,
-    buildDirectorPeopleInputsFromText(movie.directorText || fallback.directorText),
-    {
-      replaceKinds: ['DIRECTOR'],
-    }
-  )
+  await syncMoviePeople(movie.id, [], {
+    replaceKinds: ['DIRECTOR'],
+  })
 
   return movie
 }
@@ -489,14 +480,9 @@ export async function upsertMovie(tmdb: TmdbMovie, fallback?: FallbackMovieData)
     })
 
     await syncMovieTags(movie.id, movie.genresText || fallback?.genresText)
-    await syncMoviePeople(
-      movie.id,
-      tmdb.peopleCredits ||
-        buildDirectorPeopleInputsFromText(tmdb.directorText || fallback?.directorText),
-      {
-        replaceKinds: tmdb.peopleCredits ? ['DIRECTOR', 'CAST'] : ['DIRECTOR'],
-      }
-    )
+    await syncMoviePeople(movie.id, tmdb.peopleCredits || [], {
+      replaceKinds: ['DIRECTOR'],
+    })
 
     return movie
   }
@@ -534,16 +520,9 @@ export async function upsertMovie(tmdb: TmdbMovie, fallback?: FallbackMovieData)
     })
 
     await syncMovieTags(movie.id, movie.genresText || fallback?.genresText)
-    await syncMoviePeople(
-      movie.id,
-      tmdb.peopleCredits ||
-        buildDirectorPeopleInputsFromText(
-          movie.directorText || tmdb.directorText || fallback?.directorText
-        ),
-      {
-        replaceKinds: tmdb.peopleCredits ? ['DIRECTOR', 'CAST'] : ['DIRECTOR'],
-      }
-    )
+    await syncMoviePeople(movie.id, tmdb.peopleCredits || [], {
+      replaceKinds: ['DIRECTOR'],
+    })
 
     return movie
   }
@@ -569,16 +548,9 @@ export async function upsertMovie(tmdb: TmdbMovie, fallback?: FallbackMovieData)
   })
 
   await syncMovieTags(movie.id, movie.genresText || fallback?.genresText)
-  await syncMoviePeople(
-    movie.id,
-    tmdb.peopleCredits ||
-      buildDirectorPeopleInputsFromText(
-        movie.directorText || tmdb.directorText || fallback?.directorText
-      ),
-    {
-      replaceKinds: tmdb.peopleCredits ? ['DIRECTOR', 'CAST'] : ['DIRECTOR'],
-    }
-  )
+  await syncMoviePeople(movie.id, tmdb.peopleCredits || [], {
+    replaceKinds: ['DIRECTOR'],
+  })
 
   return movie
 }

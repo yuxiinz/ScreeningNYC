@@ -176,24 +176,6 @@ async function getOrCreatePersonId(input: MoviePersonSyncInput) {
   return created.id
 }
 
-export function buildDirectorPeopleInputsFromText(
-  directorText?: string | null
-): MoviePersonSyncInput[] {
-  if (!directorText) {
-    return []
-  }
-
-  return directorText
-    .split(/\s*,\s*|\s+\/\s+|\s+&\s+/)
-    .map((name) => normalizeWhitespace(name))
-    .filter(Boolean)
-    .map((name, index) => ({
-      name,
-      kind: 'DIRECTOR' as const,
-      billingOrder: index,
-    }))
-}
-
 export async function syncMoviePeople(
   movieId: number,
   inputs: MoviePersonSyncInput[],
@@ -267,7 +249,7 @@ export async function syncMoviePeople(
 export async function syncMoviePeopleFromTmdbId(movieId: number, tmdbId: number) {
   const people = await fetchTmdbMoviePeople(tmdbId)
   await syncMoviePeople(movieId, people, {
-    replaceKinds: ['DIRECTOR', 'CAST'],
+    replaceKinds: ['DIRECTOR'],
   })
 }
 

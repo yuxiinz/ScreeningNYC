@@ -13,7 +13,9 @@
     "lint": "eslint",
     "ingest:theater": "tsx scripts/ingest_theater.ts",
     "cleanup:showtimes": "tsx scripts/cleanup_expired_showtimes.ts",
+    "cleanup:directors": "tsx scripts/cleanup_directors.ts",
     "backfill:showtime-end-times": "tsx scripts/backfill_showtime_end_times.ts",
+    "backfill:directors": "tsx scripts/backfill_people.ts",
     "backfill:people": "tsx scripts/backfill_people.ts",
     "reminders:watchlist": "tsx scripts/send_watchlist_reminders.ts"
   },

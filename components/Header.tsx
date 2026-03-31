@@ -46,7 +46,7 @@ export default function Header({
             href="/people"
             className={linkClassName('/people', ['/people/'])}
           >
-            PEOPLE
+            DIRECTORS
           </Link>
         </div>
 

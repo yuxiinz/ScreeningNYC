@@ -1,4 +1,4 @@
-export type MoviePersonKindValue = 'DIRECTOR' | 'CAST'
+export type MoviePersonKindValue = 'DIRECTOR'
 
 export type MoviePersonSyncInput = {
   tmdbId?: number
