@@ -38,6 +38,57 @@ function buildUnauthorizedResponse(error: AuthRequiredError) {
   )
 }
 
+function parseRatingInput(input: unknown): number | null | 'invalid' {
+  if (typeof input === 'undefined') {
+    return null
+  }
+
+  if (input === null) {
+    return null
+  }
+
+  if (typeof input !== 'number' || Number.isNaN(input) || input < 0 || input > 5) {
+    return 'invalid'
+  }
+
+  if (!Number.isInteger(input * 2)) {
+    return 'invalid'
+  }
+
+  return input
+}
+
+function parseWatchedAtInput(input: unknown): Date | null | 'invalid' {
+  if (typeof input === 'undefined' || input === null || input === '') {
+    return null
+  }
+
+  if (typeof input !== 'string') {
+    return 'invalid'
+  }
+
+  const trimmed = input.trim()
+
+  if (!trimmed) {
+    return null
+  }
+
+  const dateOnlyMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch
+    return new Date(`${year}-${month}-${day}T12:00:00.000Z`)
+  }
+
+  const parsed = new Date(trimmed)
+
+  if (Number.isNaN(parsed.getTime())) {
+    return 'invalid'
+  }
+
+  return parsed
+}
+
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ movieId: string }> }
@@ -60,6 +111,7 @@ export async function PUT(
     ?.confirmRemoveWant
   const preserveWatchedAt = (body as { preserveWatchedAt?: unknown })
     ?.preserveWatchedAt
+  const watchedAtInput = (body as { watchedAt?: unknown })?.watchedAt
   const ratingInput = (body as { rating?: unknown })?.rating
   const reviewTextInput = (body as { reviewText?: unknown })?.reviewText
 
@@ -89,18 +141,25 @@ export async function PUT(
     )
   }
 
-  if (
-    typeof ratingInput !== 'undefined' &&
-    ratingInput !== null &&
-    (typeof ratingInput !== 'number' ||
-      !Number.isInteger(ratingInput) ||
-      ratingInput < 0 ||
-      ratingInput > 5)
-  ) {
+  const watchedAt = parseWatchedAtInput(watchedAtInput)
+
+  if (watchedAt === 'invalid') {
+    return NextResponse.json(
+      {
+        code: 'INVALID_WATCHED_AT',
+        message: 'watchedAt must be an ISO datetime string or YYYY-MM-DD.',
+      },
+      { status: 400 }
+    )
+  }
+
+  const rating = parseRatingInput(ratingInput)
+
+  if (rating === 'invalid') {
     return NextResponse.json(
       {
         code: 'INVALID_RATING',
-        message: 'rating must be null or an integer from 0 to 5.',
+        message: 'rating must be null or a number from 0 to 5 in 0.5 increments.',
       },
       { status: 400 }
     )
@@ -120,7 +179,6 @@ export async function PUT(
     )
   }
 
-  const rating = typeof ratingInput === 'number' ? ratingInput : null
   const reviewText = typeof reviewTextInput === 'string' ? reviewTextInput : null
 
   if (getReviewWordCount(reviewText) > 200) {
@@ -146,6 +204,7 @@ export async function PUT(
     const result = await markWatched(userId, movieId, {
       confirmRemoveWant,
       preserveWatchedAt,
+      watchedAt: watchedAt || undefined,
       rating,
       reviewText,
     })

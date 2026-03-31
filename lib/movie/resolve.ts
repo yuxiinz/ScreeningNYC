@@ -1,7 +1,13 @@
 import axios from 'axios'
+import type { Movie } from '@prisma/client'
 
-import { upsertMovie } from '@/lib/ingest/services/persist_service'
-import type { TmdbMovie } from '@/lib/ingest/services/tmdb_service'
+import {
+  mergeMovieMetadata,
+  type FallbackMovieData,
+  upsertMovie,
+} from '@/lib/ingest/services/persist_service'
+import { searchTmdbMovie, type TmdbMovie } from '@/lib/ingest/services/tmdb_service'
+import { extractImdbIdFromUrl, findLocalMovieByImportMatch } from '@/lib/movie/match'
 import { mapTmdbMovieCreditsToPeople } from '@/lib/people/tmdb'
 import {
   buildTmdbImageUrl,
@@ -31,6 +37,9 @@ type TmdbMovieDetailResponse = {
   backdrop_path?: string | null
   homepage?: string | null
   genres?: Array<{
+    name?: string
+  }>
+  production_countries?: Array<{
     name?: string
   }>
 }
@@ -64,6 +73,25 @@ export type TmdbCandidate = {
 }
 
 export { TmdbApiKeyMissingError }
+
+export type MovieImportResolveInput = {
+  title: string
+  titleCandidates?: string[]
+  directorText?: string
+  releaseYear?: number
+  releaseDate?: Date
+  posterUrl?: string
+  tmdbId?: number
+  imdbId?: string
+  doubanUrl?: string
+  letterboxdUrl?: string
+  productionCountriesText?: string
+}
+
+export type MovieImportResolveResult = {
+  movie: Movie | null
+  matchedVia: 'tmdb_id' | 'imdb_id' | 'local_signature' | 'tmdb_search' | 'none'
+}
 
 export class TmdbMovieNotFoundError extends Error {
   constructor(message = 'TMDB movie not found.') {
@@ -169,6 +197,10 @@ async function fetchTmdbMovieById(tmdbId: number): Promise<TmdbMovie> {
       .map((genre) => genre.name)
       .filter(Boolean)
       .join(', ')
+    const productionCountries = (detail.production_countries || [])
+      .map((country) => country.name)
+      .filter(Boolean)
+      .join(', ')
 
     return {
       tmdbId: detail.id,
@@ -184,6 +216,7 @@ async function fetchTmdbMovieById(tmdbId: number): Promise<TmdbMovie> {
         : undefined,
       officialSiteUrl: detail.homepage || undefined,
       genresText: genres || undefined,
+      productionCountriesText: productionCountries || undefined,
       directorText: directors || undefined,
       castText: cast || undefined,
       peopleCredits: mapTmdbMovieCreditsToPeople(credits),
@@ -197,7 +230,90 @@ async function fetchTmdbMovieById(tmdbId: number): Promise<TmdbMovie> {
   }
 }
 
-export async function resolveMovieFromTmdbId(tmdbId: number) {
+function buildFallbackFromImportInput(input: MovieImportResolveInput): FallbackMovieData {
+  return {
+    title: input.title,
+    titleCandidates: input.titleCandidates,
+    directorText: input.directorText,
+    releaseYear: input.releaseYear,
+    releaseDate: input.releaseDate,
+    posterUrl: input.posterUrl,
+    imdbUrl: input.imdbId ? `https://www.imdb.com/title/${input.imdbId}` : undefined,
+    doubanUrl: input.doubanUrl,
+    letterboxdUrl: input.letterboxdUrl,
+    productionCountriesText: input.productionCountriesText,
+  }
+}
+
+export async function resolveMovieFromTmdbId(
+  tmdbId: number,
+  fallback?: FallbackMovieData
+) {
   const tmdbMovie = await fetchTmdbMovieById(tmdbId)
-  return upsertMovie(tmdbMovie)
+  return upsertMovie(tmdbMovie, fallback)
+}
+
+export async function resolveMovieFromImportInput(
+  input: MovieImportResolveInput
+): Promise<MovieImportResolveResult> {
+  const fallback = buildFallbackFromImportInput(input)
+
+  if (input.tmdbId) {
+    const movie = await resolveMovieFromTmdbId(input.tmdbId, fallback)
+    return {
+      movie,
+      matchedVia: 'tmdb_id',
+    }
+  }
+
+  const localMovie = await findLocalMovieByImportMatch({
+    title: input.title,
+    titleCandidates: input.titleCandidates,
+    directorText: input.directorText,
+    releaseYear: input.releaseYear,
+    imdbId: input.imdbId,
+  })
+
+  if (localMovie) {
+    const mergedMovie = await mergeMovieMetadata(localMovie.id, fallback)
+
+    return {
+      movie: mergedMovie || localMovie,
+      matchedVia:
+        input.imdbId &&
+        extractImdbIdFromUrl(localMovie.imdbUrl) === input.imdbId.toLowerCase()
+          ? 'imdb_id'
+          : 'local_signature',
+    }
+  }
+
+  let tmdbApiKey: string | undefined
+
+  try {
+    tmdbApiKey = getTmdbApiKey()
+  } catch (error) {
+    if (!(error instanceof TmdbApiKeyMissingError)) {
+      throw error
+    }
+  }
+
+  const tmdbMovie = await searchTmdbMovie({
+    title: input.title,
+    titleCandidates: input.titleCandidates,
+    directorText: input.directorText,
+    releaseYear: input.releaseYear,
+    tmdbApiKey,
+  })
+
+  if (!tmdbMovie.tmdbId) {
+    return {
+      movie: null,
+      matchedVia: 'none',
+    }
+  }
+
+  return {
+    movie: await upsertMovie(tmdbMovie, fallback),
+    matchedVia: 'tmdb_search',
+  }
 }

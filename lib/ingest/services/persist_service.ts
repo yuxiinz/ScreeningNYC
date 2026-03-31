@@ -1,9 +1,11 @@
 import crypto from 'crypto'
+import type { Movie, Prisma } from '@prisma/client'
 import { DateTime } from 'luxon'
 import { prisma } from '../../prisma'
 import { APP_TIMEZONE } from '../../timezone'
 import type { TmdbMovie } from './tmdb_service'
 import { canonicalizeTitle } from './tmdb_service'
+import { findLocalMovieByImportMatch } from '@/lib/movie/match'
 import {
   syncMoviePeople,
   syncMovieTags,
@@ -21,14 +23,29 @@ type PersistConfig = {
 
 export type FallbackMovieData = {
   title: string
+  titleCandidates?: string[]
   directorText?: string
   releaseYear?: number
+  releaseDate?: Date
   runtimeMinutes?: number
   overview?: string
   posterUrl?: string
+  imdbUrl?: string
+  doubanUrl?: string
+  letterboxdUrl?: string
   officialSiteUrl?: string
   genresText?: string
+  productionCountriesText?: string
   preferTitle?: boolean
+}
+
+type DbClient = typeof prisma | Prisma.TransactionClient
+
+export class MovieIdentityConflictError extends Error {
+  constructor(message = 'Existing movie matched the import signature with a different TMDB id.') {
+    super(message)
+    this.name = 'MovieIdentityConflictError'
+  }
 }
 
 let showtimeShownTitleColumnSupportPromise: Promise<boolean> | null = null
@@ -37,16 +54,13 @@ function normalizeWhitespace(input?: string | null): string {
   return (input || '').replace(/\s+/g, ' ').replace(/\u00a0/g, ' ').trim()
 }
 
-function normalizeName(input?: string | null): string {
-  return normalizeWhitespace(input)
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-}
-
 function releaseYearToDate(year?: number): Date | undefined {
   if (!year || Number.isNaN(year)) return undefined
   return new Date(`${year}-01-01T00:00:00.000Z`)
+}
+
+function getFallbackReleaseDate(fallback?: FallbackMovieData) {
+  return fallback?.releaseDate || releaseYearToDate(fallback?.releaseYear)
 }
 
 function isBadPosterUrl(url?: string | null): boolean {
@@ -335,72 +349,124 @@ export async function upsertFormat(name: string) {
   })
 }
 
-async function findLocalMovieBySignature(input: {
-  title: string
-  directorText?: string
-  releaseYear?: number
-}) {
-  const canonicalTitle = canonicalizeTitle(input.title)
-  const normalizedDirector = normalizeName(input.directorText)
-  const yearDate = releaseYearToDate(input.releaseYear)
+function buildMovieCreateData(
+  tmdb: TmdbMovie | null,
+  fallback: FallbackMovieData | undefined,
+  preferredTitle: string,
+  fallbackReleaseDate: Date | undefined
+) {
+  return {
+    ...(tmdb?.tmdbId ? { tmdbId: tmdb.tmdbId } : {}),
+    title: preferredTitle,
+    originalTitle: tmdb?.originalTitle,
+    releaseDate: tmdb?.releaseDate || fallbackReleaseDate,
+    runtimeMinutes: tmdb?.runtimeMinutes || fallback?.runtimeMinutes,
+    overview: tmdb?.overview || fallback?.overview,
+    posterUrl: choosePosterUrl({
+      tmdbPosterUrl: tmdb?.posterUrl,
+      fallbackPosterUrl: fallback?.posterUrl,
+    }),
+    backdropUrl: tmdb?.backdropUrl,
+    imdbUrl: tmdb?.imdbUrl || fallback?.imdbUrl,
+    doubanUrl: fallback?.doubanUrl,
+    letterboxdUrl: fallback?.letterboxdUrl,
+    officialSiteUrl: tmdb?.officialSiteUrl || fallback?.officialSiteUrl,
+    genresText: tmdb?.genresText || fallback?.genresText,
+    productionCountriesText:
+      tmdb?.productionCountriesText || fallback?.productionCountriesText,
+    directorText: tmdb?.directorText || fallback?.directorText,
+    castText: tmdb?.castText,
+  }
+}
 
-  const candidates = await prisma.movie.findMany({
+function buildMovieMergeData(params: {
+  existing: Movie
+  tmdb?: TmdbMovie | null
+  fallback?: FallbackMovieData
+  preferredTitle?: string
+  fallbackReleaseDate?: Date
+  preferIncomingTitle?: boolean
+}) {
+  const { existing, tmdb, fallback, preferredTitle, fallbackReleaseDate } = params
+  const existingProductionCountriesText =
+    'productionCountriesText' in existing
+      ? (existing.productionCountriesText ?? null)
+      : null
+
+  return {
+    title:
+      params.preferIncomingTitle && preferredTitle ? preferredTitle : existing.title,
+    originalTitle: existing.originalTitle || tmdb?.originalTitle,
+    releaseDate: existing.releaseDate || tmdb?.releaseDate || fallbackReleaseDate,
+    runtimeMinutes: existing.runtimeMinutes || tmdb?.runtimeMinutes || fallback?.runtimeMinutes,
+    overview: existing.overview || tmdb?.overview || fallback?.overview,
+    posterUrl: choosePosterUrl({
+      tmdbPosterUrl: tmdb?.posterUrl,
+      existingPosterUrl: existing.posterUrl,
+      fallbackPosterUrl: fallback?.posterUrl,
+    }),
+    backdropUrl: existing.backdropUrl || tmdb?.backdropUrl,
+    imdbUrl: existing.imdbUrl || tmdb?.imdbUrl || fallback?.imdbUrl,
+    doubanUrl: existing.doubanUrl || fallback?.doubanUrl,
+    letterboxdUrl: existing.letterboxdUrl || fallback?.letterboxdUrl,
+    officialSiteUrl:
+      existing.officialSiteUrl || tmdb?.officialSiteUrl || fallback?.officialSiteUrl,
+    genresText: existing.genresText || tmdb?.genresText || fallback?.genresText,
+    productionCountriesText:
+      existingProductionCountriesText || tmdb?.productionCountriesText || fallback?.productionCountriesText,
+    directorText: existing.directorText || tmdb?.directorText || fallback?.directorText,
+    castText: existing.castText || tmdb?.castText,
+  }
+}
+
+export async function mergeMovieMetadata(
+  movieId: number,
+  fallback: FallbackMovieData,
+  db: DbClient = prisma
+) {
+  const existing = await db.movie.findUnique({
     where: {
-      title: {
-        equals: canonicalTitle,
-        mode: 'insensitive',
-      },
+      id: movieId,
     },
-    orderBy: { id: 'asc' },
   })
 
-  for (const candidate of candidates) {
-    const candidateDirector = normalizeName(candidate.directorText)
-    const candidateYear = candidate.releaseDate
-      ? new Date(candidate.releaseDate).getUTCFullYear()
-      : undefined
-    const inputYear = yearDate ? yearDate.getUTCFullYear() : undefined
-
-    const directorMatch =
-      !normalizedDirector || !candidateDirector || normalizedDirector === candidateDirector
-
-    const yearMatch =
-      !inputYear || !candidateYear || inputYear === candidateYear
-
-    if (directorMatch && yearMatch) return candidate
+  if (!existing) {
+    return null
   }
 
-  return null
+  return db.movie.update({
+    where: { id: existing.id },
+    data: buildMovieMergeData({
+      existing,
+      fallback: {
+        ...fallback,
+        title: canonicalizeTitle(fallback.title),
+      },
+      fallbackReleaseDate: getFallbackReleaseDate(fallback),
+    }),
+  })
 }
 
 export async function upsertLocalMovie(fallback: FallbackMovieData) {
   const canonicalTitle = canonicalizeTitle(fallback.title)
-
-  const existing = await findLocalMovieBySignature({
+  const existing = await findLocalMovieByImportMatch({
     title: canonicalTitle,
+    titleCandidates: fallback.titleCandidates,
     directorText: fallback.directorText,
     releaseYear: fallback.releaseYear,
+    imdbId: fallback.imdbUrl,
   })
-
-  const releaseDate = releaseYearToDate(fallback.releaseYear)
+  const releaseDate = getFallbackReleaseDate(fallback)
 
   if (existing) {
-    const movie = await prisma.movie.update({
-      where: { id: existing.id },
-      data: {
-        title: canonicalTitle,
-        directorText: existing.directorText || fallback.directorText,
-        releaseDate: existing.releaseDate || releaseDate,
-        runtimeMinutes: existing.runtimeMinutes || fallback.runtimeMinutes,
-        overview: existing.overview || fallback.overview,
-        posterUrl: choosePosterUrl({
-          existingPosterUrl: existing.posterUrl,
-          fallbackPosterUrl: fallback.posterUrl,
-        }),
-        officialSiteUrl: existing.officialSiteUrl || fallback.officialSiteUrl,
-        genresText: existing.genresText || fallback.genresText,
-      },
+    const movie = await mergeMovieMetadata(existing.id, {
+      ...fallback,
+      title: canonicalTitle,
     })
+
+    if (!movie) {
+      throw new Error(`Movie ${existing.id} disappeared during local upsert.`)
+    }
 
     await syncMovieTags(movie.id, movie.genresText)
     await syncMoviePeople(movie.id, [], {
@@ -411,18 +477,15 @@ export async function upsertLocalMovie(fallback: FallbackMovieData) {
   }
 
   const movie = await prisma.movie.create({
-    data: {
-      title: canonicalTitle,
-      directorText: fallback.directorText,
-      releaseDate,
-      runtimeMinutes: fallback.runtimeMinutes,
-      overview: fallback.overview,
-      posterUrl: choosePosterUrl({
-        fallbackPosterUrl: fallback.posterUrl,
-      }),
-      officialSiteUrl: fallback.officialSiteUrl,
-      genresText: fallback.genresText,
-    },
+    data: buildMovieCreateData(
+      null,
+      {
+        ...fallback,
+        title: canonicalTitle,
+      },
+      canonicalTitle,
+      releaseDate
+    ),
   })
 
   await syncMovieTags(movie.id, movie.genresText)
@@ -435,116 +498,80 @@ export async function upsertLocalMovie(fallback: FallbackMovieData) {
 
 export async function upsertMovie(tmdb: TmdbMovie, fallback?: FallbackMovieData) {
   const fallbackTitle = canonicalizeTitle(fallback?.title || tmdb.title || 'Untitled')
-  const fallbackReleaseDate = releaseYearToDate(fallback?.releaseYear)
+  const fallbackReleaseDate = getFallbackReleaseDate(fallback)
   const preferredTitle =
     fallback?.preferTitle && fallbackTitle ? fallbackTitle : tmdb.title || fallbackTitle
+  const releaseYear =
+    fallback?.releaseYear ||
+    (fallbackReleaseDate ? fallbackReleaseDate.getUTCFullYear() : undefined) ||
+    (tmdb.releaseDate ? new Date(tmdb.releaseDate).getUTCFullYear() : undefined)
 
-  if (tmdb.tmdbId) {
-    const movie = await prisma.movie.upsert({
-      where: { tmdbId: tmdb.tmdbId },
-      update: {
-        title: preferredTitle,
-        originalTitle: tmdb.originalTitle,
-        releaseDate: tmdb.releaseDate || fallbackReleaseDate,
-        runtimeMinutes: tmdb.runtimeMinutes || fallback?.runtimeMinutes,
-        overview: tmdb.overview || fallback?.overview,
-        posterUrl: choosePosterUrl({
-          tmdbPosterUrl: tmdb.posterUrl,
-          fallbackPosterUrl: fallback?.posterUrl,
-        }),
-        backdropUrl: tmdb.backdropUrl,
-        imdbUrl: tmdb.imdbUrl,
-        officialSiteUrl: tmdb.officialSiteUrl || fallback?.officialSiteUrl,
-        genresText: tmdb.genresText || fallback?.genresText,
-        directorText: tmdb.directorText || fallback?.directorText,
-        castText: tmdb.castText,
-      },
-      create: {
-        tmdbId: tmdb.tmdbId,
-        title: preferredTitle,
-        originalTitle: tmdb.originalTitle,
-        releaseDate: tmdb.releaseDate || fallbackReleaseDate,
-        runtimeMinutes: tmdb.runtimeMinutes || fallback?.runtimeMinutes,
-        overview: tmdb.overview || fallback?.overview,
-        posterUrl: choosePosterUrl({
-          tmdbPosterUrl: tmdb.posterUrl,
-          fallbackPosterUrl: fallback?.posterUrl,
-        }),
-        backdropUrl: tmdb.backdropUrl,
-        imdbUrl: tmdb.imdbUrl,
-        officialSiteUrl: tmdb.officialSiteUrl || fallback?.officialSiteUrl,
-        genresText: tmdb.genresText || fallback?.genresText,
-        directorText: tmdb.directorText || fallback?.directorText,
-        castText: tmdb.castText,
-      },
-    })
-
-    await syncMovieTags(movie.id, movie.genresText || fallback?.genresText)
-    await syncMoviePeople(movie.id, tmdb.peopleCredits || [], {
-      replaceKinds: ['DIRECTOR'],
-    })
-
-    return movie
-  }
-
-  const existing = await findLocalMovieBySignature({
+  const matchInput = {
     title: fallbackTitle,
+    titleCandidates: fallback?.titleCandidates,
     directorText: fallback?.directorText || tmdb.directorText,
-    releaseYear:
-      fallback?.releaseYear ||
-      (tmdb.releaseDate ? new Date(tmdb.releaseDate).getUTCFullYear() : undefined),
-  })
-
-  if (existing) {
-    const movie = await prisma.movie.update({
-      where: { id: existing.id },
-      data: {
-        title: existing.title || fallbackTitle,
-        originalTitle: existing.originalTitle || tmdb.originalTitle,
-        releaseDate: existing.releaseDate || tmdb.releaseDate || fallbackReleaseDate,
-        runtimeMinutes: existing.runtimeMinutes || tmdb.runtimeMinutes || fallback?.runtimeMinutes,
-        overview: existing.overview || tmdb.overview || fallback?.overview,
-        posterUrl: choosePosterUrl({
-          tmdbPosterUrl: tmdb.posterUrl,
-          existingPosterUrl: existing.posterUrl,
-          fallbackPosterUrl: fallback?.posterUrl,
-        }),
-        backdropUrl: existing.backdropUrl || tmdb.backdropUrl,
-        imdbUrl: existing.imdbUrl || tmdb.imdbUrl,
-        officialSiteUrl:
-          existing.officialSiteUrl || tmdb.officialSiteUrl || fallback?.officialSiteUrl,
-        genresText: existing.genresText || tmdb.genresText || fallback?.genresText,
-        directorText: existing.directorText || tmdb.directorText || fallback?.directorText,
-        castText: existing.castText || tmdb.castText,
-      },
-    })
-
-    await syncMovieTags(movie.id, movie.genresText || fallback?.genresText)
-    await syncMoviePeople(movie.id, tmdb.peopleCredits || [], {
-      replaceKinds: ['DIRECTOR'],
-    })
-
-    return movie
+    releaseYear,
+    imdbId: fallback?.imdbUrl || tmdb.imdbUrl,
   }
 
-  const movie = await prisma.movie.create({
-    data: {
-      title: fallbackTitle,
-      originalTitle: tmdb.originalTitle,
-      releaseDate: tmdb.releaseDate || fallbackReleaseDate,
-      runtimeMinutes: tmdb.runtimeMinutes || fallback?.runtimeMinutes,
-      overview: tmdb.overview || fallback?.overview,
-      posterUrl: choosePosterUrl({
-        tmdbPosterUrl: tmdb.posterUrl,
-        fallbackPosterUrl: fallback?.posterUrl,
-      }),
-      backdropUrl: tmdb.backdropUrl,
-      imdbUrl: tmdb.imdbUrl,
-      officialSiteUrl: tmdb.officialSiteUrl || fallback?.officialSiteUrl,
-      genresText: tmdb.genresText || fallback?.genresText,
-      directorText: tmdb.directorText || fallback?.directorText,
-      castText: tmdb.castText,
-    },
+  const movie = await prisma.$transaction(async (tx) => {
+    if (tmdb.tmdbId) {
+      const existingByTmdbId = await tx.movie.findUnique({
+        where: {
+          tmdbId: tmdb.tmdbId,
+        },
+      })
+
+      if (existingByTmdbId) {
+        return tx.movie.update({
+          where: {
+            id: existingByTmdbId.id,
+          },
+          data: buildMovieMergeData({
+            existing: existingByTmdbId,
+            tmdb,
+            fallback,
+            preferredTitle,
+            fallbackReleaseDate,
+            preferIncomingTitle: true,
+          }),
+        })
+      }
+    }
+
+    const existingBySignature = await findLocalMovieByImportMatch(matchInput, tx)
+
+    if (existingBySignature) {
+      if (
+        tmdb.tmdbId &&
+        existingBySignature.tmdbId &&
+        existingBySignature.tmdbId !== tmdb.tmdbId
+      ) {
+        throw new MovieIdentityConflictError()
+      }
+
+      return tx.movie.update({
+        where: {
+          id: existingBySignature.id,
+        },
+        data: {
+          ...buildMovieMergeData({
+            existing: existingBySignature,
+            tmdb,
+            fallback,
+            preferredTitle,
+            fallbackReleaseDate,
+          }),
+          ...(tmdb.tmdbId && !existingBySignature.tmdbId
+            ? { tmdbId: tmdb.tmdbId }
+            : {}),
+        },
+      })
+    }
+
+    return tx.movie.create({
+      data: buildMovieCreateData(tmdb, fallback, preferredTitle, fallbackReleaseDate),
+    })
   })
 
   await syncMovieTags(movie.id, movie.genresText || fallback?.genresText)

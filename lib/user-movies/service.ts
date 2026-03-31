@@ -1,3 +1,5 @@
+import { Prisma } from '@prisma/client'
+
 import { prisma } from '@/lib/prisma'
 import {
   getReviewWordCount,
@@ -7,6 +9,20 @@ import {
 export type MovieCollectionState = {
   inWant: boolean
   inWatched: boolean
+}
+
+function toPlainRating(
+  value: Prisma.Decimal | number | null | undefined
+): number | null {
+  if (value === null || typeof value === 'undefined') {
+    return null
+  }
+
+  if (typeof value === 'number') {
+    return value
+  }
+
+  return value.toNumber()
 }
 
 function getUniqueMovieIds(movieIds: number[]) {
@@ -98,6 +114,17 @@ export async function getMovieStatesForUser(
 
 export async function addWant(userId: string, movieId: number) {
   const addedWhileOnScreen = await movieHasUpcomingShowtimes(movieId)
+  const existing = await prisma.watchlistItem.findUnique({
+    where: {
+      userId_movieId: {
+        userId,
+        movieId,
+      },
+    },
+    select: {
+      id: true,
+    },
+  })
 
   await prisma.watchlistItem.upsert({
     where: {
@@ -117,6 +144,7 @@ export async function addWant(userId: string, movieId: number) {
   return {
     movieId,
     inWant: true,
+    alreadyExisted: Boolean(existing),
   }
 }
 
@@ -137,6 +165,7 @@ export async function removeWant(userId: string, movieId: number) {
 type MarkWatchedInput = {
   confirmRemoveWant?: boolean
   preserveWatchedAt?: boolean
+  watchedAt?: Date
   rating?: number | null
   reviewText?: string | null
 }
@@ -146,8 +175,12 @@ export async function markWatched(
   movieId: number,
   input: MarkWatchedInput = {}
 ) {
-  const reviewText = normalizeReviewText(input.reviewText)
-  const reviewWordCount = getReviewWordCount(reviewText)
+  const reviewText =
+    typeof input.reviewText === 'undefined'
+      ? undefined
+      : normalizeReviewText(input.reviewText)
+  const reviewWordCount =
+    typeof reviewText === 'undefined' ? undefined : getReviewWordCount(reviewText)
 
   return prisma.$transaction(async (tx) => {
     const [watchlistItem, existingWatchedMovie] = await Promise.all([
@@ -171,6 +204,8 @@ export async function markWatched(
         },
         select: {
           watchedAt: true,
+          rating: true,
+          reviewText: true,
         },
       }),
     ])
@@ -184,9 +219,10 @@ export async function markWatched(
     }
 
     const watchedAt =
-      input.preserveWatchedAt && existingWatchedMovie?.watchedAt
+      input.watchedAt ||
+      (input.preserveWatchedAt && existingWatchedMovie?.watchedAt
         ? existingWatchedMovie.watchedAt
-        : new Date()
+        : new Date())
 
     const watchedMovie = await tx.userMovieWatch.upsert({
       where: {
@@ -197,17 +233,21 @@ export async function markWatched(
       },
       update: {
         watchedAt,
-        rating: input.rating ?? null,
-        reviewText,
-        reviewWordCount,
+        ...(typeof input.rating !== 'undefined' ? { rating: input.rating } : {}),
+        ...(typeof reviewText !== 'undefined'
+          ? {
+              reviewText,
+              reviewWordCount,
+            }
+          : {}),
       },
       create: {
         userId,
         movieId,
         watchedAt,
         rating: input.rating ?? null,
-        reviewText,
-        reviewWordCount,
+        reviewText: reviewText ?? null,
+        reviewWordCount: reviewWordCount ?? 0,
       },
       select: {
         watchedAt: true,
@@ -220,8 +260,9 @@ export async function markWatched(
       movieId,
       inWatched: true,
       removedFromWant: Boolean(watchlistItem && input.confirmRemoveWant),
+      alreadyExisted: Boolean(existingWatchedMovie),
       watchedAt: watchedMovie.watchedAt.toISOString(),
-      rating: watchedMovie.rating,
+      rating: toPlainRating(watchedMovie.rating),
       reviewText: watchedMovie.reviewText,
     }
   })
@@ -327,6 +368,9 @@ export async function getWatchedListPageData(userId: string) {
 
   return {
     totalCount: items.length,
-    items,
+    items: items.map((item) => ({
+      ...item,
+      rating: toPlainRating(item.rating),
+    })),
   }
 }

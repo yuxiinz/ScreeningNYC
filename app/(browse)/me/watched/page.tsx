@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
+import MovieCsvImportButton from '@/components/movie/MovieCsvImportButton'
 import MovieListActions from '@/components/movie/MovieListActions'
 import MovieExternalLinks from '@/components/movie/MovieExternalLinks'
 import PosterImage from '@/components/movie/PosterImage'
@@ -55,9 +56,12 @@ export default async function WatchedPage() {
           / WATCHED
         </p>
         <h1 className="mb-2 text-[2.4rem] font-black leading-[1.05]">WATCHED</h1>
-        <p className="m-0 text-[0.98rem] leading-[1.6] text-text-secondary">
-          You have watched {data.totalCount} film{data.totalCount === 1 ? '' : 's'}.
-        </p>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <p className="m-0 text-[0.98rem] leading-[1.6] text-text-secondary lg:max-w-[720px]">
+            You have watched {data.totalCount} film{data.totalCount === 1 ? '' : 's'}.
+          </p>
+          <MovieCsvImportButton listType="watched" className="lg:w-[360px]" />
+        </div>
       </section>
 
       {data.items.length > 0 ? (

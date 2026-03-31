@@ -23,6 +23,7 @@ export type TmdbMovie = {
   imdbUrl?: string
   officialSiteUrl?: string
   genresText?: string
+  productionCountriesText?: string
   directorText?: string
   castText?: string
   peopleCredits?: MoviePersonSyncInput[]
@@ -57,6 +58,9 @@ type TmdbMovieDetailResponse = {
   backdrop_path?: string | null
   homepage?: string | null
   genres?: Array<{
+    name?: string
+  }>
+  production_countries?: Array<{
     name?: string
   }>
 }
@@ -326,6 +330,10 @@ export async function searchTmdbMovie(params: SearchTmdbParams): Promise<TmdbMov
     .map((g) => g.name)
     .filter(Boolean)
     .join(', ')
+  const productionCountries = (detail?.production_countries || [])
+    .map((country) => country.name)
+    .filter(Boolean)
+    .join(', ')
 
   return {
     tmdbId: detail.id,
@@ -343,6 +351,7 @@ export async function searchTmdbMovie(params: SearchTmdbParams): Promise<TmdbMov
     imdbUrl: external?.imdb_id ? `https://www.imdb.com/title/${external.imdb_id}` : undefined,
     officialSiteUrl: detail.homepage || undefined,
     genresText: genres || undefined,
+    productionCountriesText: productionCountries || undefined,
     directorText: directors || params.directorText,
     castText: cast || undefined,
     peopleCredits: mapTmdbMovieCreditsToPeople(credits),

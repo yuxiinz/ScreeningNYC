@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
+import MovieCsvImportButton from '@/components/movie/MovieCsvImportButton'
 import MovieListActions from '@/components/movie/MovieListActions'
 import MovieExternalLinks from '@/components/movie/MovieExternalLinks'
 import PosterImage from '@/components/movie/PosterImage'
@@ -103,11 +104,16 @@ export default async function WantListPage({
             DIRECTORS
           </Link>
         </div>
-        <p className="m-0 text-[0.98rem] leading-[1.6] text-text-secondary">
-          {activeTab === 'films'
-            ? getHeadline(filmData.totalCount, filmData.onScreenNowCount)
-            : getDirectorHeadline(directorData.totalCount, directorData.onScreenNowCount)}
-        </p>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <p className="m-0 text-[0.98rem] leading-[1.6] text-text-secondary lg:max-w-[720px]">
+            {activeTab === 'films'
+              ? getHeadline(filmData.totalCount, filmData.onScreenNowCount)
+              : getDirectorHeadline(directorData.totalCount, directorData.onScreenNowCount)}
+          </p>
+          {activeTab === 'films' ? (
+            <MovieCsvImportButton listType="want" className="lg:w-[360px]" />
+          ) : null}
+        </div>
       </section>
 
       {activeTab === 'films' ? (
