@@ -211,9 +211,10 @@ export async function markWatched(
     ])
 
     if (watchlistItem && input.confirmRemoveWant) {
-      await tx.watchlistItem.delete({
+      await tx.watchlistItem.deleteMany({
         where: {
-          id: watchlistItem.id,
+          userId,
+          movieId,
         },
       })
     }

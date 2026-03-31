@@ -98,6 +98,23 @@ function normalizeName(name?: string) {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[’']/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+}
+
+function getSearchRankBonus(rank: number, resultCount: number) {
+  const rankBonus = [40, 26, 16, 10, 5, 0][rank] ?? 0
+
+  if (resultCount === 1 && rank === 0) {
+    return rankBonus + 35
+  }
+
+  if (resultCount <= 3 && rank === 0) {
+    return rankBonus + 12
+  }
+
+  return rankBonus
 }
 
 function normalizeTmdbQueryTitle(title?: string | null): string {
@@ -151,8 +168,11 @@ function scoreCandidate(params: {
     score += 80
   } else if (
     scrapedTitle &&
-    candidateTitle &&
-    (candidateTitle.includes(scrapedTitle) || scrapedTitle.includes(candidateTitle))
+    ((candidateTitle &&
+      (candidateTitle.includes(scrapedTitle) || scrapedTitle.includes(candidateTitle))) ||
+      (candidateOriginalTitle &&
+        (candidateOriginalTitle.includes(scrapedTitle) ||
+          scrapedTitle.includes(candidateOriginalTitle))))
   ) {
     score += 35
   }
@@ -225,6 +245,10 @@ export async function searchTmdbMovie(params: SearchTmdbParams): Promise<TmdbMov
     detail: TmdbMovieDetailResponse
     credits: TmdbCreditsResponse
     matchedQuery: string
+    searchRank: number
+    resultCount: number
+    exactTitleMatch: boolean
+    exactOriginalTitleMatch: boolean
   } | null = null
   let bestScore = Number.NEGATIVE_INFINITY
 
@@ -246,7 +270,7 @@ export async function searchTmdbMovie(params: SearchTmdbParams): Promise<TmdbMov
       continue
     }
 
-    for (const candidate of results.slice(0, 6)) {
+    for (const [index, candidate] of results.slice(0, 6).entries()) {
       const movieId = candidate.id
 
       try {
@@ -274,22 +298,38 @@ export async function searchTmdbMovie(params: SearchTmdbParams): Promise<TmdbMov
         const year = detail?.release_date
           ? Number(String(detail.release_date).slice(0, 4))
           : undefined
+        const normalizedQuery = normalizeName(query)
+        const normalizedCandidateTitle = normalizeName(detail.title)
+        const normalizedCandidateOriginalTitle = normalizeName(detail.original_title)
+        const exactTitleMatch =
+          Boolean(normalizedQuery) && normalizedQuery === normalizedCandidateTitle
+        const exactOriginalTitleMatch =
+          Boolean(normalizedQuery) && normalizedQuery === normalizedCandidateOriginalTitle
 
-        const score = scoreCandidate({
-          scrapedTitle: query,
-          scrapedDirector: params.directorText,
-          scrapedYear: params.releaseYear,
-          scrapedRuntime: params.runtimeMinutes,
-          candidateTitle: detail.title,
-          candidateOriginalTitle: detail.original_title,
-          candidateYear: year,
-          candidateDirector: director,
-          candidateRuntime: detail.runtime,
-        })
+        const score =
+          scoreCandidate({
+            scrapedTitle: query,
+            scrapedDirector: params.directorText,
+            scrapedYear: params.releaseYear,
+            scrapedRuntime: params.runtimeMinutes,
+            candidateTitle: detail.title,
+            candidateOriginalTitle: detail.original_title,
+            candidateYear: year,
+            candidateDirector: director,
+            candidateRuntime: detail.runtime,
+          }) + getSearchRankBonus(index, results.length)
 
         if (score > bestScore) {
           bestScore = score
-          best = { detail, credits, matchedQuery: query }
+          best = {
+            detail,
+            credits,
+            matchedQuery: query,
+            searchRank: index,
+            resultCount: results.length,
+            exactTitleMatch,
+            exactOriginalTitleMatch,
+          }
         }
       } catch {
         continue
@@ -297,7 +337,23 @@ export async function searchTmdbMovie(params: SearchTmdbParams): Promise<TmdbMov
     }
   }
 
-  if (!best || bestScore < 95) {
+  const hasSupportingMetadata = Boolean(
+    params.directorText || params.releaseYear || params.runtimeMinutes
+  )
+  if (!best) {
+    return buildFallbackOnly(params)
+  }
+
+  const matchesConfidently =
+    bestScore >= (hasSupportingMetadata ? 95 : 80) ||
+    (best.exactTitleMatch && bestScore >= 88) ||
+    (best.exactOriginalTitleMatch && bestScore >= 75) ||
+    (!hasSupportingMetadata &&
+      best.searchRank === 0 &&
+      best.resultCount === 1 &&
+      bestScore >= 70)
+
+  if (!matchesConfidently) {
     return buildFallbackOnly(params)
   }
 

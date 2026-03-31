@@ -1,5 +1,6 @@
 import crypto from 'crypto'
-import type { Movie, Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
+import type { Movie } from '@prisma/client'
 import { DateTime } from 'luxon'
 import { prisma } from '../../prisma'
 import { APP_TIMEZONE } from '../../timezone'
@@ -573,9 +574,41 @@ export async function upsertMovie(tmdb: TmdbMovie, fallback?: FallbackMovieData)
       })
     }
 
-    return tx.movie.create({
-      data: buildMovieCreateData(tmdb, fallback, preferredTitle, fallbackReleaseDate),
-    })
+    try {
+      return await tx.movie.create({
+        data: buildMovieCreateData(tmdb, fallback, preferredTitle, fallbackReleaseDate),
+      })
+    } catch (error) {
+      if (
+        tmdb.tmdbId &&
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const existingByTmdbId = await tx.movie.findUnique({
+          where: {
+            tmdbId: tmdb.tmdbId,
+          },
+        })
+
+        if (existingByTmdbId) {
+          return tx.movie.update({
+            where: {
+              id: existingByTmdbId.id,
+            },
+            data: buildMovieMergeData({
+              existing: existingByTmdbId,
+              tmdb,
+              fallback,
+              preferredTitle,
+              fallbackReleaseDate,
+              preferIncomingTitle: true,
+            }),
+          })
+        }
+      }
+
+      throw error
+    }
   })
 
   await syncMovieTags(movie.id, movie.genresText || fallback?.genresText)

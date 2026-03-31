@@ -22,7 +22,7 @@ export function normalizeMovieName(input?: string | null): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[’']/g, '')
-    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim()
 }
 
@@ -33,7 +33,7 @@ export function normalizeDirectorName(input?: string | null): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[’']/g, '')
-    .replace(/[^a-z0-9,\s]+/g, ' ')
+    .replace(/[^\p{L}\p{N},\s]+/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -233,7 +233,7 @@ async function findMoviesByLooseTitleCandidates(
 ) {
   const looseCandidates = titleCandidates.filter((candidate) => {
     const normalized = normalizeMovieName(candidate)
-    return normalized.length >= 4 || candidate.includes(' ')
+    return normalized.length >= 4 || candidate.includes(' ') || /[^\x00-\x7F]/.test(candidate)
   })
 
   if (looseCandidates.length === 0) {
