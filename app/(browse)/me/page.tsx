@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
 import { auth } from '@/auth'
@@ -10,6 +11,9 @@ function formatDate(date: Date) {
     dateStyle: 'medium',
   }).format(date)
 }
+
+const LINK_CARD_CLASS =
+  'group block rounded-panel border border-border-default bg-card-bg p-5 shadow-card transition-colors hover:border-text-primary'
 
 export default async function MePage() {
   const session = await auth()
@@ -56,7 +60,7 @@ export default async function MePage() {
       <section className="mb-8">
         <h1 className="mb-2 text-[2.4rem] font-black leading-[1.05]">ME</h1>
         <p className="m-0 text-[0.98rem] leading-[1.6] text-text-secondary">
-          Account and reminder settings live here. Want list and watched management will attach to this dashboard in the next phases.
+          Account and reminder settings live here. Want list and watched records now have dedicated pages from this dashboard.
         </p>
       </section>
 
@@ -95,23 +99,23 @@ export default async function MePage() {
           />
         </article>
 
-        <article className="rounded-panel border border-border-default bg-card-bg p-5 shadow-card">
+        <Link href="/me/want-list" className={LINK_CARD_CLASS}>
           <h2 className="mb-4 text-[1.15rem] font-bold">
             Want to watch in theaters
           </h2>
           <p className="mb-2 text-[2rem] font-black">{user._count.watchlistItems}</p>
-          <p className="m-0 text-[0.88rem] leading-[1.6] text-text-secondary">
-            Collection and reminder actions land in the next phase. The dashboard slot is already reserved so future sections can move around cleanly.
+          <p className="m-0 text-[0.88rem] leading-[1.6] text-text-secondary group-hover:text-text-primary">
+            Open your want list and see which picks are already on screen in NYC.
           </p>
-        </article>
+        </Link>
 
-        <article className="rounded-panel border border-border-default bg-card-bg p-5 shadow-card">
+        <Link href="/me/watched" className={LINK_CARD_CLASS}>
           <h2 className="mb-4 text-[1.15rem] font-bold">Watched / reviews</h2>
           <p className="mb-2 text-[2rem] font-black">{user._count.watchedMovies}</p>
-          <p className="m-0 text-[0.88rem] leading-[1.6] text-text-secondary">
-            Watched records, ratings, and short reviews will attach here in the next phase.
+          <p className="m-0 text-[0.88rem] leading-[1.6] text-text-secondary group-hover:text-text-primary">
+            Open your watched list and manage the films you have already marked as seen.
           </p>
-        </article>
+        </Link>
       </section>
     </main>
   )

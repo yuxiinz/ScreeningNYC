@@ -26,6 +26,19 @@ export const dynamic = 'force-dynamic'
 const SHOWTIME_ROW_CLASS =
   'flex flex-wrap items-start justify-between gap-4 rounded-panel border border-border-default bg-card-bg px-5 py-[15px]'
 const SHOWTIME_META_CLASS = 'flex flex-wrap items-baseline gap-5'
+type MovieDetailShowtime = {
+  id: number
+  startTime: Date
+  runtimeMinutes: number | null
+  ticketUrl: string | null
+  shownTitle: string | null
+  theater: {
+    name: string
+  }
+  format: {
+    name: string
+  } | null
+}
 
 function getPosterImageClass(posterIsTmdb: boolean) {
   return [
@@ -134,9 +147,9 @@ export default async function MovieDetailPage({
     inWatched: false,
   }
 
-  const groupedByDate: Record<string, typeof movie.showtimes> = {}
+  const groupedByDate: Record<string, MovieDetailShowtime[]> = {}
 
-  movie.showtimes.forEach(showtime => {
+  movie.showtimes.forEach((showtime: MovieDetailShowtime) => {
     const date = getDateKeyInAppTimezone(showtime.startTime)
     if (!groupedByDate[date]) groupedByDate[date] = []
     groupedByDate[date].push(showtime)
@@ -221,7 +234,7 @@ export default async function MovieDetailPage({
                 </h3>
 
                 <div className="flex flex-col gap-2.5">
-                  {showtimes.map(showtime => (
+                  {showtimes.map((showtime: MovieDetailShowtime) => (
                     <div key={showtime.id} className={SHOWTIME_ROW_CLASS}>
                       <div className="min-w-0 flex-1">
                         {getShowtimeDisplayTitle(showtime.shownTitle, movie.title) && (

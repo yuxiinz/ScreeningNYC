@@ -195,3 +195,91 @@ export async function removeWatched(userId: string, movieId: number) {
     inWatched: false,
   }
 }
+
+export async function getWantListPageData(userId: string) {
+  const now = new Date()
+
+  const items = await prisma.watchlistItem.findMany({
+    where: {
+      userId,
+    },
+    orderBy: {
+      createdAt: 'desc',
+    },
+    select: {
+      createdAt: true,
+      movie: {
+        select: {
+          id: true,
+          title: true,
+          releaseDate: true,
+          runtimeMinutes: true,
+          directorText: true,
+          posterUrl: true,
+          imdbUrl: true,
+          doubanUrl: true,
+          letterboxdUrl: true,
+          showtimes: {
+            where: {
+              startTime: {
+                gt: now,
+              },
+              status: 'SCHEDULED',
+            },
+            orderBy: {
+              startTime: 'asc',
+            },
+            take: 3,
+            select: {
+              id: true,
+              startTime: true,
+              theater: {
+                select: {
+                  name: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  })
+
+  return {
+    totalCount: items.length,
+    onScreenNowCount: items.filter((item) => item.movie.showtimes.length > 0).length,
+    items,
+  }
+}
+
+export async function getWatchedListPageData(userId: string) {
+  const items = await prisma.userMovieWatch.findMany({
+    where: {
+      userId,
+    },
+    orderBy: {
+      watchedAt: 'desc',
+    },
+    select: {
+      watchedAt: true,
+      movie: {
+        select: {
+          id: true,
+          title: true,
+          releaseDate: true,
+          runtimeMinutes: true,
+          directorText: true,
+          posterUrl: true,
+          imdbUrl: true,
+          doubanUrl: true,
+          letterboxdUrl: true,
+        },
+      },
+    },
+  })
+
+  return {
+    totalCount: items.length,
+    items,
+  }
+}
