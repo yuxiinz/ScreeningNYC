@@ -19,6 +19,7 @@ import {
   normalizeFormat,
   parseStartTime,
   buildFingerprint,
+  deleteExpiredShowtimesBatch,
   disconnectPrisma,
 } from '../lib/ingest/services/persist_service'
 
@@ -244,6 +245,19 @@ function formatLocalTime(date: Date): string {
 function computeEndTime(startTime: Date, runtimeMinutes?: number): Date | undefined {
   if (!runtimeMinutes || runtimeMinutes <= 0) return undefined
   return new Date(startTime.getTime() + runtimeMinutes * 60 * 1000)
+}
+
+async function cleanupExpiredShowtimes() {
+  const batchSize = 1000
+  let totalDeleted = 0
+
+  while (true) {
+    const deleted = await deleteExpiredShowtimesBatch(batchSize)
+    totalDeleted += deleted
+    if (deleted < batchSize) break
+  }
+
+  console.log(`[cleanup] Expired showtimes deleted after ingest: ${totalDeleted}`)
 }
 
 async function ingestOneTheater(
@@ -521,6 +535,8 @@ async function main() {
       console.log(`[${result.theaterSlug}] failed | error=${result.error}`)
     }
   }
+
+  await cleanupExpiredShowtimes()
 
   const failedCount = results.filter((r) => !r.success).length
 

@@ -6,8 +6,10 @@ import Resend from 'next-auth/providers/resend'
 
 import { authEnv, isGoogleAuthConfigured, isMagicLinkConfigured } from '@/lib/auth/env'
 import { verifyPassword } from '@/lib/auth/password'
-import { ensureUserSettings, findAuthUserByEmail, normalizeEmail } from '@/lib/auth/users'
+import { findAuthUserByEmail, normalizeEmail } from '@/lib/auth/users'
 import { prisma } from '@/lib/prisma'
+
+const isDevelopment = process.env.NODE_ENV !== 'production'
 
 class InvalidCredentialsError extends CredentialsSignin {
   code = 'invalid_credentials'
@@ -59,8 +61,6 @@ providers.push(
         throw new InvalidCredentialsError()
       }
 
-      await ensureUserSettings(user.id)
-
       return {
         id: user.id,
         email: user.email,
@@ -86,6 +86,7 @@ if (isGoogleAuthConfigured()) {
     Google({
       clientId: authEnv.googleClientId,
       clientSecret: authEnv.googleClientSecret,
+      allowDangerousEmailAccountLinking: true,
     })
   )
 }
@@ -94,6 +95,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   secret: authEnv.secret,
   trustHost: true,
+  debug: isDevelopment,
+  logger: {
+    error(error) {
+      console.error('[auth][error]', error)
+    },
+    warn(code) {
+      console.warn('[auth][warn]', code)
+    },
+    debug(message, metadata) {
+      if (isDevelopment) {
+        console.log('[auth][debug]', message, metadata)
+      }
+    },
+  },
   pages: {
     signIn: '/login',
   },
@@ -102,9 +117,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   providers,
   callbacks: {
-    async signIn({ user }) {
-      if (user.id) {
-        await ensureUserSettings(user.id)
+    async signIn({ user, account, profile }) {
+      if (account?.provider === 'google') {
+        console.log('[auth][google][signIn]', {
+          userEmail: user.email,
+          providerAccountId: account.providerAccountId,
+          profileEmail:
+            profile && typeof profile === 'object' && 'email' in profile
+              ? profile.email
+              : null,
+          profileEmailVerified:
+            profile && typeof profile === 'object' && 'email_verified' in profile
+              ? profile.email_verified
+              : null,
+        })
       }
 
       return true

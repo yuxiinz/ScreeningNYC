@@ -4,7 +4,6 @@ import { isMagicLinkConfigured } from './env'
 import { issueEmailVerificationToken } from './email-verification'
 import { hashPassword, validatePassword } from './password'
 import {
-  ensureUserSettings,
   isValidEmail,
   normalizeEmail,
   normalizeOptionalName,
@@ -102,7 +101,6 @@ export async function registerUser(input: RegisterUserInput): Promise<RegisterUs
   })
 
   await issueEmailVerificationToken(user)
-  await ensureUserSettings(user.id)
 
   return {
     ok: true,
@@ -147,7 +145,6 @@ export async function resendRegistrationVerificationEmail(emailInput: string) {
   }
 
   await issueEmailVerificationToken(user)
-  await ensureUserSettings(user.id)
 
   return {
     ok: true as const,

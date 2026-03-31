@@ -1,3 +1,5 @@
+// app/api/auth/verify-email/route.ts
+
 import { NextResponse } from 'next/server'
 
 import { consumeEmailVerificationToken } from '@/lib/auth/email-verification'
