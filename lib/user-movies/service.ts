@@ -12,6 +12,18 @@ export class WantRemovalConfirmationRequiredError extends Error {
   }
 }
 
+export function getReviewWordCount(reviewText?: string | null) {
+  return (reviewText || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length
+}
+
+function normalizeReviewText(reviewText?: string | null) {
+  const normalizedReviewText = (reviewText || '').trim()
+  return normalizedReviewText || null
+}
+
 function getUniqueMovieIds(movieIds: number[]) {
   return [...new Set(movieIds.filter((movieId) => Number.isInteger(movieId) && movieId > 0))]
 }
@@ -119,6 +131,8 @@ export async function removeWant(userId: string, movieId: number) {
 
 type MarkWatchedInput = {
   confirmRemoveWant?: boolean
+  rating?: number | null
+  reviewText?: string | null
 }
 
 export async function markWatched(
@@ -127,6 +141,8 @@ export async function markWatched(
   input: MarkWatchedInput = {}
 ) {
   const watchedAt = new Date()
+  const reviewText = normalizeReviewText(input.reviewText)
+  const reviewWordCount = getReviewWordCount(reviewText)
 
   return prisma.$transaction(async (tx) => {
     const watchlistItem = await tx.watchlistItem.findUnique({
@@ -162,14 +178,22 @@ export async function markWatched(
       },
       update: {
         watchedAt,
+        rating: input.rating ?? null,
+        reviewText,
+        reviewWordCount,
       },
       create: {
         userId,
         movieId,
         watchedAt,
+        rating: input.rating ?? null,
+        reviewText,
+        reviewWordCount,
       },
       select: {
         watchedAt: true,
+        rating: true,
+        reviewText: true,
       },
     })
 
@@ -178,6 +202,8 @@ export async function markWatched(
       inWatched: true,
       removedFromWant: Boolean(watchlistItem),
       watchedAt: watchedMovie.watchedAt.toISOString(),
+      rating: watchedMovie.rating,
+      reviewText: watchedMovie.reviewText,
     }
   })
 }
@@ -262,6 +288,8 @@ export async function getWatchedListPageData(userId: string) {
     },
     select: {
       watchedAt: true,
+      rating: true,
+      reviewText: true,
       movie: {
         select: {
           id: true,

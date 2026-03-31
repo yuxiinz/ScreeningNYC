@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { AuthRequiredError, requireUserId } from '@/lib/auth/require-user-id'
 import {
+  getReviewWordCount,
   markWatched,
   removeWatched,
   WantRemovalConfirmationRequiredError,
@@ -58,6 +59,8 @@ export async function PUT(
 
   const confirmRemoveWant = (body as { confirmRemoveWant?: unknown })
     ?.confirmRemoveWant
+  const ratingInput = (body as { rating?: unknown })?.rating
+  const reviewTextInput = (body as { reviewText?: unknown })?.reviewText
 
   if (
     typeof confirmRemoveWant !== 'undefined' &&
@@ -67,6 +70,50 @@ export async function PUT(
       {
         code: 'INVALID_CONFIRMATION',
         message: 'confirmRemoveWant must be a boolean.',
+      },
+      { status: 400 }
+    )
+  }
+
+  if (
+    typeof ratingInput !== 'undefined' &&
+    ratingInput !== null &&
+    (typeof ratingInput !== 'number' ||
+      !Number.isInteger(ratingInput) ||
+      ratingInput < 1 ||
+      ratingInput > 5)
+  ) {
+    return NextResponse.json(
+      {
+        code: 'INVALID_RATING',
+        message: 'rating must be null or an integer from 1 to 5.',
+      },
+      { status: 400 }
+    )
+  }
+
+  if (
+    typeof reviewTextInput !== 'undefined' &&
+    reviewTextInput !== null &&
+    typeof reviewTextInput !== 'string'
+  ) {
+    return NextResponse.json(
+      {
+        code: 'INVALID_REVIEW',
+        message: 'reviewText must be a string or null.',
+      },
+      { status: 400 }
+    )
+  }
+
+  const rating = typeof ratingInput === 'number' ? ratingInput : null
+  const reviewText = typeof reviewTextInput === 'string' ? reviewTextInput : null
+
+  if (getReviewWordCount(reviewText) > 200) {
+    return NextResponse.json(
+      {
+        code: 'REVIEW_TOO_LONG',
+        message: 'reviewText must be 200 words or fewer.',
       },
       { status: 400 }
     )
@@ -84,6 +131,8 @@ export async function PUT(
 
     const result = await markWatched(userId, movieId, {
       confirmRemoveWant,
+      rating,
+      reviewText,
     })
 
     return NextResponse.json({

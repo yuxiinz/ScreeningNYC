@@ -118,6 +118,18 @@ export default async function WatchedPage() {
                     Marked watched on {formatDate(item.watchedAt)}.
                   </p>
 
+                  {item.rating ? (
+                    <p className="mb-2 text-[0.88rem] leading-[1.6] text-text-body">
+                      Rated {item.rating}/5.
+                    </p>
+                  ) : null}
+
+                  {item.reviewText ? (
+                    <p className="mb-4 whitespace-pre-line text-[0.88rem] leading-[1.7] text-text-secondary">
+                      {item.reviewText}
+                    </p>
+                  ) : null}
+
                   <MovieListActions
                     movieId={item.movie.id}
                     initialInWant={movieState.inWant}

@@ -16,6 +16,8 @@ type MutationErrorPayload = {
   message?: string
 }
 
+const RATING_OPTIONS: Array<number | null> = [null, 1, 2, 3, 4, 5]
+
 function buildButtonClass(
   isActive: boolean,
   tone: 'default' | 'positive',
@@ -43,6 +45,13 @@ async function getErrorMessage(response: Response, fallbackMessage: string) {
   }
 }
 
+function getReviewWordCount(reviewText: string) {
+  return reviewText
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length
+}
+
 export default function MovieListActions({
   movieId,
   initialInWant,
@@ -53,7 +62,12 @@ export default function MovieListActions({
   const [inWant, setInWant] = useState(initialInWant)
   const [inWatched, setInWatched] = useState(initialInWatched)
   const [pendingAction, setPendingAction] = useState<PendingAction>(null)
+  const [watchedDialogOpen, setWatchedDialogOpen] = useState(false)
+  const [rating, setRating] = useState<number | null>(null)
+  const [reviewText, setReviewText] = useState('')
   const [error, setError] = useState('')
+  const reviewWordCount = getReviewWordCount(reviewText)
+  const reviewTooLong = reviewWordCount > 200
 
   async function handleWantToggle() {
     setPendingAction('want')
@@ -83,32 +97,20 @@ export default function MovieListActions({
   }
 
   async function handleWatchedToggle() {
-    setError('')
-    let confirmRemoveWant = false
-
-    if (!inWatched && inWant) {
-      confirmRemoveWant = window.confirm(
-        'Mark as watched and remove it from Want to watch in theaters?'
-      )
-
-      if (!confirmRemoveWant) {
-        return
-      }
+    if (!inWatched) {
+      setError('')
+      setRating(null)
+      setReviewText('')
+      setWatchedDialogOpen(true)
+      return
     }
 
+    setError('')
     setPendingAction('watched')
 
     try {
       const response = await fetch(`/api/me/movies/${movieId}/watched`, {
-        method: inWatched ? 'DELETE' : 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: inWatched
-          ? undefined
-          : JSON.stringify({
-              confirmRemoveWant,
-            }),
+        method: 'DELETE',
       })
 
       if (!response.ok) {
@@ -117,9 +119,44 @@ export default function MovieListActions({
         )
       }
 
-      if (inWatched) {
-        setInWatched(false)
-        return
+      setInWatched(false)
+    } catch (nextError) {
+      setError(
+        nextError instanceof Error
+          ? nextError.message
+          : 'Could not update watched list.'
+      )
+    } finally {
+      setPendingAction(null)
+    }
+  }
+
+  async function handleWatchedSave() {
+    if (reviewTooLong) {
+      setError('Review must be 200 words or fewer.')
+      return
+    }
+
+    setPendingAction('watched')
+    setError('')
+
+    try {
+      const response = await fetch(`/api/me/movies/${movieId}/watched`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          confirmRemoveWant: inWant,
+          rating,
+          reviewText: reviewText.trim() || null,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(
+          await getErrorMessage(response, 'Could not update watched list.')
+        )
       }
 
       setInWatched(true)
@@ -127,6 +164,8 @@ export default function MovieListActions({
       if (inWant) {
         setInWant(false)
       }
+
+      setWatchedDialogOpen(false)
     } catch (nextError) {
       setError(
         nextError instanceof Error
@@ -168,10 +207,110 @@ export default function MovieListActions({
         </button>
       </div>
 
-      {error ? (
+      {error && !watchedDialogOpen ? (
         <p className="mt-2 text-[0.78rem] leading-[1.5] text-[#ffb3b3]">
           {error}
         </p>
+      ) : null}
+
+      {watchedDialogOpen ? (
+        <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/70 px-5 py-8">
+          <div className="w-full max-w-[560px] rounded-panel border border-border-strong bg-card-bg p-6 shadow-popover">
+            <div className="mb-6">
+              <h3 className="mb-2 text-[1.5rem] font-black leading-[1.05]">
+                MARK WATCHED
+              </h3>
+              <p className="m-0 text-[0.92rem] leading-[1.6] text-text-secondary">
+                Add an optional rating and a short review.
+              </p>
+              {inWant ? (
+                <p className="mt-3 text-[0.82rem] leading-[1.6] text-accent-positive">
+                  Saving this will also remove the film from Want to watch in theaters.
+                </p>
+              ) : null}
+            </div>
+
+            <div className="mb-6">
+              <p className="mb-3 text-[0.78rem] font-semibold tracking-[0.08em] text-text-dim">
+                RATING
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {RATING_OPTIONS.map((option) => (
+                  <button
+                    key={option === null ? 'none' : option}
+                    type="button"
+                    onClick={() => setRating(option)}
+                    className={[
+                      'rounded-panel border px-3 py-2 text-[0.82rem] font-semibold transition-colors',
+                      rating === option
+                        ? 'border-text-primary bg-text-primary text-page-bg'
+                        : 'border-border-input text-text-secondary hover:border-text-primary hover:text-text-primary',
+                    ].join(' ')}
+                  >
+                    {option === null ? 'No rating' : `${option}/5`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="m-0 text-[0.78rem] font-semibold tracking-[0.08em] text-text-dim">
+                  SHORT REVIEW
+                </p>
+                <p
+                  className={[
+                    'm-0 text-[0.78rem]',
+                    reviewTooLong ? 'text-[#ffb3b3]' : 'text-text-dim',
+                  ].join(' ')}
+                >
+                  {reviewWordCount}/200 words
+                </p>
+              </div>
+              <textarea
+                value={reviewText}
+                onChange={(event) => setReviewText(event.target.value)}
+                rows={5}
+                placeholder="Optional. Keep it short."
+                className="w-full rounded-panel border border-border-input bg-page-bg px-4 py-3 text-[0.92rem] leading-[1.6] text-text-primary outline-none placeholder:text-text-dim"
+              />
+            </div>
+
+            {error ? (
+              <p className="mb-6 text-[0.82rem] leading-[1.6] text-[#ffb3b3]">
+                {error}
+              </p>
+            ) : null}
+
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!pendingAction) {
+                    setWatchedDialogOpen(false)
+                    setError('')
+                  }
+                }}
+                disabled={pendingAction !== null}
+                className="rounded-panel border border-border-input px-4 py-3 text-[0.86rem] font-semibold text-text-secondary transition-colors hover:border-text-primary hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!pendingAction) {
+                    void handleWatchedSave()
+                  }
+                }}
+                disabled={pendingAction !== null || reviewTooLong}
+                className="rounded-panel border border-accent-positive bg-accent-positive px-4 py-3 text-[0.86rem] font-bold text-page-bg transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {pendingAction === 'watched' ? 'Saving...' : 'Save watched'}
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
     </div>
   )
