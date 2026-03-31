@@ -4,6 +4,11 @@ import { prisma } from '../../prisma'
 import { APP_TIMEZONE } from '../../timezone'
 import type { TmdbMovie } from './tmdb_service'
 import { canonicalizeTitle } from './tmdb_service'
+import {
+  buildDirectorPeopleInputsFromText,
+  syncMoviePeople,
+  syncMovieTags,
+} from '@/lib/movie/relations'
 
 type PersistConfig = {
   theaterName: string
@@ -381,7 +386,7 @@ export async function upsertLocalMovie(fallback: FallbackMovieData) {
   const releaseDate = releaseYearToDate(fallback.releaseYear)
 
   if (existing) {
-    return prisma.movie.update({
+    const movie = await prisma.movie.update({
       where: { id: existing.id },
       data: {
         title: canonicalTitle,
@@ -397,9 +402,20 @@ export async function upsertLocalMovie(fallback: FallbackMovieData) {
         genresText: existing.genresText || fallback.genresText,
       },
     })
+
+    await syncMovieTags(movie.id, movie.genresText)
+    await syncMoviePeople(
+      movie.id,
+      buildDirectorPeopleInputsFromText(movie.directorText || fallback.directorText),
+      {
+        replaceKinds: ['DIRECTOR'],
+      }
+    )
+
+    return movie
   }
 
-  return prisma.movie.create({
+  const movie = await prisma.movie.create({
     data: {
       title: canonicalTitle,
       directorText: fallback.directorText,
@@ -413,6 +429,17 @@ export async function upsertLocalMovie(fallback: FallbackMovieData) {
       genresText: fallback.genresText,
     },
   })
+
+  await syncMovieTags(movie.id, movie.genresText)
+  await syncMoviePeople(
+    movie.id,
+    buildDirectorPeopleInputsFromText(movie.directorText || fallback.directorText),
+    {
+      replaceKinds: ['DIRECTOR'],
+    }
+  )
+
+  return movie
 }
 
 export async function upsertMovie(tmdb: TmdbMovie, fallback?: FallbackMovieData) {
@@ -422,7 +449,7 @@ export async function upsertMovie(tmdb: TmdbMovie, fallback?: FallbackMovieData)
     fallback?.preferTitle && fallbackTitle ? fallbackTitle : tmdb.title || fallbackTitle
 
   if (tmdb.tmdbId) {
-    return prisma.movie.upsert({
+    const movie = await prisma.movie.upsert({
       where: { tmdbId: tmdb.tmdbId },
       update: {
         title: preferredTitle,
@@ -460,6 +487,18 @@ export async function upsertMovie(tmdb: TmdbMovie, fallback?: FallbackMovieData)
         castText: tmdb.castText,
       },
     })
+
+    await syncMovieTags(movie.id, movie.genresText || fallback?.genresText)
+    await syncMoviePeople(
+      movie.id,
+      tmdb.peopleCredits ||
+        buildDirectorPeopleInputsFromText(tmdb.directorText || fallback?.directorText),
+      {
+        replaceKinds: tmdb.peopleCredits ? ['DIRECTOR', 'CAST'] : ['DIRECTOR'],
+      }
+    )
+
+    return movie
   }
 
   const existing = await findLocalMovieBySignature({
@@ -471,7 +510,7 @@ export async function upsertMovie(tmdb: TmdbMovie, fallback?: FallbackMovieData)
   })
 
   if (existing) {
-    return prisma.movie.update({
+    const movie = await prisma.movie.update({
       where: { id: existing.id },
       data: {
         title: existing.title || fallbackTitle,
@@ -493,9 +532,23 @@ export async function upsertMovie(tmdb: TmdbMovie, fallback?: FallbackMovieData)
         castText: existing.castText || tmdb.castText,
       },
     })
+
+    await syncMovieTags(movie.id, movie.genresText || fallback?.genresText)
+    await syncMoviePeople(
+      movie.id,
+      tmdb.peopleCredits ||
+        buildDirectorPeopleInputsFromText(
+          movie.directorText || tmdb.directorText || fallback?.directorText
+        ),
+      {
+        replaceKinds: tmdb.peopleCredits ? ['DIRECTOR', 'CAST'] : ['DIRECTOR'],
+      }
+    )
+
+    return movie
   }
 
-  return prisma.movie.create({
+  const movie = await prisma.movie.create({
     data: {
       title: fallbackTitle,
       originalTitle: tmdb.originalTitle,
@@ -514,6 +567,20 @@ export async function upsertMovie(tmdb: TmdbMovie, fallback?: FallbackMovieData)
       castText: tmdb.castText,
     },
   })
+
+  await syncMovieTags(movie.id, movie.genresText || fallback?.genresText)
+  await syncMoviePeople(
+    movie.id,
+    tmdb.peopleCredits ||
+      buildDirectorPeopleInputsFromText(
+        movie.directorText || tmdb.directorText || fallback?.directorText
+      ),
+    {
+      replaceKinds: tmdb.peopleCredits ? ['DIRECTOR', 'CAST'] : ['DIRECTOR'],
+    }
+  )
+
+  return movie
 }
 
 export async function upsertShowtime(params: {
@@ -589,6 +656,41 @@ export async function markMissingShowtimesAsCanceled(
       lastVerifiedAt: new Date(),
     },
   })
+}
+
+export async function getIngestTableCounts() {
+  const [
+    theaterCount,
+    movieCount,
+    formatCount,
+    showtimeCount,
+    scheduledShowtimeCount,
+    canceledShowtimeCount,
+  ] = await Promise.all([
+    prisma.theater.count(),
+    prisma.movie.count(),
+    prisma.format.count(),
+    prisma.showtime.count(),
+    prisma.showtime.count({
+      where: {
+        status: 'SCHEDULED',
+      },
+    }),
+    prisma.showtime.count({
+      where: {
+        status: 'CANCELED',
+      },
+    }),
+  ])
+
+  return {
+    theaterCount,
+    movieCount,
+    formatCount,
+    showtimeCount,
+    scheduledShowtimeCount,
+    canceledShowtimeCount,
+  }
 }
 
 export async function backfillMissingShowtimeEndTimesBatch(batchSize = 500): Promise<number> {

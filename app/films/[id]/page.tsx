@@ -1,5 +1,6 @@
 // app/films/[id]/page.tsx
 
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import BackButton from '@/components/BackButton'
@@ -12,8 +13,10 @@ import {
   getReleaseYear,
   isTmdbPoster,
 } from '@/lib/movie/display'
+import { syncMoviePeopleFromTmdbId } from '@/lib/movie/relations'
 import { prisma } from '@/lib/prisma'
 import { isFreeTicketValue } from '@/lib/showtime/ticket'
+import { TmdbApiKeyMissingError } from '@/lib/tmdb/client'
 import { getMovieStatesForUser } from '@/lib/user-movies/service'
 import {
   formatDateKeyInAppTimezone,
@@ -106,17 +109,27 @@ function extractMetaFromOverview(input?: string | null) {
   }
 }
 
-export default async function MovieDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
-  const { id } = await params
-  const currentUserIdPromise = getCurrentUserId()
-
-  const movie = await prisma.movie.findUnique({
-    where: { id: parseInt(id, 10) },
+async function getMovieDetail(movieId: number) {
+  return prisma.movie.findUnique({
+    where: { id: movieId },
     include: {
+      peopleLinks: {
+        where: {
+          kind: 'DIRECTOR',
+        },
+        select: {
+          billingOrder: true,
+          person: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        orderBy: {
+          billingOrder: 'asc',
+        },
+      },
       showtimes: {
         select: {
           id: true,
@@ -137,6 +150,35 @@ export default async function MovieDetailPage({
       },
     },
   })
+}
+
+export default async function MovieDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
+  const { id } = await params
+  const currentUserIdPromise = getCurrentUserId()
+  const movieId = parseInt(id, 10)
+
+  if (!Number.isInteger(movieId) || movieId <= 0) {
+    notFound()
+  }
+
+  let movie = await getMovieDetail(movieId)
+
+  if (!movie) return notFound()
+
+  if (movie.tmdbId && movie.peopleLinks.length === 0) {
+    try {
+      await syncMoviePeopleFromTmdbId(movie.id, movie.tmdbId)
+      movie = await getMovieDetail(movieId)
+    } catch (error) {
+      if (!(error instanceof TmdbApiKeyMissingError)) {
+        throw error
+      }
+    }
+  }
 
   if (!movie) return notFound()
 
@@ -157,6 +199,7 @@ export default async function MovieDetailPage({
 
   const posterIsTmdb = isTmdbPoster(movie.posterUrl)
   const director = cleanDirectorText(movie.directorText)
+  const directorPeople = movie.peopleLinks.map((link) => link.person)
   const year = getReleaseYear(movie.releaseDate)
   const overviewMeta = extractMetaFromOverview(movie.overview)
   const displayFormat = overviewMeta.inferredFormat || ''
@@ -187,7 +230,20 @@ export default async function MovieDetailPage({
             </h1>
 
             <p className="m-0 mb-2.5 text-[1.1rem] leading-[1.5] text-text-secondary">
-              Directed by {director}
+              Directed by{' '}
+              {directorPeople.length > 0
+                ? directorPeople.map((person, index) => (
+                    <span key={person.id}>
+                      {index > 0 ? ', ' : null}
+                      <Link
+                        href={`/people/${person.id}`}
+                        className="border-b border-text-secondary text-text-secondary no-underline transition-colors hover:text-text-primary"
+                      >
+                        {person.name}
+                      </Link>
+                    </span>
+                  ))
+                : director}
             </p>
 
             {(year || movie.runtimeMinutes || displayFormat) && (

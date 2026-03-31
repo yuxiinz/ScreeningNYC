@@ -1,0 +1,37 @@
+name: Watchlist Reminders
+
+on:
+  schedule:
+    - cron: '0 16,17 * * *'
+  workflow_dispatch:
+
+jobs:
+  reminders:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Send watchlist reminders
+        run: npm run reminders:watchlist
+        env:
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          REMINDER_BASE_URL: ${{ secrets.REMINDER_BASE_URL }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          NODE_ENV: production

@@ -42,6 +42,12 @@ export default function Header({
           <Link href="/map" className={linkClassName('/map')}>
             MAP
           </Link>
+          <Link
+            href="/people"
+            className={linkClassName('/people', ['/people/'])}
+          >
+            PEOPLE
+          </Link>
         </div>
 
         <Link

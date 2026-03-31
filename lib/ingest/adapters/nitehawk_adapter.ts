@@ -585,7 +585,7 @@ function buildRowsFromApiData(params: {
       posterUrl,
       tmdbTitleCandidates: titleParse.tmdbTitleCandidates,
       preferMovieTitleForDisplay: titleParse.preferMovieTitleForDisplay,
-      matchedMovieTitleHint: shownTitle,
+      matchedMovieTitleHint: titleParse.title || shownTitle,
     })
   }
 

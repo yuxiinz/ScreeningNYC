@@ -2,6 +2,12 @@ import axios from 'axios'
 
 import { upsertMovie } from '@/lib/ingest/services/persist_service'
 import type { TmdbMovie } from '@/lib/ingest/services/tmdb_service'
+import { mapTmdbMovieCreditsToPeople } from '@/lib/people/tmdb'
+import {
+  buildTmdbImageUrl,
+  getTmdbApiKey,
+  TmdbApiKeyMissingError,
+} from '@/lib/tmdb/client'
 
 type TmdbSearchMovieResult = {
   id: number
@@ -31,11 +37,17 @@ type TmdbMovieDetailResponse = {
 
 type TmdbCreditsResponse = {
   crew?: Array<{
+    id: number
     job?: string
     name?: string
+    gender?: number | null
+    order?: number
   }>
   cast?: Array<{
+    id: number
     name?: string
+    gender?: number | null
+    order?: number
   }>
 }
 
@@ -51,12 +63,7 @@ export type TmdbCandidate = {
   posterUrl?: string | null
 }
 
-export class TmdbApiKeyMissingError extends Error {
-  constructor(message = 'TMDB_API_KEY is not configured.') {
-    super(message)
-    this.name = 'TmdbApiKeyMissingError'
-  }
-}
+export { TmdbApiKeyMissingError }
 
 export class TmdbMovieNotFoundError extends Error {
   constructor(message = 'TMDB movie not found.') {
@@ -65,22 +72,12 @@ export class TmdbMovieNotFoundError extends Error {
   }
 }
 
-function getTmdbApiKey() {
-  const apiKey = process.env.TMDB_API_KEY?.trim()
-
-  if (!apiKey) {
-    throw new TmdbApiKeyMissingError()
-  }
-
-  return apiKey
-}
-
 function buildPosterUrl(path?: string | null) {
-  return path ? `https://image.tmdb.org/t/p/w500${path}` : null
+  return buildTmdbImageUrl(path, 'w500')
 }
 
 function buildBackdropUrl(path?: string | null) {
-  return path ? `https://image.tmdb.org/t/p/w780${path}` : undefined
+  return buildTmdbImageUrl(path, 'w780') || undefined
 }
 
 export async function searchTmdbCandidates(
@@ -189,6 +186,7 @@ async function fetchTmdbMovieById(tmdbId: number): Promise<TmdbMovie> {
       genresText: genres || undefined,
       directorText: directors || undefined,
       castText: cast || undefined,
+      peopleCredits: mapTmdbMovieCreditsToPeople(credits),
     }
   } catch (error) {
     if (axios.isAxiosError(error) && error.response?.status === 404) {

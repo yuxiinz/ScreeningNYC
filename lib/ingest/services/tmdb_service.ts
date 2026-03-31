@@ -1,11 +1,15 @@
 // lib/ingest/services/tmdb_service.ts
 
 import axios from 'axios'
+import { normalizeScreeningMovieTitle } from '../core/screening_title'
 import {
   normalizeWhitespace,
   stripLeadingBullets,
   isLikelyProgramTitle,
 } from '../core/text'
+import { mapTmdbMovieCreditsToPeople } from '@/lib/people/tmdb'
+import type { MoviePersonSyncInput } from '@/lib/people/types'
+import { buildTmdbImageUrl } from '@/lib/tmdb/client'
 
 export type TmdbMovie = {
   tmdbId?: number
@@ -21,6 +25,7 @@ export type TmdbMovie = {
   genresText?: string
   directorText?: string
   castText?: string
+  peopleCredits?: MoviePersonSyncInput[]
   matchedQueryTitle?: string
 }
 
@@ -57,15 +62,16 @@ type TmdbMovieDetailResponse = {
 }
 
 type TmdbCreditsPerson = {
+  id: number
   job?: string
   name?: string
+  gender?: number | null
+  order?: number
 }
 
 type TmdbCreditsResponse = {
   crew?: TmdbCreditsPerson[]
-  cast?: Array<{
-    name?: string
-  }>
+  cast?: TmdbCreditsPerson[]
 }
 
 type TmdbExternalIdsResponse = {
@@ -90,8 +96,13 @@ function normalizeName(name?: string) {
     .replace(/[\u0300-\u036f]/g, '')
 }
 
+function normalizeTmdbQueryTitle(title?: string | null): string {
+  const canonical = canonicalizeTitle(title || '')
+  return normalizeWhitespace(normalizeScreeningMovieTitle(canonical) || canonical)
+}
+
 function shouldSkipTmdbSearch(params: SearchTmdbParams): boolean {
-  const title = canonicalizeTitle(params.title)
+  const title = normalizeTmdbQueryTitle(params.title)
   if (!title) return true
   if (isLikelyProgramTitle(title)) return true
 
@@ -172,8 +183,10 @@ function scoreCandidate(params: {
 }
 
 function buildFallbackOnly(params: SearchTmdbParams): TmdbMovie {
+  const fallbackTitle = normalizeTmdbQueryTitle(params.title) || canonicalizeTitle(params.title)
+
   return {
-    title: canonicalizeTitle(params.title) || params.title,
+    title: fallbackTitle || params.title,
     releaseDate: params.releaseYear
       ? new Date(`${params.releaseYear}-01-01T00:00:00.000Z`)
       : undefined,
@@ -192,8 +205,8 @@ export async function searchTmdbMovie(params: SearchTmdbParams): Promise<TmdbMov
   }
 
   const candidateQueries = [
-    canonicalizeTitle(params.title),
-    ...(params.titleCandidates || []).map((candidate) => canonicalizeTitle(candidate)),
+    normalizeTmdbQueryTitle(params.title),
+    ...(params.titleCandidates || []).map((candidate) => normalizeTmdbQueryTitle(candidate)),
   ]
     .map((candidate) => normalizeWhitespace(candidate))
     .filter(Boolean)
@@ -322,16 +335,17 @@ export async function searchTmdbMovie(params: SearchTmdbParams): Promise<TmdbMov
     runtimeMinutes: detail.runtime || params.runtimeMinutes,
     overview: detail.overview || undefined,
     posterUrl: detail.poster_path
-      ? `https://image.tmdb.org/t/p/w500${detail.poster_path}`
+      ? buildTmdbImageUrl(detail.poster_path, 'w500') || undefined
       : undefined,
     backdropUrl: detail.backdrop_path
-      ? `https://image.tmdb.org/t/p/w780${detail.backdrop_path}`
+      ? buildTmdbImageUrl(detail.backdrop_path, 'w780') || undefined
       : undefined,
     imdbUrl: external?.imdb_id ? `https://www.imdb.com/title/${external.imdb_id}` : undefined,
     officialSiteUrl: detail.homepage || undefined,
     genresText: genres || undefined,
     directorText: directors || params.directorText,
     castText: cast || undefined,
+    peopleCredits: mapTmdbMovieCreditsToPeople(credits),
     matchedQueryTitle: best.matchedQuery,
   }
 }

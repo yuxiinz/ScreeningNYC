@@ -16,7 +16,7 @@ Screening NYC is a Next.js application that aggregates screenings from independe
 - Search across films, including titles without active showtimes
 - TMDB-backed metadata enrichment when `TMDB_API_KEY` is available
 - Email/password, magic link, and Google sign-in
-- User dashboard with account state and watchlist reminder toggle
+- User dashboard with account state, Friday watchlist summaries, and noon new-on-screen reminders
 
 ## Stack
 
@@ -99,6 +99,7 @@ DATABASE_URL="postgresql://..."
 TMDB_API_KEY="..."
 AUTH_SECRET="..."
 APP_BASE_URL="http://localhost:3000"
+REMINDER_BASE_URL="https://www.screeningnyc.com"
 EMAIL_FROM="auth@example.com"
 RESEND_API_KEY="..."
 GOOGLE_CLIENT_ID="..."
@@ -107,6 +108,7 @@ GOOGLE_CLIENT_SECRET="..."
 
 `TMDB_API_KEY` is optional.
 `AUTH_SECRET`, `EMAIL_FROM`, and `RESEND_API_KEY` are required for auth email flows.
+`REMINDER_BASE_URL` is optional and lets reminder emails point at the public site even when local auth still uses `APP_BASE_URL`.
 `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are required for Google SSO.
 
 Run locally:
@@ -137,6 +139,18 @@ Backfill missing `endTime` values and then clean expired showtimes (one-time rol
 
 ```bash
 npm run backfill:showtime-end-times
+```
+
+Send watchlist reminder emails manually:
+
+```bash
+npm run reminders:watchlist -- --force
+```
+
+Force the Friday summary branch for testing:
+
+```bash
+npm run reminders:watchlist -- --force --mode=summary
 ```
 
 You can also pass theater slugs as arguments to limit the run:
@@ -171,6 +185,7 @@ npm run build
 - GitHub Actions `ci.yml` runs install, Prisma client generation, Next route type generation, typecheck, lint, and build.
 - GitHub Actions `daily_ingest.yml` runs the daily ingest job and expects `DATABASE_URL` and `TMDB_API_KEY` secrets.
 - GitHub Actions `cleanup_showtimes.yml` runs every 15 minutes and deletes expired showtimes from `Showtime`.
+- GitHub Actions `watchlist_reminders.yml` runs around noon in `America/New_York` and sends either a Friday summary or a newly-on-screen reminder email.
 
 ## Notes
 

@@ -20,6 +20,23 @@ function getUniqueMovieIds(movieIds: number[]) {
   return [...new Set(movieIds.filter((movieId) => Number.isInteger(movieId) && movieId > 0))]
 }
 
+async function movieHasUpcomingShowtimes(movieId: number, now: Date = new Date()) {
+  const showtime = await prisma.showtime.findFirst({
+    where: {
+      movieId,
+      startTime: {
+        gt: now,
+      },
+      status: 'SCHEDULED',
+    },
+    select: {
+      id: true,
+    },
+  })
+
+  return Boolean(showtime)
+}
+
 export async function getMovieStatesForUser(
   userId: string | null,
   movieIds: number[]
@@ -87,6 +104,8 @@ export async function getMovieStatesForUser(
 }
 
 export async function addWant(userId: string, movieId: number) {
+  const addedWhileOnScreen = await movieHasUpcomingShowtimes(movieId)
+
   await prisma.watchlistItem.upsert({
     where: {
       userId_movieId: {
@@ -98,6 +117,7 @@ export async function addWant(userId: string, movieId: number) {
     create: {
       userId,
       movieId,
+      addedWhileOnScreen,
     },
   })
 

@@ -4,6 +4,7 @@ import 'dotenv/config'
 import { DateTime } from 'luxon'
 import { getShowtimeScraper } from '../lib/ingest/adapters'
 import { THEATER_META } from '../lib/ingest/config/theater_meta'
+import { normalizeScreeningMovieTitle } from '../lib/ingest/core/screening_title'
 import { APP_TIMEZONE } from '../lib/timezone'
 import {
   searchTmdbMovie,
@@ -16,6 +17,7 @@ import {
   upsertLocalMovie,
   upsertShowtime,
   markMissingShowtimesAsCanceled,
+  getIngestTableCounts,
   normalizeFormat,
   parseStartTime,
   buildFingerprint,
@@ -312,10 +314,16 @@ async function ingestOneTheater(
 
     parsedCount += 1
 
-    const canonicalTitle = canonicalizeTitle(item.movieTitle)
-    const fallbackMovieTitle = item.shownTitle || canonicalTitle
+    const canonicalTitle = canonicalizeTitle(
+      normalizeScreeningMovieTitle(item.movieTitle || item.shownTitle)
+    )
+    const fallbackMovieTitle =
+      canonicalTitle ||
+      canonicalizeTitle(normalizeScreeningMovieTitle(item.shownTitle || item.movieTitle))
     const matchedMovieTitle = canonicalizeTitle(
-      item.matchedMovieTitleHint || item.movieTitle
+      normalizeScreeningMovieTitle(
+        item.matchedMovieTitleHint || item.movieTitle || item.shownTitle
+      )
     )
     const formatName = normalizeFormat(item.rawFormat)
 
@@ -339,7 +347,7 @@ async function ingestOneTheater(
     const format = await upsertFormat(formatName)
 
     const isProgram = isProgramContent({
-      title: item.movieTitle,
+      title: canonicalTitle || item.movieTitle,
       overview: item.overview,
     })
 
@@ -358,7 +366,7 @@ async function ingestOneTheater(
       })
     } else if (TMDB_API_KEY) {
       const tmdbMovie = await searchTmdbMovie({
-        title: item.movieTitle,
+        title: canonicalTitle || item.movieTitle,
         titleCandidates: item.tmdbTitleCandidates,
         directorText: item.directorText,
         releaseYear: item.releaseYear,
@@ -537,6 +545,20 @@ async function main() {
   }
 
   await cleanupExpiredShowtimes()
+
+  const counts = await getIngestTableCounts()
+
+  console.log('\n========== Table totals ==========')
+  console.log(
+    [
+      `Theater=${counts.theaterCount}`,
+      `Movie=${counts.movieCount}`,
+      `Format=${counts.formatCount}`,
+      `Showtime=${counts.showtimeCount}`,
+      `ShowtimeScheduled=${counts.scheduledShowtimeCount}`,
+      `ShowtimeCanceled=${counts.canceledShowtimeCount}`,
+    ].join(' | ')
+  )
 
   const failedCount = results.filter((r) => !r.success).length
 

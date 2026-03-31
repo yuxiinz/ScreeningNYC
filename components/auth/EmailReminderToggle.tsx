@@ -46,7 +46,7 @@ export default function EmailReminderToggle({
         <div className="min-w-0 flex-1">
           <p className="mb-1 text-[0.92rem] font-semibold">Want list email reminders</p>
           <p className="m-0 text-[0.82rem] leading-[1.5] text-text-secondary">
-            Sends an email when a wanted film is currently showing or gets new showtimes later.
+            Sends a Friday summary for wanted films already on screen, or a noon alert when a previously off-screen pick starts showing.
           </p>
         </div>
 

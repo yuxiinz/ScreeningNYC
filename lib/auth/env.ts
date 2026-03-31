@@ -1,10 +1,22 @@
 const isProduction = process.env.NODE_ENV === 'production'
+const defaultSiteUrl = 'https://www.screeningnyc.com'
 
 function stripTrailingSlash(input: string) {
   return input.replace(/\/+$/, '')
 }
 
 const fallbackBaseUrl = 'http://localhost:3000'
+
+function isLocalHostUrl(input?: string) {
+  if (!input) return false
+
+  try {
+    const host = new URL(input).hostname
+    return host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0'
+  } catch {
+    return false
+  }
+}
 
 export const authEnv = {
   secret:
@@ -34,6 +46,20 @@ export function isMagicLinkConfigured() {
 
 export function getAppBaseUrl() {
   return authEnv.baseUrl
+}
+
+export function getReminderBaseUrl() {
+  if (process.env.REMINDER_BASE_URL) {
+    return stripTrailingSlash(process.env.REMINDER_BASE_URL)
+  }
+
+  const publicBaseUrl = [
+    process.env.APP_BASE_URL,
+    process.env.AUTH_URL,
+    process.env.NEXTAUTH_URL,
+  ].find((value) => value && !isLocalHostUrl(value))
+
+  return stripTrailingSlash(publicBaseUrl || defaultSiteUrl)
 }
 
 export function getAuthFeatureFlags() {

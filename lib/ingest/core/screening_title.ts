@@ -13,6 +13,7 @@ type ExtractedTitleFormat = {
 
 type ExtractedBracketedDescriptor = {
   text: string
+  rawFormat?: string
   descriptor?: string
 }
 
@@ -181,13 +182,25 @@ export function extractBracketedDescriptor(
   const cleaned = cleanText(value)
   if (!cleaned) return { text: '' }
 
-  const match = cleaned.match(/\s*\(([^()]+)\)\s*$/)
+  const match = cleaned.match(/\s*(?:\(([^()]+)\)|\[([^[\]]+)\])\s*$/)
   if (!match || typeof match.index !== 'number') {
     return { text: cleaned }
   }
 
-  const descriptor = cleanText(match[1])
-  if (!descriptor || !isLikelyBracketedNote(descriptor)) {
+  const descriptor = cleanText(match[1] || match[2])
+  if (!descriptor) {
+    return { text: cleaned }
+  }
+
+  const rawFormat = parseFormat(descriptor)
+  if (rawFormat) {
+    return {
+      text: cleanText(cleaned.slice(0, match.index)),
+      rawFormat,
+    }
+  }
+
+  if (!isLikelyBracketedNote(descriptor)) {
     return { text: cleaned }
   }
 
@@ -244,18 +257,60 @@ export function parseScreeningTitle(value?: string | null): ParsedScreeningTitle
     return { title: '' }
   }
 
-  const yearExtraction = extractTrailingYear(cleaned)
-  const formatExtraction = extractInlineFormat(yearExtraction.text)
-  const bracketExtraction = extractBracketedDescriptor(formatExtraction.text)
-  const suffixSplit = splitCuratorialSuffix(bracketExtraction.text)
+  let remaining = cleaned
+  let releaseYear: number | undefined
+  let rawFormat: string | undefined
+  const bracketNotes: string[] = []
+
+  for (let index = 0; index < 6; index += 1) {
+    const yearExtraction = extractTrailingYear(remaining)
+    if (!releaseYear && yearExtraction.releaseYear && yearExtraction.text !== remaining) {
+      releaseYear = yearExtraction.releaseYear
+      remaining = yearExtraction.text
+      continue
+    }
+
+    const bracketExtraction = extractBracketedDescriptor(remaining)
+    if (bracketExtraction.text !== remaining) {
+      if (!rawFormat && bracketExtraction.rawFormat) {
+        rawFormat = bracketExtraction.rawFormat
+      }
+
+      if (bracketExtraction.descriptor) {
+        bracketNotes.unshift(bracketExtraction.descriptor)
+      }
+
+      remaining = bracketExtraction.text
+      continue
+    }
+
+    const formatExtraction = extractInlineFormat(remaining)
+    if (!rawFormat && formatExtraction.rawFormat && formatExtraction.text !== remaining) {
+      rawFormat = formatExtraction.rawFormat
+      remaining = formatExtraction.text
+      continue
+    }
+
+    break
+  }
+
+  const suffixSplit = splitCuratorialSuffix(remaining)
   const title = cleanText(suffixSplit.title)
 
   return {
     title,
-    releaseYear: yearExtraction.releaseYear,
-    rawFormat: formatExtraction.rawFormat,
-    showtimeNote: mergeShowtimeNotes(bracketExtraction.descriptor, suffixSplit.note),
+    releaseYear,
+    rawFormat,
+    showtimeNote: mergeShowtimeNotes(...bracketNotes, suffixSplit.note),
     tmdbTitleCandidates: suffixSplit.tmdbTitleCandidates,
     preferMovieTitleForDisplay: title !== cleaned,
   }
+}
+
+export function normalizeScreeningMovieTitle(value?: string | null): string {
+  const cleaned = cleanText(value)
+  if (!cleaned) return ''
+
+  const parsed = parseScreeningTitle(cleaned)
+  return cleanText(parsed.title) || cleaned
 }

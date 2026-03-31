@@ -6,13 +6,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "test": "node --import tsx --test ./tests/title-normalization.test.ts",
     "postinstall": "prisma generate",
     "typecheck": "tsc --noEmit",
     "build:clean": "rm -rf .next && next build",
     "lint": "eslint",
     "ingest:theater": "tsx scripts/ingest_theater.ts",
     "cleanup:showtimes": "tsx scripts/cleanup_expired_showtimes.ts",
-    "backfill:showtime-end-times": "tsx scripts/backfill_showtime_end_times.ts"
+    "backfill:showtime-end-times": "tsx scripts/backfill_showtime_end_times.ts",
+    "backfill:people": "tsx scripts/backfill_people.ts",
+    "reminders:watchlist": "tsx scripts/send_watchlist_reminders.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
