@@ -13,6 +13,7 @@ type TmdbMovieCreditsPerson = {
   id: number
   name?: string
   gender?: number | null
+  profile_path?: string | null
   job?: string
   order?: number
 }
@@ -55,6 +56,7 @@ export function mapTmdbMovieCreditsToPeople(
       tmdbId: person.id,
       name: person.name || 'Unknown',
       gender: person.gender ?? null,
+      photoUrl: buildTmdbImageUrl(person.profile_path, 'w500'),
       kind: 'DIRECTOR' as const,
       billingOrder: index,
     }))

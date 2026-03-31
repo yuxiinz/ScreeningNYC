@@ -9,13 +9,6 @@ export type MovieCollectionState = {
   inWatched: boolean
 }
 
-export class WantRemovalConfirmationRequiredError extends Error {
-  constructor(message = 'Movie is still in want list.') {
-    super(message)
-    this.name = 'WantRemovalConfirmationRequiredError'
-  }
-}
-
 function getUniqueMovieIds(movieIds: number[]) {
   return [...new Set(movieIds.filter((movieId) => Number.isInteger(movieId) && movieId > 0))]
 }
@@ -181,10 +174,6 @@ export async function markWatched(
         },
       }),
     ])
-
-    if (watchlistItem && !existingWatchedMovie && !input.confirmRemoveWant) {
-      throw new WantRemovalConfirmationRequiredError()
-    }
 
     if (watchlistItem && input.confirmRemoveWant) {
       await tx.watchlistItem.delete({

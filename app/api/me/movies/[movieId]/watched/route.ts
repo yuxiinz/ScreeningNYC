@@ -4,7 +4,6 @@ import { AuthRequiredError, requireUserId } from '@/lib/auth/require-user-id'
 import {
   markWatched,
   removeWatched,
-  WantRemovalConfirmationRequiredError,
 } from '@/lib/user-movies/service'
 import { getReviewWordCount } from '@/lib/user-movies/review'
 
@@ -158,16 +157,6 @@ export async function PUT(
   } catch (error) {
     if (error instanceof AuthRequiredError) {
       return buildUnauthorizedResponse(error)
-    }
-
-    if (error instanceof WantRemovalConfirmationRequiredError) {
-      return NextResponse.json(
-        {
-          code: 'WANT_REMOVAL_CONFIRMATION_REQUIRED',
-          message: error.message,
-        },
-        { status: 409 }
-      )
     }
 
     console.error('[api][me][movies][watched][PUT]', error)

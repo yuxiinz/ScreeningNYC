@@ -43,7 +43,7 @@ async function main() {
   })
 
   console.log(
-    `[watchlist-reminders] mode=${result.executedMode} dryRun=${result.dryRun} initialized=${result.initializedWatchlistItems} transitionCandidates=${result.transitionCandidates} transitionEmailsSent=${result.transitionEmailsSent} transitionItemsDelivered=${result.transitionItemsDelivered} summaryCandidates=${result.summaryCandidates} summaryEmailsSent=${result.summaryEmailsSent}${result.skippedReason ? ` reason="${result.skippedReason}"` : ''}`
+    `[watchlist-reminders] mode=${result.executedMode} dryRun=${result.dryRun} initialized=${result.initializedWatchlistItems} transitionCandidates=${result.transitionCandidates} transitionEmailsSent=${result.transitionEmailsSent} transitionItemsDelivered=${result.transitionItemsDelivered} directorTransitionCandidates=${result.directorTransitionCandidates} directorTransitionEmailsSent=${result.directorTransitionEmailsSent} directorTransitionItemsDelivered=${result.directorTransitionItemsDelivered} summaryCandidates=${result.summaryCandidates} summaryEmailsSent=${result.summaryEmailsSent} directorSummaryCandidates=${result.directorSummaryCandidates} directorSummaryEmailsSent=${result.directorSummaryEmailsSent}${result.skippedReason ? ` reason="${result.skippedReason}"` : ''}`
   )
 }
 

@@ -19,13 +19,15 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts                   Account[]
-  sessions                   Session[]
-  settings                   UserSettings?
-  emailVerificationTokens    EmailVerificationToken[]
-  watchlistItems             WatchlistItem[]
-  watchlistSummaryDeliveries WatchlistSummaryDelivery[]
-  watchedMovies              UserMovieWatch[]
+  accounts                           Account[]
+  sessions                           Session[]
+  settings                           UserSettings?
+  emailVerificationTokens            EmailVerificationToken[]
+  watchlistItems                     WatchlistItem[]
+  directorWatchlistItems             DirectorWatchlistItem[]
+  watchlistSummaryDeliveries         WatchlistSummaryDelivery[]
+  directorWatchlistSummaryDeliveries DirectorWatchlistSummaryDelivery[]
+  watchedMovies                      UserMovieWatch[]
 }
 
 model Account {
@@ -109,11 +111,12 @@ model Movie {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  showtimes        Showtime[]
-  watchlistItems   WatchlistItem[]
-  userMovieWatches UserMovieWatch[]
-  peopleLinks      MoviePerson[]
-  tagLinks         MovieTag[]
+  showtimes                               Showtime[]
+  watchlistItems                          WatchlistItem[]
+  directorWatchlistNotificationDeliveries DirectorWatchlistNotificationDelivery[]
+  userMovieWatches                        UserMovieWatch[]
+  peopleLinks                             MoviePerson[]
+  tagLinks                                MovieTag[]
 
   @@index([title])
 }
@@ -123,10 +126,12 @@ model Person {
   tmdbId    Int?     @unique
   name      String
   gender    Int?
+  photoUrl  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  movieLinks MoviePerson[]
+  movieLinks             MoviePerson[]
+  directorWatchlistItems DirectorWatchlistItem[]
 
   @@index([name])
 }
@@ -243,7 +248,37 @@ model WatchlistItem {
   @@index([movieId])
 }
 
+model DirectorWatchlistItem {
+  id                 Int      @id @default(autoincrement())
+  userId             String
+  personId           Int
+  addedWhileOnScreen Boolean?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user                   User                                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  person                 Person                                  @relation(fields: [personId], references: [id], onDelete: Cascade)
+  notificationDeliveries DirectorWatchlistNotificationDelivery[]
+
+  @@unique([userId, personId])
+  @@index([personId])
+}
+
 model WatchlistSummaryDelivery {
+  id              Int      @id @default(autoincrement())
+  userId          String
+  summaryDateKey  String
+  resendMessageId String?
+  sentToEmail     String
+  sentAt          DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, summaryDateKey])
+  @@index([summaryDateKey])
+}
+
+model DirectorWatchlistSummaryDelivery {
   id              Int      @id @default(autoincrement())
   userId          String
   summaryDateKey  String
@@ -288,6 +323,21 @@ model WatchlistNotificationDelivery {
 
   @@unique([watchlistItemId, showtimeId])
   @@index([showtimeId])
+}
+
+model DirectorWatchlistNotificationDelivery {
+  id                      Int      @id @default(autoincrement())
+  directorWatchlistItemId Int
+  movieId                 Int
+  resendMessageId         String?
+  sentToEmail             String
+  sentAt                  DateTime @default(now())
+
+  directorWatchlistItem DirectorWatchlistItem @relation(fields: [directorWatchlistItemId], references: [id], onDelete: Cascade)
+  movie                 Movie                 @relation(fields: [movieId], references: [id], onDelete: Cascade)
+
+  @@unique([directorWatchlistItemId, movieId])
+  @@index([movieId])
 }
 
 enum ShowtimeStatus {

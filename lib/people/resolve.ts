@@ -3,6 +3,7 @@ import axios from 'axios'
 import { syncMoviePeopleFromTmdbId } from '@/lib/movie/relations'
 import { prisma } from '@/lib/prisma'
 import {
+  buildTmdbImageUrl,
   getTmdbApiKey,
   TmdbApiKeyMissingError,
 } from '@/lib/tmdb/client'
@@ -11,6 +12,7 @@ type TmdbSearchPersonResult = {
   id: number
   name?: string
   known_for_department?: string | null
+  profile_path?: string | null
   popularity?: number
 }
 
@@ -23,6 +25,7 @@ type TmdbPersonDetailResponse = {
   name?: string
   gender?: number | null
   known_for_department?: string | null
+  profile_path?: string | null
 }
 
 type TmdbPersonMovieCredit = {
@@ -38,6 +41,7 @@ export type TmdbDirectorCandidate = {
   source: 'TMDB'
   tmdbId: number
   name: string
+  photoUrl?: string | null
 }
 
 export { TmdbApiKeyMissingError }
@@ -108,6 +112,7 @@ export async function searchTmdbDirectorCandidates(
       source: 'TMDB' as const,
       tmdbId: person.id,
       name: person.name || 'Unknown',
+      photoUrl: buildTmdbImageUrl(person.profile_path, 'w500'),
     }))
 }
 
@@ -147,6 +152,7 @@ async function fetchTmdbDirectorById(tmdbId: number) {
       tmdbId: detail.id,
       name: detail.name || 'Unknown',
       gender: detail.gender ?? null,
+      photoUrl: buildTmdbImageUrl(detail.profile_path, 'w500'),
       directedMovieTmdbIds: getDirectedMovieTmdbIds(credits),
     }
   } catch (error) {
@@ -198,6 +204,7 @@ export async function resolveDirectorFromTmdbId(tmdbId: number) {
       data: {
         name: director.name,
         gender: director.gender,
+        ...(director.photoUrl ? { photoUrl: director.photoUrl } : {}),
       },
     })
 
@@ -213,6 +220,7 @@ export async function resolveDirectorFromTmdbId(tmdbId: number) {
       tmdbId: director.tmdbId,
       name: director.name,
       gender: director.gender,
+      ...(director.photoUrl ? { photoUrl: director.photoUrl } : {}),
     },
   })
 }

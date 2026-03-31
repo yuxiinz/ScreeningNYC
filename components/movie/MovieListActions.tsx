@@ -60,6 +60,7 @@ export default function MovieListActions({
   const [inWatched, setInWatched] = useState(initialInWatched)
   const [pendingAction, setPendingAction] = useState<PendingAction>(null)
   const [watchedDialogOpen, setWatchedDialogOpen] = useState(false)
+  const [removeWantDialogOpen, setRemoveWantDialogOpen] = useState(false)
   const [rating, setRating] = useState<number | null>(null)
   const [reviewText, setReviewText] = useState('')
   const [error, setError] = useState('')
@@ -152,7 +153,6 @@ export default function MovieListActions({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          confirmRemoveWant: inWant,
           rating,
           reviewText: reviewText.trim() || null,
         }),
@@ -165,12 +165,39 @@ export default function MovieListActions({
       }
 
       setInWatched(true)
+      setWatchedDialogOpen(false)
 
       if (inWant) {
-        setInWant(false)
+        setRemoveWantDialogOpen(true)
+      }
+    } catch (nextError) {
+      setError(
+        nextError instanceof Error
+          ? nextError.message
+          : 'Could not update watched list.'
+      )
+    } finally {
+      setPendingAction(null)
+    }
+  }
+
+  async function handleRemoveWantAfterWatched() {
+    setPendingAction('want')
+    setError('')
+
+    try {
+      const response = await fetch(`/api/me/movies/${movieId}/want`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error(
+          await getErrorMessage(response, 'Could not update want list.')
+        )
       }
 
-      setWatchedDialogOpen(false)
+      setInWant(false)
+      setRemoveWantDialogOpen(false)
 
       if (pathname === '/me/want-list') {
         router.refresh()
@@ -179,7 +206,7 @@ export default function MovieListActions({
       setError(
         nextError instanceof Error
           ? nextError.message
-          : 'Could not update watched list.'
+          : 'Could not update want list.'
       )
     } finally {
       setPendingAction(null)
@@ -234,7 +261,8 @@ export default function MovieListActions({
               </p>
               {inWant ? (
                 <p className="mt-3 text-[0.82rem] leading-[1.6] text-accent-positive">
-                  Saving this will also remove the film from Want to watch in theaters.
+                  After saving, you can choose whether to keep this film in Want to
+                  watch in theaters.
                 </p>
               ) : null}
             </div>
@@ -300,6 +328,56 @@ export default function MovieListActions({
                 className="rounded-panel border border-accent-positive bg-accent-positive px-4 py-3 text-[0.86rem] font-bold text-page-bg transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {pendingAction === 'watched' ? 'Saving...' : 'Save watched'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {removeWantDialogOpen ? (
+        <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/70 px-5 py-8">
+          <div className="w-full max-w-[520px] rounded-panel border border-border-strong bg-card-bg p-6 shadow-popover">
+            <div className="mb-6">
+              <h3 className="mb-2 text-[1.5rem] font-black leading-[1.05]">
+                KEEP IN WANT LIST?
+              </h3>
+              <p className="m-0 text-[0.92rem] leading-[1.6] text-text-secondary">
+                This film was marked as watched and saved successfully. Do you also want
+                to remove it from Want to watch in theaters?
+              </p>
+            </div>
+
+            {error ? (
+              <p className="mb-6 text-[0.82rem] leading-[1.6] text-[#ffb3b3]">
+                {error}
+              </p>
+            ) : null}
+
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (!pendingAction) {
+                    setRemoveWantDialogOpen(false)
+                    setError('')
+                  }
+                }}
+                disabled={pendingAction !== null}
+                className="rounded-panel border border-border-input px-4 py-3 text-[0.86rem] font-semibold text-text-secondary transition-colors hover:border-text-primary hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Keep in want
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!pendingAction) {
+                    void handleRemoveWantAfterWatched()
+                  }
+                }}
+                disabled={pendingAction !== null}
+                className="rounded-panel border border-text-primary bg-text-primary px-4 py-3 text-[0.86rem] font-bold text-page-bg transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {pendingAction === 'want' ? 'Removing...' : 'Remove from want'}
               </button>
             </div>
           </div>

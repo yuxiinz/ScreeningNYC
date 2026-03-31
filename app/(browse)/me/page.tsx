@@ -43,6 +43,7 @@ export default async function MePage() {
       _count: {
         select: {
           watchlistItems: true,
+          directorWatchlistItems: true,
           watchedMovies: true,
         },
       },
@@ -103,9 +104,14 @@ export default async function MePage() {
           <h2 className="mb-4 text-[1.15rem] font-bold">
             Want to watch in theaters
           </h2>
-          <p className="mb-2 text-[2rem] font-black">{user._count.watchlistItems}</p>
+          <p className="mb-2 text-[2rem] font-black">
+            {user._count.watchlistItems + user._count.directorWatchlistItems}
+          </p>
           <p className="m-0 text-[0.88rem] leading-[1.6] text-text-secondary group-hover:text-text-primary">
-            Open your want list and see which picks are already on screen in NYC.
+            Open your want list for films and directors currently on screen in NYC.
+          </p>
+          <p className="mt-3 text-[0.78rem] leading-[1.6] text-text-dim group-hover:text-text-secondary">
+            {user._count.watchlistItems} films · {user._count.directorWatchlistItems} directors
           </p>
         </Link>
 

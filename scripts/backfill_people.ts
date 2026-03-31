@@ -23,10 +23,37 @@ async function main() {
           tmdbId: {
             not: null,
           },
+          OR: [
+            {
+              peopleLinks: {
+                none: {
+                  kind: 'DIRECTOR',
+                },
+              },
+            },
+            {
+              peopleLinks: {
+                some: {
+                  kind: 'DIRECTOR',
+                  person: {
+                    photoUrl: null,
+                  },
+                },
+              },
+            },
+          ],
+        },
+        {
+          tmdbId: {
+            not: null,
+          },
           peopleLinks: {
-            none: {
+            some: {
               kind: 'DIRECTOR',
             },
+          },
+          tagLinks: {
+            none: {},
           },
         },
       ],

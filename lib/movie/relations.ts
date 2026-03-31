@@ -77,6 +77,7 @@ async function getOrCreatePersonId(input: MoviePersonSyncInput) {
         data: {
           name,
           ...(input.gender !== undefined ? { gender: input.gender ?? null } : {}),
+          ...(input.photoUrl ? { photoUrl: input.photoUrl } : {}),
         },
       })
 
@@ -105,6 +106,7 @@ async function getOrCreatePersonId(input: MoviePersonSyncInput) {
           tmdbId: input.tmdbId,
           name,
           ...(input.gender !== undefined ? { gender: input.gender ?? null } : {}),
+          ...(input.photoUrl ? { photoUrl: input.photoUrl } : {}),
         },
       })
 
@@ -117,6 +119,7 @@ async function getOrCreatePersonId(input: MoviePersonSyncInput) {
           tmdbId: input.tmdbId,
           name,
           ...(input.gender !== undefined ? { gender: input.gender ?? null } : {}),
+          ...(input.photoUrl ? { photoUrl: input.photoUrl } : {}),
         },
         select: {
           id: true,
@@ -167,6 +170,7 @@ async function getOrCreatePersonId(input: MoviePersonSyncInput) {
     data: {
       name,
       ...(input.gender !== undefined ? { gender: input.gender ?? null } : {}),
+      ...(input.photoUrl ? { photoUrl: input.photoUrl } : {}),
     },
     select: {
       id: true,

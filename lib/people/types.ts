@@ -4,6 +4,7 @@ export type MoviePersonSyncInput = {
   tmdbId?: number
   name: string
   gender?: number | null
+  photoUrl?: string | null
   kind: MoviePersonKindValue
   billingOrder?: number
 }

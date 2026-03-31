@@ -3,14 +3,17 @@ import { notFound } from 'next/navigation'
 
 import BackButton from '@/components/BackButton'
 import PosterImage from '@/components/movie/PosterImage'
+import DirectorListActions from '@/components/person/DirectorListActions'
 import {
   cleanDirectorText,
   getReleaseYear,
   isTmdbPoster,
 } from '@/lib/movie/display'
 import { fetchTmdbDirectorFilmography } from '@/lib/people/tmdb'
+import { getCurrentUserId } from '@/lib/auth/require-user-id'
 import { prisma } from '@/lib/prisma'
 import { TmdbApiKeyMissingError } from '@/lib/tmdb/client'
+import { getDirectorStatesForUser } from '@/lib/user-directors/service'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,6 +32,7 @@ export default async function PersonDetailPage({
 }: {
   params: Promise<{ id: string }>
 }) {
+  const currentUserIdPromise = getCurrentUserId()
   const { id } = await params
   const personId = Number.parseInt(id, 10)
 
@@ -102,6 +106,10 @@ export default async function PersonDetailPage({
   const tmdbOnlyMovies = externalMovies.filter(
     (movie) => !localTmdbIds.has(movie.tmdbId)
   )
+  const currentUserId = await currentUserIdPromise
+  const directorState = (
+    await getDirectorStatesForUser(currentUserId, [person.id])
+  ).get(person.id)
 
   return (
     <main className="mx-auto max-w-[var(--container-wide)]">
@@ -115,6 +123,14 @@ export default async function PersonDetailPage({
         <p className="m-0 text-[1rem] leading-[1.5] text-text-secondary">
           Director
         </p>
+
+        {currentUserId ? (
+          <DirectorListActions
+            personId={person.id}
+            initialInWant={directorState?.inWant || false}
+            className="mt-4"
+          />
+        ) : null}
 
         <p className="m-0 mt-3 text-[0.95rem] leading-[1.5] text-text-muted">
           {localMovies.length} directed film{localMovies.length === 1 ? '' : 's'} in
