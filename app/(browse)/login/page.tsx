@@ -29,12 +29,12 @@ export default async function LoginPage({
   searchParams: Promise<LoginPageSearchParams>
 }) {
   const session = await auth()
+  const params = await searchParams
 
-  if (session?.user) {
-    redirect('/me')
+  if (session?.user?.id) {
+    redirect(getSafeRedirectTo(params.redirectTo))
   }
 
-  const params = await searchParams
   const authFeatures = getAuthFeatureFlags()
 
   return (

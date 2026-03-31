@@ -7,7 +7,7 @@ export default async function BrowseLayout({
   children: React.ReactNode
 }>) {
   const session = await auth()
-  const isAuthenticated = Boolean(session?.user)
+  const isAuthenticated = Boolean(session?.user?.id)
 
   return (
     <div className="min-h-screen bg-page-bg px-5 py-10 text-text-primary">

@@ -6,7 +6,7 @@ import RegisterForm from '@/components/auth/RegisterForm'
 export default async function RegisterPage() {
   const session = await auth()
 
-  if (session?.user) {
+  if (session?.user?.id) {
     redirect('/me')
   }
 
