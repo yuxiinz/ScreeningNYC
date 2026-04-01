@@ -587,7 +587,23 @@ export async function upsertMovie(tmdb: TmdbMovie, fallback?: FallbackMovieData)
         existingBySignature.tmdbId &&
         existingBySignature.tmdbId !== tmdb.tmdbId
       ) {
-        throw new MovieIdentityConflictError()
+        const conflictTitle = preferredTitle || fallbackTitle || tmdb.title || 'Untitled'
+        const conflictDirector = matchInput.directorText || tmdb.directorText || 'n/a'
+        const conflictYear = releaseYear ?? 'n/a'
+        const conflictMessage = [
+          'Existing movie matched the import signature with a different TMDB id.',
+          `title=${conflictTitle}`,
+          `existingId=${existingBySignature.id}`,
+          `existingTmdbId=${existingBySignature.tmdbId}`,
+          `incomingTmdbId=${tmdb.tmdbId}`,
+          `director=${conflictDirector}`,
+          `year=${conflictYear}`,
+          tmdb.matchedQueryTitle ? `matchedQuery=${tmdb.matchedQueryTitle}` : '',
+        ]
+          .filter(Boolean)
+          .join(' ')
+
+        throw new MovieIdentityConflictError(conflictMessage)
       }
 
       return tx.movie.update({
