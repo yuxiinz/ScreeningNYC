@@ -360,6 +360,31 @@ function normalizeComparableText(value?: string | null): string {
     .trim()
 }
 
+function isWeakTmdbCandidate(candidate: string, primaryTitle: string): boolean {
+  const normalizedCandidate = normalizeComparableText(candidate)
+  if (!normalizedCandidate) return true
+
+  if (normalizedCandidate.length < 3) return true
+
+  const candidateParts = normalizedCandidate.split(/\s+/).filter(Boolean)
+  const normalizedPrimary = normalizeComparableText(primaryTitle)
+  const primaryParts = normalizedPrimary.split(/\s+/).filter(Boolean)
+
+  if (
+    candidateParts.length === 1 &&
+    primaryParts.length > 1 &&
+    normalizedCandidate.length < 6
+  ) {
+    return true
+  }
+
+  if (normalizedPrimary.includes(normalizedCandidate) && normalizedCandidate.length < 5) {
+    return true
+  }
+
+  return false
+}
+
 function stripCreatorPossessiveTitle(
   title?: string | null,
   directorText?: string
@@ -615,7 +640,11 @@ function buildTmdbTitleCandidates(input: {
     (candidate) => normalizeComparableText(candidate) !== normalizedMovieTitle
   )
 
-  return filtered.length ? filtered : undefined
+  const refined = filtered.filter(
+    (candidate) => !isWeakTmdbCandidate(candidate, input.movieTitle)
+  )
+
+  return refined.length ? refined : undefined
 }
 
 function pickBetterMovieTitle(
