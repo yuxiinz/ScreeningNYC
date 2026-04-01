@@ -2,6 +2,10 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import {
+  buildTmdbQueryCandidates,
+  expandTmdbQueryVariants,
+} from '../lib/ingest/services/tmdb_service'
+import {
   detectCsvProvider,
   parseDoubanCsv,
   parseFlexibleRating,
@@ -48,4 +52,34 @@ test('parseFlexibleRating rejects unsupported increments', () => {
   assert.equal(parseFlexibleRating('3.7'), undefined)
   assert.equal(parseFlexibleRating('5.5'), undefined)
   assert.equal(parseFlexibleRating('4.5'), 4.5)
+})
+
+test('expandTmdbQueryVariants restores useful search spacing for compact aliases', () => {
+  assert.deepEqual(expandTmdbQueryVariants('TheGodfather'), [
+    'TheGodfather',
+    'The Godfather',
+  ])
+  assert.deepEqual(expandTmdbQueryVariants('RomanHoliday'), [
+    'RomanHoliday',
+    'Roman Holiday',
+  ])
+  assert.deepEqual(expandTmdbQueryVariants('Leplaisir'), ['Leplaisir', 'Le plaisir'])
+})
+
+test('buildTmdbQueryCandidates prefers slash aliases before the first translated title', () => {
+  assert.deepEqual(
+    buildTmdbQueryCandidates({
+      title: '教父',
+      titleCandidates: ['教父', 'TheGodfather'],
+    }),
+    ['TheGodfather', 'The Godfather', '教父']
+  )
+
+  assert.deepEqual(
+    buildTmdbQueryCandidates({
+      title: '乡愁',
+      titleCandidates: ['乡愁', 'Ностальгия', '怀乡', 'Nostalghia'],
+    }),
+    ['Ностальгия', 'Nostalghia', '怀乡', '乡愁']
+  )
 })

@@ -2,12 +2,16 @@ import axios from 'axios'
 import type { Movie } from '@prisma/client'
 
 import {
-  mergeMovieMetadata,
+  mergeMovieImportLinks,
   type FallbackMovieData,
   upsertMovie,
 } from '@/lib/ingest/services/persist_service'
 import { searchTmdbMovie, type TmdbMovie } from '@/lib/ingest/services/tmdb_service'
-import { extractImdbIdFromUrl, findLocalMovieByImportMatch } from '@/lib/movie/match'
+import {
+  extractImdbIdFromUrl,
+  findLocalMovieByImportMatch,
+  normalizeMovieName,
+} from '@/lib/movie/match'
 import { mapTmdbMovieCreditsToPeople } from '@/lib/people/tmdb'
 import {
   buildTmdbImageUrl,
@@ -245,6 +249,63 @@ function buildFallbackFromImportInput(input: MovieImportResolveInput): FallbackM
   }
 }
 
+function hasDistinctImportAliases(input: MovieImportResolveInput) {
+  const normalizedTitles = [
+    input.title,
+    ...(input.titleCandidates || []),
+  ]
+    .map((candidate) => normalizeMovieName(candidate))
+    .filter(Boolean)
+
+  return new Set(normalizedTitles).size > 1
+}
+
+function isLikelyBlockedImportPoster(url?: string | null) {
+  return Boolean(url && /doubanio\.com\/view\/photo/i.test(url))
+}
+
+function shouldAttemptCanonicalTmdbLookup(
+  localMovie: Movie,
+  input: MovieImportResolveInput
+) {
+  if (localMovie.tmdbId) {
+    return false
+  }
+
+  const inputImdbId = extractImdbIdFromUrl(input.imdbId) || input.imdbId?.toLowerCase()
+  const localImdbId = extractImdbIdFromUrl(localMovie.imdbUrl)
+
+  if (inputImdbId && localImdbId && inputImdbId === localImdbId) {
+    return false
+  }
+
+  const hasDisambiguatingMetadata = Boolean(
+    input.releaseYear || input.directorText || input.imdbId || hasDistinctImportAliases(input)
+  )
+
+  if (!hasDisambiguatingMetadata) {
+    return false
+  }
+
+  return Boolean(
+    !localMovie.directorText ||
+      !localMovie.originalTitle ||
+      !localMovie.imdbUrl ||
+      isLikelyBlockedImportPoster(localMovie.posterUrl)
+  )
+}
+
+async function supplementImportMatchedMovie(
+  movie: Movie,
+  fallback: FallbackMovieData
+) {
+  return mergeMovieImportLinks(movie.id, {
+    imdbUrl: fallback.imdbUrl,
+    doubanUrl: fallback.doubanUrl,
+    letterboxdUrl: fallback.letterboxdUrl,
+  })
+}
+
 export async function resolveMovieFromTmdbId(
   tmdbId: number,
   fallback?: FallbackMovieData
@@ -257,6 +318,8 @@ export async function resolveMovieFromImportInput(
   input: MovieImportResolveInput
 ): Promise<MovieImportResolveResult> {
   const fallback = buildFallbackFromImportInput(input)
+  const normalizedInputImdbId =
+    extractImdbIdFromUrl(input.imdbId) || input.imdbId?.toLowerCase() || null
 
   if (input.tmdbId) {
     const movie = await resolveMovieFromTmdbId(input.tmdbId, fallback)
@@ -277,15 +340,19 @@ export async function resolveMovieFromImportInput(
   })
 
   if (localMovie) {
-    const mergedMovie = await mergeMovieMetadata(localMovie.id, fallback)
+    const localImdbId = extractImdbIdFromUrl(localMovie.imdbUrl)
+    const matchedVia =
+      normalizedInputImdbId && localImdbId === normalizedInputImdbId
+        ? 'imdb_id'
+        : 'local_signature'
 
-    return {
-      movie: mergedMovie || localMovie,
-      matchedVia:
-        input.imdbId &&
-        extractImdbIdFromUrl(localMovie.imdbUrl) === input.imdbId.toLowerCase()
-          ? 'imdb_id'
-          : 'local_signature',
+    if (!shouldAttemptCanonicalTmdbLookup(localMovie, input)) {
+      const supplementedMovie = await supplementImportMatchedMovie(localMovie, fallback)
+
+      return {
+        movie: supplementedMovie || localMovie,
+        matchedVia,
+      }
     }
   }
 
@@ -308,6 +375,19 @@ export async function resolveMovieFromImportInput(
   })
 
   if (!tmdbMovie.tmdbId) {
+    if (localMovie) {
+      const supplementedMovie = await supplementImportMatchedMovie(localMovie, fallback)
+
+      return {
+        movie: supplementedMovie || localMovie,
+        matchedVia:
+          normalizedInputImdbId &&
+          extractImdbIdFromUrl(localMovie.imdbUrl) === normalizedInputImdbId
+            ? 'imdb_id'
+            : 'local_signature',
+      }
+    }
+
     return {
       movie: null,
       matchedVia: 'none',

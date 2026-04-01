@@ -103,6 +103,104 @@ function normalizeName(name?: string) {
     .trim()
 }
 
+function splitCompactLatinTitle(title: string) {
+  return title
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .replace(/([A-Za-z])(\d)/g, '$1 $2')
+    .replace(/(\d)([A-Za-z])/g, '$1 $2')
+    .replace(/[:._-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function addArticleSplitVariant(title: string, variants: Set<string>) {
+  const compact = title.trim()
+
+  if (!compact || /\s/.test(compact)) {
+    return
+  }
+
+  const lower = compact.toLowerCase()
+  const prefixes = ['the', 'le', 'la', 'les', 'un', 'une', 'el', 'los', 'las']
+
+  for (const prefix of prefixes) {
+    if (!lower.startsWith(prefix) || compact.length <= prefix.length + 2) {
+      continue
+    }
+
+    const remainder = compact.slice(prefix.length)
+
+    if (!/^\p{L}[\p{L}\p{N}'’.-]*$/u.test(remainder)) {
+      continue
+    }
+
+    variants.add(
+      `${compact.slice(0, prefix.length)} ${remainder}`.replace(/\s+/g, ' ').trim()
+    )
+  }
+}
+
+export function expandTmdbQueryVariants(title: string): string[] {
+  const normalized = normalizeWhitespace(title).trim()
+
+  if (!normalized) {
+    return []
+  }
+
+  const variants = new Set<string>([normalized])
+  const splitCompact = splitCompactLatinTitle(normalized)
+
+  if (splitCompact) {
+    variants.add(splitCompact)
+  }
+
+  addArticleSplitVariant(normalized, variants)
+  addArticleSplitVariant(splitCompact, variants)
+
+  return [...variants].filter(Boolean)
+}
+
+function isMostlyCjkTitle(title: string) {
+  const letters = [...title].filter((char) => /\p{L}/u.test(char))
+
+  if (!letters.length) {
+    return false
+  }
+
+  const cjkLetters = letters.filter((char) => /\p{Script=Han}/u.test(char))
+  return cjkLetters.length / letters.length >= 0.5
+}
+
+export function buildTmdbQueryCandidates(params: {
+  title: string
+  titleCandidates?: string[]
+}): string[] {
+  const baseCandidates = (params.titleCandidates?.length
+    ? params.titleCandidates
+    : [params.title]
+  )
+    .map((candidate) => normalizeTmdbQueryTitle(candidate))
+    .filter(Boolean)
+    .filter((candidate, index, arr) => arr.indexOf(candidate) === index)
+
+  if (!baseCandidates.length) {
+    return []
+  }
+
+  const [primaryTitle, ...aliases] = baseCandidates
+  const aliasNonCjk = aliases.filter((candidate) => !isMostlyCjkTitle(candidate))
+  const aliasCjk = aliases.filter((candidate) => isMostlyCjkTitle(candidate))
+  const orderedBases = [...aliasNonCjk, ...aliasCjk, primaryTitle]
+
+  return orderedBases
+    .flatMap((candidate) => expandTmdbQueryVariants(candidate))
+    .map((candidate) => normalizeWhitespace(candidate))
+    .filter(Boolean)
+    .filter((candidate, index, arr) => arr.indexOf(candidate) === index)
+    .slice(0, 8)
+}
+
 function getSearchRankBonus(rank: number, resultCount: number) {
   const rankBonus = [40, 26, 16, 10, 5, 0][rank] ?? 0
 
@@ -190,9 +288,9 @@ function scoreCandidate(params: {
 
   if (params.scrapedYear && params.candidateYear) {
     const diff = Math.abs(params.scrapedYear - params.candidateYear)
-    if (diff === 0) score += 25
-    else if (diff === 1) score += 12
-    else if (diff === 2) score += 6
+    if (diff === 0) score += 55
+    else if (diff === 1) score += 20
+    else if (diff === 2) score += 8
     else score -= 20
   }
 
@@ -228,14 +326,10 @@ export async function searchTmdbMovie(params: SearchTmdbParams): Promise<TmdbMov
     return buildFallbackOnly(params)
   }
 
-  const candidateQueries = [
-    normalizeTmdbQueryTitle(params.title),
-    ...(params.titleCandidates || []).map((candidate) => normalizeTmdbQueryTitle(candidate)),
-  ]
-    .map((candidate) => normalizeWhitespace(candidate))
-    .filter(Boolean)
-    .filter((candidate, index, arr) => arr.indexOf(candidate) === index)
-    .slice(0, 6)
+  const candidateQueries = buildTmdbQueryCandidates({
+    title: params.title,
+    titleCandidates: params.titleCandidates,
+  })
 
   if (!candidateQueries.length) {
     return buildFallbackOnly(params)
@@ -261,6 +355,7 @@ export async function searchTmdbMovie(params: SearchTmdbParams): Promise<TmdbMov
           api_key: params.tmdbApiKey,
           query,
           include_adult: false,
+          year: params.releaseYear,
         },
       }
     )

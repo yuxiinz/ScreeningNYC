@@ -94,7 +94,7 @@ function choosePosterUrl(params: {
       ? params.fallbackPosterUrl
       : undefined
 
-  return fallbackGood || existingGood || undefined
+  return existingGood || fallbackGood || undefined
 }
 
 async function supportsShowtimeShownTitleColumn(): Promise<boolean> {
@@ -445,6 +445,41 @@ export async function mergeMovieMetadata(
       },
       fallbackReleaseDate: getFallbackReleaseDate(fallback),
     }),
+  })
+}
+
+export async function mergeMovieImportLinks(
+  movieId: number,
+  fallback: Pick<FallbackMovieData, 'imdbUrl' | 'doubanUrl' | 'letterboxdUrl'>,
+  db: DbClient = prisma
+) {
+  const existing = await db.movie.findUnique({
+    where: {
+      id: movieId,
+    },
+  })
+
+  if (!existing) {
+    return null
+  }
+
+  const data = {
+    imdbUrl: existing.imdbUrl || fallback.imdbUrl,
+    doubanUrl: existing.doubanUrl || fallback.doubanUrl,
+    letterboxdUrl: existing.letterboxdUrl || fallback.letterboxdUrl,
+  }
+
+  if (
+    data.imdbUrl === existing.imdbUrl &&
+    data.doubanUrl === existing.doubanUrl &&
+    data.letterboxdUrl === existing.letterboxdUrl
+  ) {
+    return existing
+  }
+
+  return db.movie.update({
+    where: { id: existing.id },
+    data,
   })
 }
 
