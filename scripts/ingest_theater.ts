@@ -16,6 +16,7 @@ import {
   upsertFormat,
   upsertMovie,
   upsertLocalMovie,
+  mergeMovieMetadata,
   upsertShowtime,
   markMissingShowtimesAsCanceled,
   getIngestTableCounts,
@@ -191,6 +192,16 @@ const THEATER_CONFIGS: TheaterIngestConfig[] = [
     officialSiteUrl:
       process.env.NITEHAWK_PROSPECTPARK_OFFICIAL_URL ||
       'https://nitehawkcinema.com/prospectpark/',
+  },
+  {
+    theaterName: 'Japan Society',
+    theaterSlug: 'japansociety',
+    sourceName: 'japansociety',
+    sourceUrl:
+      process.env.JAPANSOCIETY_SHOWTIMES_URL ||
+      'https://japansociety.org/wp-json/events/v1/data?events_categories=9127&limit=120',
+    officialSiteUrl:
+      process.env.JAPANSOCIETY_OFFICIAL_URL || 'https://japansociety.org/film/',
   },
 ]
 
@@ -381,7 +392,17 @@ async function ingestOneTheater(
       const existingMovie = await findLocalMovieByImportMatch(matchInput)
 
       if (existingMovie) {
-        movie = existingMovie
+        movie =
+          (await mergeMovieMetadata(existingMovie.id, {
+            title: matchedMovieTitle || fallbackMovieTitle || existingMovie.title,
+            directorText: item.directorText,
+            releaseYear: item.releaseYear,
+            runtimeMinutes: item.runtimeMinutes,
+            overview: item.overview,
+            posterUrl: item.posterUrl,
+            officialSiteUrl: item.sourceUrl,
+            genresText: config.theaterName,
+          })) || existingMovie
       } else if (TMDB_API_KEY) {
         const tmdbMovie = await searchTmdbMovie({
           title: canonicalTitle || item.movieTitle,

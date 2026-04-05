@@ -11,6 +11,7 @@ import { scrapeMomiShowtimes } from './momi_adapter'
 import { scrapeBamShowtimes } from './bam_adapter'
 import { scrapeParisShowtimes } from './paris_adapter'
 import { scrapeNitehawkShowtimes } from './nitehawk_adapter'
+import { scrapeJapanSocietyShowtimes } from './japansociety_adapter'
 
 export function getShowtimeScraper(theaterSlug: string) {
   switch (theaterSlug) {
@@ -39,6 +40,8 @@ export function getShowtimeScraper(theaterSlug: string) {
     case 'nitehawkwilliamsburg':
     case 'nitehawkprospectpark':
       return scrapeNitehawkShowtimes
+    case 'japansociety':
+      return scrapeJapanSocietyShowtimes
     default:
       throw new Error(`Unsupported theater: ${theaterSlug}`)
   }

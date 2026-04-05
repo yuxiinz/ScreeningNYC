@@ -71,4 +71,9 @@ export const THEATER_META = {
     longitude: -73.9808,
     address: '188 Prospect Park W, Brooklyn, NY 11215',
   },
+  japansociety: {
+    latitude: 40.7525569,
+    longitude: -73.9682461,
+    address: '333 East 47th Street, New York, NY 10017',
+  },
 } as const
