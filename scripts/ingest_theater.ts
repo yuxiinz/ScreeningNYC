@@ -77,6 +77,15 @@ const THEATER_CONFIGS: TheaterIngestConfig[] = [
       process.env.FILMFORUM_OFFICIAL_URL || 'https://filmforum.org',
   },
   {
+    theaterName: 'Film at Lincoln Center',
+    theaterSlug: 'flc',
+    sourceName: 'flc',
+    sourceUrl:
+      process.env.FLC_SHOWTIMES_URL || 'https://api.filmlinc.org/showtimes',
+    officialSiteUrl:
+      process.env.FLC_OFFICIAL_URL || 'https://www.filmlinc.org/',
+  },
+  {
     theaterName: 'IFC Center',
     theaterSlug: 'ifc',
     sourceName: 'ifc',

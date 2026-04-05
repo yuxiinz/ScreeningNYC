@@ -91,4 +91,9 @@ export const THEATER_META = {
     longitude: -73.9682461,
     address: '333 East 47th Street, New York, NY 10017',
   },
+  flc: {
+    latitude: 40.7737,
+    longitude: -73.9833,
+    address: '144 W 65th St, New York, NY 10023',
+  },
 } as const
