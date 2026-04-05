@@ -55,6 +55,92 @@ function normalizeWhitespace(input?: string | null): string {
   return (input || '').replace(/\s+/g, ' ').replace(/\u00a0/g, ' ').trim()
 }
 
+function normalizeComparableMovieTitle(input?: string | null): string {
+  return canonicalizeTitle(input || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[’']/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+}
+
+function scoreMovieTitleNoise(input?: string | null): number {
+  const title = normalizeWhitespace(input)
+  if (!title) return 0
+
+  let score = 0
+
+  if (/^.+?\s+presents:?\s+.+/i.test(title)) {
+    score += 6
+  }
+
+  if (
+    /\s+\+\s*(?:q(?:\s*&\s*|\s+and\s+)a|q&a|qa|intro(?:duction)?|seminar|discussion|panel|conversation|in person)\b/i.test(
+      title
+    )
+  ) {
+    score += 5
+  }
+
+  if (/\s+\|\s+.+/.test(title)) {
+    score += 4
+  }
+
+  if (
+    /\s*[-–—]\s*(4K\s*DCP|DCP|35\s*MM|16\s*MM|70\s*MM|IMAX|DIGITAL|BLU[\s-]?RAY|SUPER[\s-]?8(?:MM)?)\b/i.test(
+      title
+    )
+  ) {
+    score += 4
+  }
+
+  if (/[-–—:|]\s*$/.test(title)) {
+    score += 3
+  }
+
+  return score
+}
+
+function shouldPreferIncomingMovieTitle(
+  existingTitle?: string | null,
+  incomingTitle?: string | null
+): boolean {
+  const existing = canonicalizeTitle(existingTitle || '')
+  const incoming = canonicalizeTitle(incomingTitle || '')
+
+  if (!incoming || existing === incoming) {
+    return false
+  }
+
+  if (!existing) {
+    return true
+  }
+
+  const existingNoise = scoreMovieTitleNoise(existing)
+  const incomingNoise = scoreMovieTitleNoise(incoming)
+
+  if (incomingNoise >= existingNoise) {
+    return false
+  }
+
+  const existingComparable = normalizeComparableMovieTitle(existing)
+  const incomingComparable = normalizeComparableMovieTitle(incoming)
+
+  if (!existingComparable || !incomingComparable) {
+    return false
+  }
+
+  if (
+    existingComparable.includes(incomingComparable) ||
+    incomingComparable.includes(existingComparable)
+  ) {
+    return true
+  }
+
+  return existingNoise > 0 && incoming.length < existing.length
+}
+
 function releaseYearToDate(year?: number): Date | undefined {
   if (!year || Number.isNaN(year)) return undefined
   return new Date(`${year}-01-01T00:00:00.000Z`)
@@ -474,15 +560,21 @@ export async function mergeMovieMetadata(
     return null
   }
 
+  const normalizedFallbackTitle = canonicalizeTitle(fallback.title)
+
   return db.movie.update({
     where: { id: existing.id },
     data: buildMovieMergeData({
       existing,
       fallback: {
         ...fallback,
-        title: canonicalizeTitle(fallback.title),
+        title: normalizedFallbackTitle,
       },
       fallbackReleaseDate: getFallbackReleaseDate(fallback),
+      preferredTitle: normalizedFallbackTitle,
+      preferIncomingTitle:
+        fallback.preferTitle ||
+        shouldPreferIncomingMovieTitle(existing.title, normalizedFallbackTitle),
     }),
   })
 }
@@ -656,6 +748,9 @@ export async function upsertMovie(tmdb: TmdbMovie, fallback?: FallbackMovieData)
             fallback,
             preferredTitle,
             fallbackReleaseDate,
+            preferIncomingTitle:
+              fallback?.preferTitle ||
+              shouldPreferIncomingMovieTitle(existingBySignature.title, preferredTitle),
           }),
           ...(tmdb.tmdbId && !existingBySignature.tmdbId
             ? { tmdbId: tmdb.tmdbId }

@@ -1,9 +1,9 @@
 // lib/ingest/adapters/cinemavillage_adapter.ts
 
+import axios from 'axios'
 import * as cheerio from 'cheerio'
 import { DateTime } from 'luxon'
 import type { ScrapedShowtime, TheaterAdapterConfig } from './types'
-import { fetchHtml } from '../core/http'
 import { cleanText, decodeHtmlEntities, normalizeWhitespace } from '../core/text'
 import { buildAbsoluteUrl } from '../core/url'
 import { parseRuntimeMinutes, parseYear } from '../core/meta'
@@ -13,6 +13,13 @@ import { APP_TIMEZONE } from '../../timezone'
 
 const CINEMA_VILLAGE_BASE_URL = 'https://www.cinemavillage.com'
 const DEFAULT_CALENDAR_URL = 'https://www.cinemavillage.com/calendar/'
+const CINEMA_VILLAGE_HEADERS = {
+  'User-Agent':
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36',
+  Accept: 'text/html,application/xhtml+xml',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'Upgrade-Insecure-Requests': '1',
+}
 
 type TitleParse = ReturnType<typeof parseScreeningTitle>
 
@@ -40,8 +47,92 @@ type CinemaVillageDetail = {
   preferMovieTitleForDisplay?: boolean
 }
 
+type CinemaVillageSession = {
+  cookie?: string
+}
+
 function absoluteUrl(value?: string | null): string | undefined {
   return buildAbsoluteUrl(CINEMA_VILLAGE_BASE_URL, value)
+}
+
+function buildCookieHeader(setCookieHeader: unknown): string | undefined {
+  if (!Array.isArray(setCookieHeader)) return undefined
+
+  const cookie = setCookieHeader
+    .map((value) => cleanText(String(value).split(';')[0]))
+    .filter(Boolean)
+    .join('; ')
+
+  return cookie || undefined
+}
+
+async function initCinemaVillageSession(): Promise<CinemaVillageSession> {
+  try {
+    const response = await axios.get<string>(`${CINEMA_VILLAGE_BASE_URL}/`, {
+      timeout: 20000,
+      headers: CINEMA_VILLAGE_HEADERS,
+      responseType: 'text',
+    })
+
+    return {
+      cookie: buildCookieHeader(response.headers['set-cookie']),
+    }
+  } catch {
+    return {}
+  }
+}
+
+async function fetchCinemaVillageHtml(
+  url: string,
+  session: CinemaVillageSession,
+  referer = `${CINEMA_VILLAGE_BASE_URL}/`
+): Promise<string> {
+  const headers = {
+    ...CINEMA_VILLAGE_HEADERS,
+    Referer: referer,
+    ...(session.cookie ? { Cookie: session.cookie } : {}),
+  }
+
+  try {
+    const response = await axios.get<string>(url, {
+      timeout: 20000,
+      headers,
+      responseType: 'text',
+    })
+
+    const nextCookie = buildCookieHeader(response.headers['set-cookie'])
+    if (nextCookie) {
+      session.cookie = nextCookie
+    }
+
+    return response.data
+  } catch (error) {
+    if (!axios.isAxiosError(error) || error.response?.status !== 403) {
+      throw error
+    }
+
+    const refreshedSession = await initCinemaVillageSession()
+    if (refreshedSession.cookie) {
+      session.cookie = refreshedSession.cookie
+    }
+
+    const retryResponse = await axios.get<string>(url, {
+      timeout: 20000,
+      headers: {
+        ...CINEMA_VILLAGE_HEADERS,
+        Referer: referer,
+        ...(session.cookie ? { Cookie: session.cookie } : {}),
+      },
+      responseType: 'text',
+    })
+
+    const nextCookie = buildCookieHeader(retryResponse.headers['set-cookie'])
+    if (nextCookie) {
+      session.cookie = nextCookie
+    }
+
+    return retryResponse.data
+  }
 }
 
 function stripAccessibilitySuffix(value?: string | null): string {
@@ -213,10 +304,10 @@ function parseDetailPage(
 export async function scrapeCinemaVillageShowtimes(
   config: TheaterAdapterConfig
 ): Promise<ScrapedShowtime[]> {
-  const calendarUrl =
-    cleanText(config.sourceUrl) || DEFAULT_CALENDAR_URL
+  const calendarUrl = cleanText(config.sourceUrl) || DEFAULT_CALENDAR_URL
+  const session = await initCinemaVillageSession()
 
-  const html = await fetchHtml(calendarUrl)
+  const html = await fetchCinemaVillageHtml(calendarUrl, session)
   const listings = parseCalendarPage(html)
   const detailCache = new Map<string, CinemaVillageDetail | null>()
   const rows: ScrapedShowtime[] = []
@@ -228,7 +319,7 @@ export async function scrapeCinemaVillageShowtimes(
     if (detail === undefined) {
       try {
         detail = parseDetailPage(
-          await fetchHtml(listing.sourceUrl),
+          await fetchCinemaVillageHtml(listing.sourceUrl, session, calendarUrl),
           listing.sourceUrl,
           listing.shownTitle
         )

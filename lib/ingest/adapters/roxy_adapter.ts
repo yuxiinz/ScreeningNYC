@@ -10,6 +10,13 @@ import { parseScreeningTitle } from '../core/screening_title'
 
 const ROXY_BASE_URL = 'https://www.roxycinemanewyork.com'
 const DEFAULT_NOW_SHOWING_URL = 'https://www.roxycinemanewyork.com/now-showing/'
+const ROXY_EVENT_SUFFIX_PATTERN =
+  /\s+\+\s*(?:q(?:\s*&\s*|\s+and\s+)a|q&a|qa|intro(?:duction)?|seminar|discussion|panel|conversation|in person)\b[^|]*(?=(?:\s+\|\s+|$))/gi
+const ROXY_PRESENTS_PREFIX_PATTERN = /^(.+?)\s+presents:?\s+(.+)$/i
+const ROXY_SERIES_SUFFIX_PATTERN = /\s+\|\s+.+$/
+const ROXY_FORMAT_SUFFIX_PATTERN =
+  /\s*[-–—]\s*(4K\s*DCP|DCP|35\s*MM|16\s*MM|70\s*MM|IMAX|DIGITAL|BLU[\s-]?RAY|SUPER[\s-]?8(?:MM)?)\b.*$/i
+const ROXY_TRAILING_SEPARATOR_PATTERN = /\s*[-–—:|]+\s*$/
 
 function absoluteUrl(value?: string | null): string | undefined {
   return buildAbsoluteUrl(ROXY_BASE_URL, value)
@@ -22,10 +29,27 @@ function extractPurchaseId(ticketUrl?: string): string | undefined {
   return cleaned.match(/\/purchase\/(\d+)\b/i)?.[1]
 }
 
-function normalizeRoxyMovieTitle(shownTitle: string): string {
-  return cleanText(shownTitle)
-    .split(/\s+\|\s+/)[0]
-    .replace(/\s+\+\s*(?:q(?:\s*&\s*|\s+and\s+)a|q&a|qa)\b.*$/i, '')
+function stripRoxyEventSuffixes(value?: string | null): string {
+  return cleanText(value).replace(ROXY_EVENT_SUFFIX_PATTERN, '').trim()
+}
+
+function stripRoxyCuratorialPrefix(value?: string | null): string {
+  const cleaned = cleanText(value)
+  const match = cleaned.match(ROXY_PRESENTS_PREFIX_PATTERN)
+  if (!match?.[1] || !match[2]) return cleaned
+
+  const prefix = cleanText(match[1])
+  const rest = cleanText(match[2])
+  if (!prefix || !rest || prefix.split(/\s+/).length > 6) return cleaned
+
+  return rest
+}
+
+function normalizeRoxyShownTitle(rawTitle: string): string {
+  return stripRoxyCuratorialPrefix(stripRoxyEventSuffixes(rawTitle))
+    .replace(ROXY_SERIES_SUFFIX_PATTERN, '')
+    .replace(ROXY_FORMAT_SUFFIX_PATTERN, '')
+    .replace(ROXY_TRAILING_SEPARATOR_PATTERN, '')
     .trim()
 }
 
@@ -39,12 +63,14 @@ export async function scrapeRoxyShowtimes(
 
   $('.detailed-screening__card').each((_, cardEl) => {
     const card = $(cardEl)
-    const shownTitle = cleanText(
+    const rawTitle = cleanText(
       decodeHtmlEntities(card.find('.detailed-screening__title').first().text())
     )
-    const titleParse = parseScreeningTitle(normalizeRoxyMovieTitle(shownTitle))
+    const shownTitle = normalizeRoxyShownTitle(rawTitle)
+    const rawTitleParse = parseScreeningTitle(rawTitle)
     const displayTitleParse = parseScreeningTitle(shownTitle)
-    const movieTitle = titleParse.title || displayTitleParse.title || shownTitle
+    const movieTitle =
+      displayTitleParse.title || shownTitle || rawTitleParse.title || rawTitle
     const infoLine = cleanText(
       decodeHtmlEntities(card.find('.detailed-screening__info').first().text())
     )
@@ -66,19 +92,20 @@ export async function scrapeRoxyShowtimes(
         absoluteUrl(
           card.find('.detailed-screening__cta.cta--text-link').first().attr('href')
         ) || sourceUrl,
-      rawFormat: displayTitleParse.rawFormat || titleParse.rawFormat,
+      rawFormat: rawTitleParse.rawFormat || displayTitleParse.rawFormat,
       sourceShowtimeId: extractPurchaseId(ticketUrl),
-      releaseYear: displayTitleParse.releaseYear || titleParse.releaseYear || parseYear(infoLine),
+      releaseYear: rawTitleParse.releaseYear || displayTitleParse.releaseYear || parseYear(infoLine),
       runtimeMinutes: parseRuntimeMinutes(infoLine),
       overview:
         cleanText(
           decodeHtmlEntities(card.find('.detailed-screening__copy').first().text())
         ) || undefined,
       posterUrl: absoluteUrl(card.find('.detailed-screening__image').attr('src')),
-      tmdbTitleCandidates: titleParse.tmdbTitleCandidates || displayTitleParse.tmdbTitleCandidates,
+      tmdbTitleCandidates:
+        displayTitleParse.tmdbTitleCandidates || rawTitleParse.tmdbTitleCandidates,
       preferMovieTitleForDisplay:
-        titleParse.preferMovieTitleForDisplay ||
         displayTitleParse.preferMovieTitleForDisplay ||
+        rawTitleParse.preferMovieTitleForDisplay ||
         undefined,
       matchedMovieTitleHint: movieTitle !== shownTitle ? movieTitle : undefined,
     })
