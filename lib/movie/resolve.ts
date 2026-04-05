@@ -10,8 +10,8 @@ import { searchTmdbMovie, type TmdbMovie } from '@/lib/ingest/services/tmdb_serv
 import {
   extractImdbIdFromUrl,
   findLocalMovieByImportMatch,
-  normalizeMovieName,
 } from '@/lib/movie/match'
+import { shouldAttemptCanonicalTmdbLookup } from '@/lib/movie/canonical-lookup'
 import { mapTmdbMovieCreditsToPeople } from '@/lib/people/tmdb'
 import {
   buildTmdbImageUrl,
@@ -247,52 +247,6 @@ function buildFallbackFromImportInput(input: MovieImportResolveInput): FallbackM
     letterboxdUrl: input.letterboxdUrl,
     productionCountriesText: input.productionCountriesText,
   }
-}
-
-function hasDistinctImportAliases(input: MovieImportResolveInput) {
-  const normalizedTitles = [
-    input.title,
-    ...(input.titleCandidates || []),
-  ]
-    .map((candidate) => normalizeMovieName(candidate))
-    .filter(Boolean)
-
-  return new Set(normalizedTitles).size > 1
-}
-
-function isLikelyBlockedImportPoster(url?: string | null) {
-  return Boolean(url && /doubanio\.com\/view\/photo/i.test(url))
-}
-
-function shouldAttemptCanonicalTmdbLookup(
-  localMovie: Movie,
-  input: MovieImportResolveInput
-) {
-  if (localMovie.tmdbId) {
-    return false
-  }
-
-  const inputImdbId = extractImdbIdFromUrl(input.imdbId) || input.imdbId?.toLowerCase()
-  const localImdbId = extractImdbIdFromUrl(localMovie.imdbUrl)
-
-  if (inputImdbId && localImdbId && inputImdbId === localImdbId) {
-    return false
-  }
-
-  const hasDisambiguatingMetadata = Boolean(
-    input.releaseYear || input.directorText || input.imdbId || hasDistinctImportAliases(input)
-  )
-
-  if (!hasDisambiguatingMetadata) {
-    return false
-  }
-
-  return Boolean(
-    !localMovie.directorText ||
-      !localMovie.originalTitle ||
-      !localMovie.imdbUrl ||
-      isLikelyBlockedImportPoster(localMovie.posterUrl)
-  )
 }
 
 async function supplementImportMatchedMovie(

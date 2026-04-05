@@ -39,24 +39,30 @@ export function cleanPossessivePrefixTitle(text?: string | null): string {
   let s = stripLeadingBullets(text)
 
   s = s
-    .replace(/^Film Forum\s*:?\s*/i, '')
-    .replace(/^Metrograph\s*:?\s*/i, '')
+    .replace(/^Film Forum\s*(?:[·•:]\s*)?/i, '')
+    .replace(/^Metrograph\s*(?:[·•:]\s*)?/i, '')
     .replace(/^The Young Film Forum\s*\(YFF\)\s*Archive Dive:\s*/i, '')
     .replace(/^\s*["'“”‘’]+/, '')
     .replace(/["'“”‘’]+\s*$/, '')
     .trim()
 
   const possessivePrefix =
-    s.match(/^(.+?)’s\s+(.+)$/i) ||
-    s.match(/^(.+?)'s\s+(.+)$/i)
+    s.match(/^(.+?)(’s|'s|’|')\s+(.+)$/i)
 
   if (possessivePrefix) {
     const owner = normalizeWhitespace(possessivePrefix[1])
-    const rest = normalizeWhitespace(possessivePrefix[2])
+    const suffix = possessivePrefix[2]
+    const rest = normalizeWhitespace(possessivePrefix[3])
+    const isBareApostropheSuffix = suffix === '’' || suffix === "'"
+
+    if (isBareApostropheSuffix && !/[sS]$/.test(owner)) {
+      return s.trim()
+    }
 
     if (
       owner.split(/\s+/).length <= 4 &&
       /[A-ZÀ-Ý]/.test(owner) &&
+      !/[:/]/.test(owner) &&
       !/^(today|tomorrow|members|film forum|metrograph)$/i.test(owner)
     ) {
       s = rest

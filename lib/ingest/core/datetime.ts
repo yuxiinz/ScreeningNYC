@@ -277,6 +277,22 @@ export function parseShowtime(input: {
   return combineDateAndTime(date, input.timeText)
 }
 
+export function buildShowtimeRaw(
+  dateText?: string | null,
+  timeText?: string | null
+): string {
+  const parsed = parseShowtime({
+    dateText,
+    timeText,
+  })
+
+  if (parsed) {
+    return formatShowtimeRaw(parsed)
+  }
+
+  return `${normalizeWhitespace(dateText)} ${normalizeWhitespace(timeText)}`.trim()
+}
+
 export function formatDateForRaw(date: Date): string {
   return DateTime.fromJSDate(date).toFormat('cccc, LLLL d, yyyy')
 }

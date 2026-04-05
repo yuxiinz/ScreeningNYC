@@ -27,6 +27,74 @@ type MergeStats = {
   directorNotificationsDeduped: number
 }
 
+function normalizeWhitespace(input?: string | null) {
+  return (input || '').replace(/\s+/g, ' ').trim()
+}
+
+function scoreShowtimeMetadata(input: {
+  shownTitle?: string | null
+  ticketUrl?: string | null
+  sourceUrl?: string | null
+  sourceShowtimeId?: string | null
+}) {
+  let score = 0
+
+  if (normalizeWhitespace(input.shownTitle)) {
+    score += 5
+  }
+
+  if (input.sourceUrl?.includes('/events/event/')) {
+    score += 3
+  }
+
+  if (input.ticketUrl && !input.ticketUrl.includes('/events/')) {
+    score += 2
+  }
+
+  if (normalizeWhitespace(input.sourceShowtimeId)) {
+    score += 1
+  }
+
+  return score
+}
+
+function buildMergedShowtimeData(
+  existing: {
+    shownTitle?: string | null
+    ticketUrl?: string | null
+    sourceUrl?: string | null
+    sourceShowtimeId?: string | null
+    runtimeMinutes?: number | null
+    endTime?: Date | null
+  },
+  incoming: {
+    shownTitle?: string | null
+    ticketUrl?: string | null
+    sourceUrl?: string | null
+    sourceShowtimeId?: string | null
+    runtimeMinutes?: number | null
+    endTime?: Date | null
+  }
+) {
+  const preferred =
+    scoreShowtimeMetadata(incoming) > scoreShowtimeMetadata(existing)
+      ? incoming
+      : existing
+  const fallback = preferred === existing ? incoming : existing
+
+  return {
+    shownTitle:
+      normalizeWhitespace(preferred.shownTitle) ||
+      normalizeWhitespace(fallback.shownTitle) ||
+      null,
+    ticketUrl: preferred.ticketUrl || fallback.ticketUrl || null,
+    sourceUrl: preferred.sourceUrl || fallback.sourceUrl || null,
+    sourceShowtimeId: preferred.sourceShowtimeId || fallback.sourceShowtimeId || null,
+    runtimeMinutes: existing.runtimeMinutes || incoming.runtimeMinutes || null,
+    endTime: existing.endTime || incoming.endTime || null,
+  }
+}
+
 function parseArgs(): CliArgs {
   const args = process.argv.slice(2)
 
@@ -131,6 +199,12 @@ async function mergeShowtimes(
     select: {
       id: true,
       startTime: true,
+      shownTitle: true,
+      ticketUrl: true,
+      sourceUrl: true,
+      sourceShowtimeId: true,
+      runtimeMinutes: true,
+      endTime: true,
       theater: {
         select: {
           slug: true,
@@ -152,14 +226,23 @@ async function mergeShowtimes(
     select: {
       id: true,
       fingerprint: true,
+      shownTitle: true,
+      ticketUrl: true,
+      sourceUrl: true,
+      sourceShowtimeId: true,
+      runtimeMinutes: true,
+      endTime: true,
     },
   })
 
-  const fingerprintOwners = new Map<string, number>()
+  const fingerprintOwners = new Map<
+    string,
+    (typeof targetShowtimes)[number]
+  >()
 
   for (const showtime of targetShowtimes) {
     if (showtime.fingerprint) {
-      fingerprintOwners.set(showtime.fingerprint, showtime.id)
+      fingerprintOwners.set(showtime.fingerprint, showtime)
     }
   }
 
@@ -174,9 +257,14 @@ async function mergeShowtimes(
       formatName: showtime.format?.name || 'Standard',
     })
 
-    const existingShowtimeId = fingerprintOwners.get(newFingerprint)
+    const existingShowtime = fingerprintOwners.get(newFingerprint)
 
-    if (existingShowtimeId && existingShowtimeId !== showtime.id) {
+    if (existingShowtime && existingShowtime.id !== showtime.id) {
+      await db.showtime.update({
+        where: { id: existingShowtime.id },
+        data: buildMergedShowtimeData(existingShowtime, showtime),
+      })
+
       await db.$executeRaw`
         insert into "WatchlistNotificationDelivery" (
           "watchlistItemId",
@@ -187,7 +275,7 @@ async function mergeShowtimes(
         )
         select
           "watchlistItemId",
-          ${existingShowtimeId},
+          ${existingShowtime.id},
           "resendMessageId",
           "sentToEmail",
           "sentAt"
@@ -200,9 +288,7 @@ async function mergeShowtimes(
         where: { showtimeId: showtime.id },
       })
 
-      await db.showtime.delete({
-        where: { id: showtime.id },
-      })
+      await db.showtime.delete({ where: { id: showtime.id } })
 
       deduped += 1
       continue
@@ -216,7 +302,16 @@ async function mergeShowtimes(
       },
     })
 
-    fingerprintOwners.set(newFingerprint, showtime.id)
+    fingerprintOwners.set(newFingerprint, {
+      id: showtime.id,
+      fingerprint: newFingerprint,
+      shownTitle: showtime.shownTitle,
+      ticketUrl: showtime.ticketUrl,
+      sourceUrl: showtime.sourceUrl,
+      sourceShowtimeId: showtime.sourceShowtimeId,
+      runtimeMinutes: showtime.runtimeMinutes,
+      endTime: showtime.endTime,
+    })
     moved += 1
   }
 

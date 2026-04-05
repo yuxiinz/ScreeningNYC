@@ -17,6 +17,9 @@ import { parseShowtime, formatShowtimeRaw } from '../core/datetime'
 
 type DetailMovieInfo = {
   title?: string
+  shownTitle?: string
+  relatedMovieTitle?: string
+  relatedDetailUrl?: string
   directorText?: string
   releaseYear?: number
   runtimeMinutes?: number
@@ -27,6 +30,7 @@ type DetailMovieInfo = {
 
 type FilmForumEntry = {
   movieTitle: string
+  shownTitle?: string
   detailUrl?: string
   ticketUrl?: string
   posterUrl?: string
@@ -45,6 +49,15 @@ function getFilmForumUrls(sourceUrl: string) {
     comingSoonUrl: `${origin}/coming_soon`,
   }
 }
+
+type FilmForumTitleFields = {
+  movieTitle: string
+  shownTitle?: string
+}
+
+const filmForumDetailPageCache = new Map<string, Promise<DetailMovieInfo>>()
+const DIRECTORS_CUT_SUFFIX_PATTERN =
+  /^(.*?)(?::\s*(?:THE\s+)?DIRECTOR[’']S\s+CUT)$/i
 
 function cleanTitleText(text: string): string {
   if (!text) return ''
@@ -69,6 +82,109 @@ function cleanTitleText(text: string): string {
     .trim()
 
   return s
+}
+
+function normalizeComparableTitle(value?: string | null): string {
+  return cleanTitleText(value || '').toLowerCase()
+}
+
+function pickDistinctShownTitle(
+  movieTitle: string,
+  ...candidates: Array<string | undefined>
+): string | undefined {
+  const normalizedMovieTitle = normalizeComparableTitle(movieTitle)
+
+  for (const candidate of candidates) {
+    const cleaned = cleanTitleText(candidate || '')
+    if (!cleaned) continue
+    if (normalizeComparableTitle(cleaned) === normalizedMovieTitle) continue
+    return cleaned
+  }
+
+  return undefined
+}
+
+function splitFilmForumEditionTitle(value?: string | null): FilmForumTitleFields {
+  const cleaned = cleanTitleText(value || '')
+  if (!cleaned) {
+    return {
+      movieTitle: '',
+    }
+  }
+
+  const match = cleaned.match(DIRECTORS_CUT_SUFFIX_PATTERN)
+  if (!match?.[1]) {
+    return {
+      movieTitle: cleaned,
+    }
+  }
+
+  const movieTitle = cleanTitleText(match[1])
+  if (!movieTitle) {
+    return {
+      movieTitle: cleaned,
+    }
+  }
+
+  return {
+    movieTitle,
+    shownTitle: cleaned,
+  }
+}
+
+export function resolveFilmForumTitleFields(input: {
+  movieTitle?: string | null
+  shownTitle?: string | null
+  relatedMovieTitle?: string | null
+}): FilmForumTitleFields {
+  const primaryTitle = cleanTitleText(input.movieTitle || '')
+  const shownTitle = cleanTitleText(input.shownTitle || '')
+  const relatedMovieTitle = cleanTitleText(input.relatedMovieTitle || '')
+  const primaryEdition = splitFilmForumEditionTitle(primaryTitle)
+  const shownEdition = splitFilmForumEditionTitle(shownTitle)
+
+  let movieTitle =
+    relatedMovieTitle ||
+    primaryEdition.movieTitle ||
+    shownEdition.movieTitle ||
+    primaryTitle ||
+    shownTitle
+
+  if (!movieTitle) {
+    return {
+      movieTitle: '',
+    }
+  }
+
+  const normalizedPrimaryTitle = normalizeComparableTitle(primaryTitle)
+  const normalizedShownTitle = normalizeComparableTitle(shownTitle)
+
+  if (!relatedMovieTitle && normalizedPrimaryTitle && normalizedShownTitle) {
+    if (
+      normalizedShownTitle.startsWith(`${normalizedPrimaryTitle} `) &&
+      normalizedShownTitle !== normalizedPrimaryTitle
+    ) {
+      movieTitle = primaryTitle
+    } else if (
+      normalizedPrimaryTitle.startsWith(`${normalizedShownTitle} `) &&
+      normalizedPrimaryTitle !== normalizedShownTitle
+    ) {
+      movieTitle = shownTitle
+    }
+  }
+
+  const distinctShownTitle = pickDistinctShownTitle(
+    movieTitle,
+    shownTitle,
+    primaryTitle,
+    primaryEdition.shownTitle,
+    shownEdition.shownTitle
+  )
+
+  return {
+    movieTitle,
+    ...(distinctShownTitle ? { shownTitle: distinctShownTitle } : {}),
+  }
 }
 
 function parseFilmForumMetaText(metaText: string): {
@@ -113,12 +229,47 @@ function extractDirectorFromDetailPage($: cheerio.CheerioAPI): string | undefine
   return undefined
 }
 
-async function scrapeFilmForumDetailPage(url: string): Promise<DetailMovieInfo> {
+function extractRelatedMovieLinkFromDetailPage(
+  $: cheerio.CheerioAPI,
+  pageUrl: string
+): Pick<DetailMovieInfo, 'relatedMovieTitle' | 'relatedDetailUrl'> {
+  const currentPathname = new URL(pageUrl).pathname
+
+  const selectors = [
+    '.full-listing .title a.blue-type[href*="/film/"]',
+    '.column-listing .title a.blue-type[href*="/film/"]',
+  ]
+
+  for (const selector of selectors) {
+    const links = $(selector).toArray()
+
+    for (const link of links) {
+      const href = buildAbsoluteUrl(pageUrl, $(link).attr('href'))
+      if (!href) continue
+
+      const pathname = new URL(href).pathname
+      if (pathname === currentPathname) continue
+
+      const relatedMovieTitle = cleanTitleText($(link).html() || $(link).text())
+      if (!relatedMovieTitle) continue
+
+      return {
+        relatedMovieTitle,
+        relatedDetailUrl: href,
+      }
+    }
+  }
+
+  return {}
+}
+
+async function scrapeFilmForumDetailPageUncached(url: string): Promise<DetailMovieInfo> {
   const html = await fetchHtml(url)
   const $ = cheerio.load(html)
 
   const rawTitle =
     $('meta[property="og:title"]').attr('content') ||
+    $('.main-title').first().html() ||
     $('h1').first().text() ||
     $('.entry-title').first().text()
 
@@ -142,15 +293,58 @@ async function scrapeFilmForumDetailPage(url: string): Promise<DetailMovieInfo> 
   })
 
   const parsedMeta = parseFilmForumMetaText(metaText || '')
+  const relatedMovie = extractRelatedMovieLinkFromDetailPage($, url)
 
   return {
     title: title || undefined,
+    shownTitle: title || undefined,
+    ...relatedMovie,
     directorText,
     releaseYear: parsedMeta.releaseYear,
     runtimeMinutes: parsedMeta.runtimeMinutes,
     rawFormat: parsedMeta.rawFormat,
     overview: undefined,
     posterUrl,
+  }
+}
+
+async function scrapeFilmForumDetailPage(url: string): Promise<DetailMovieInfo> {
+  const cached = filmForumDetailPageCache.get(url)
+  if (cached) return cached
+
+  const request = scrapeFilmForumDetailPageUncached(url).catch((error) => {
+    filmForumDetailPageCache.delete(url)
+    throw error
+  })
+
+  filmForumDetailPageCache.set(url, request)
+  return request
+}
+
+async function resolveFilmForumDetailContext(detailUrl?: string): Promise<{
+  pageInfo?: DetailMovieInfo
+  metadataInfo?: DetailMovieInfo
+}> {
+  if (!detailUrl) return {}
+
+  const pageInfo = await scrapeFilmForumDetailPage(detailUrl).catch(
+    () => ({} as DetailMovieInfo)
+  )
+
+  if (!pageInfo.relatedDetailUrl || pageInfo.relatedDetailUrl === detailUrl) {
+    return {
+      pageInfo,
+      metadataInfo: pageInfo,
+    }
+  }
+
+  const metadataInfo = await scrapeFilmForumDetailPage(pageInfo.relatedDetailUrl).catch(
+    () => pageInfo
+  )
+
+  return {
+    pageInfo,
+    metadataInfo,
   }
 }
 
@@ -274,6 +468,7 @@ function collectDirectFilmEntries(
 
     rows.push({
       movieTitle,
+      shownTitle: movieTitle,
       detailUrl,
       ticketUrl,
       posterUrl,
@@ -309,6 +504,7 @@ async function collectEntriesFromSeriesPage(seriesUrl: string): Promise<FilmForu
 
 async function scrapeTicketPageShowtimes(params: {
   movieTitle: string
+  shownTitle?: string
   ticketUrl: string
   detailUrl?: string
   fallbackPosterUrl?: string
@@ -316,11 +512,7 @@ async function scrapeTicketPageShowtimes(params: {
   const html = await fetchHtml(params.ticketUrl)
   const $ = cheerio.load(html)
 
-  const detailInfo = params.detailUrl
-    ? await scrapeFilmForumDetailPage(params.detailUrl).catch(
-        () => ({} as DetailMovieInfo)
-      )
-    : {}
+  const { pageInfo, metadataInfo } = await resolveFilmForumDetailContext(params.detailUrl)
 
   const rows: ScrapedShowtime[] = []
 
@@ -345,18 +537,27 @@ async function scrapeTicketPageShowtimes(params: {
 
     if (!dateText || !timeText) return
 
+    const titles = resolveFilmForumTitleFields({
+      movieTitle: metadataInfo?.title || pageInfo?.relatedMovieTitle || params.movieTitle,
+      shownTitle: perfTitle || pageInfo?.shownTitle || params.shownTitle,
+      relatedMovieTitle: pageInfo?.relatedMovieTitle || metadataInfo?.title,
+    })
+
+    if (!titles.movieTitle) return
+
     rows.push({
-      movieTitle: detailInfo.title || perfTitle || params.movieTitle,
+      movieTitle: titles.movieTitle,
+      shownTitle: titles.shownTitle,
       startTimeRaw: buildFilmForumStartTimeRaw(dateText, timeText),
       ticketUrl: isSoldOut ? undefined : purchaseUrl,
       sourceUrl: params.detailUrl || params.ticketUrl,
-      rawFormat: detailInfo.rawFormat,
+      rawFormat: metadataInfo?.rawFormat,
       sourceShowtimeId,
-      directorText: detailInfo.directorText,
-      releaseYear: detailInfo.releaseYear,
-      runtimeMinutes: detailInfo.runtimeMinutes,
+      directorText: metadataInfo?.directorText,
+      releaseYear: metadataInfo?.releaseYear,
+      runtimeMinutes: metadataInfo?.runtimeMinutes,
       overview: undefined,
-      posterUrl: detailInfo.posterUrl || params.fallbackPosterUrl,
+      posterUrl: metadataInfo?.posterUrl || pageInfo?.posterUrl || params.fallbackPosterUrl,
     })
   })
 
@@ -366,24 +567,114 @@ async function scrapeTicketPageShowtimes(params: {
 async function buildFallbackRowsFromEntry(entry: FilmForumEntry): Promise<ScrapedShowtime[]> {
   if (!entry.fallbackShowtimes?.length) return []
 
-  const detailInfo = entry.detailUrl
-    ? await scrapeFilmForumDetailPage(entry.detailUrl).catch(
-        () => ({} as DetailMovieInfo)
-      )
-    : {}
+  const { pageInfo, metadataInfo } = await resolveFilmForumDetailContext(entry.detailUrl)
+  const titles = resolveFilmForumTitleFields({
+    movieTitle: metadataInfo?.title || pageInfo?.relatedMovieTitle || entry.movieTitle,
+    shownTitle: pageInfo?.shownTitle || entry.shownTitle,
+    relatedMovieTitle: pageInfo?.relatedMovieTitle || metadataInfo?.title,
+  })
 
   return entry.fallbackShowtimes.map((show) => ({
-    movieTitle: detailInfo.title || entry.movieTitle,
+    movieTitle: titles.movieTitle,
+    shownTitle: titles.shownTitle,
     startTimeRaw: show.startTimeRaw,
     ticketUrl: entry.ticketUrl,
     sourceUrl: entry.detailUrl || entry.ticketUrl,
-    rawFormat: show.rawFormat || detailInfo.rawFormat,
-    directorText: detailInfo.directorText,
-    releaseYear: detailInfo.releaseYear,
-    runtimeMinutes: detailInfo.runtimeMinutes,
+    rawFormat: show.rawFormat || metadataInfo?.rawFormat,
+    directorText: metadataInfo?.directorText,
+    releaseYear: metadataInfo?.releaseYear,
+    runtimeMinutes: metadataInfo?.runtimeMinutes,
     overview: undefined,
-    posterUrl: detailInfo.posterUrl || entry.posterUrl,
+    posterUrl: metadataInfo?.posterUrl || pageInfo?.posterUrl || entry.posterUrl,
   }))
+}
+
+function scoreFilmForumRow(row: ScrapedShowtime): number {
+  let score = 0
+
+  if (pickDistinctShownTitle(row.movieTitle, row.shownTitle)) {
+    score += 5
+  }
+
+  if (row.sourceUrl?.includes('/events/event/')) {
+    score += 3
+  }
+
+  if (row.ticketUrl && !row.ticketUrl.includes('/events/')) {
+    score += 2
+  }
+
+  if (row.sourceShowtimeId) {
+    score += 1
+  }
+
+  return score
+}
+
+function mergeFilmForumRows(
+  existing: ScrapedShowtime,
+  incoming: ScrapedShowtime
+): ScrapedShowtime {
+  const primary =
+    scoreFilmForumRow(incoming) > scoreFilmForumRow(existing) ? incoming : existing
+  const secondary = primary === existing ? incoming : existing
+  const movieTitle = cleanTitleText(primary.movieTitle || secondary.movieTitle)
+  const shownTitle = pickDistinctShownTitle(
+    movieTitle,
+    primary.shownTitle,
+    secondary.shownTitle
+  )
+
+  return {
+    movieTitle,
+    ...(shownTitle ? { shownTitle } : {}),
+    startTimeRaw: primary.startTimeRaw || secondary.startTimeRaw,
+    ticketUrl: primary.ticketUrl || secondary.ticketUrl,
+    sourceUrl: primary.sourceUrl || secondary.sourceUrl,
+    rawFormat: primary.rawFormat || secondary.rawFormat,
+    sourceShowtimeId: primary.sourceShowtimeId || secondary.sourceShowtimeId,
+    directorText: primary.directorText || secondary.directorText,
+    releaseYear: primary.releaseYear || secondary.releaseYear,
+    runtimeMinutes: primary.runtimeMinutes || secondary.runtimeMinutes,
+    overview: primary.overview || secondary.overview,
+    posterUrl: primary.posterUrl || secondary.posterUrl,
+    tmdbTitleCandidates: primary.tmdbTitleCandidates || secondary.tmdbTitleCandidates,
+    preferMovieTitleForDisplay:
+      primary.preferMovieTitleForDisplay || secondary.preferMovieTitleForDisplay,
+    matchedMovieTitleHint:
+      primary.matchedMovieTitleHint || secondary.matchedMovieTitleHint,
+  }
+}
+
+export function mergeFilmForumDuplicateRows(
+  rows: ScrapedShowtime[]
+): ScrapedShowtime[] {
+  const mergedRows = new Map<string, ScrapedShowtime>()
+
+  for (const row of rows) {
+    const normalizedTitles = resolveFilmForumTitleFields({
+      movieTitle: row.movieTitle,
+      shownTitle: row.shownTitle,
+    })
+    const normalizedRow: ScrapedShowtime = {
+      ...row,
+      movieTitle: normalizedTitles.movieTitle || row.movieTitle,
+      shownTitle: normalizedTitles.shownTitle,
+    }
+    const key = [
+      normalizeComparableTitle(normalizedRow.movieTitle),
+      normalizeWhitespace(normalizedRow.startTimeRaw),
+      normalizeComparableTitle(normalizedRow.rawFormat),
+    ].join('|')
+    const existing = mergedRows.get(key)
+
+    mergedRows.set(
+      key,
+      existing ? mergeFilmForumRows(existing, normalizedRow) : normalizedRow
+    )
+  }
+
+  return [...mergedRows.values()]
 }
 
 async function scrapeEntriesFromPage(pageUrl: string): Promise<FilmForumEntry[]> {
@@ -451,6 +742,7 @@ export async function scrapeFilmForumShowtimes(
       if (entry.ticketUrl) {
         rows = await scrapeTicketPageShowtimes({
           movieTitle: entry.movieTitle,
+          shownTitle: entry.shownTitle,
           ticketUrl: entry.ticketUrl,
           detailUrl: entry.detailUrl,
           fallbackPosterUrl: entry.posterUrl,
@@ -474,5 +766,5 @@ export async function scrapeFilmForumShowtimes(
     }
   }
 
-  return allRows
+  return mergeFilmForumDuplicateRows(allRows)
 }

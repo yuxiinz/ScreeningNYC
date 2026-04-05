@@ -64,6 +64,39 @@ function getFallbackReleaseDate(fallback?: FallbackMovieData) {
   return fallback?.releaseDate || releaseYearToDate(fallback?.releaseYear)
 }
 
+function isYearOnlyReleaseDate(date?: Date | null) {
+  if (!date) return false
+
+  return (
+    date.getUTCMonth() === 0 &&
+    date.getUTCDate() === 1 &&
+    date.getUTCHours() === 0 &&
+    date.getUTCMinutes() === 0 &&
+    date.getUTCSeconds() === 0 &&
+    date.getUTCMilliseconds() === 0
+  )
+}
+
+export function chooseMergedReleaseDate(params: {
+  existing: Pick<Movie, 'tmdbId' | 'releaseDate'>
+  tmdb?: TmdbMovie | null
+  fallbackReleaseDate?: Date
+}) {
+  const { existing, tmdb, fallbackReleaseDate } = params
+
+  if (tmdb?.releaseDate) {
+    if (!existing.releaseDate) {
+      return tmdb.releaseDate
+    }
+
+    if (!existing.tmdbId || isYearOnlyReleaseDate(existing.releaseDate)) {
+      return tmdb.releaseDate
+    }
+  }
+
+  return existing.releaseDate || tmdb?.releaseDate || fallbackReleaseDate
+}
+
 function isBadPosterUrl(url?: string | null): boolean {
   const s = normalizeWhitespace(url).toLowerCase()
   if (!s) return true
@@ -73,7 +106,9 @@ function isBadPosterUrl(url?: string | null): boolean {
     s.includes('ticketing.us.veezi.com/media/poster') ||
     s.includes('cropped-logo_metrograph') ||
     s.includes('/logo_metrograph') ||
-    s.includes('metrographred.png')
+    s.includes('metrographred.png') ||
+    s.includes('bam_logo.gif') ||
+    s.includes('/static/img/logo/')
   )
 }
 
@@ -398,7 +433,11 @@ function buildMovieMergeData(params: {
     title:
       params.preferIncomingTitle && preferredTitle ? preferredTitle : existing.title,
     originalTitle: existing.originalTitle || tmdb?.originalTitle,
-    releaseDate: existing.releaseDate || tmdb?.releaseDate || fallbackReleaseDate,
+    releaseDate: chooseMergedReleaseDate({
+      existing,
+      tmdb,
+      fallbackReleaseDate,
+    }),
     runtimeMinutes: existing.runtimeMinutes || tmdb?.runtimeMinutes || fallback?.runtimeMinutes,
     overview: existing.overview || tmdb?.overview || fallback?.overview,
     posterUrl: choosePosterUrl({

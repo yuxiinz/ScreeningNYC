@@ -21,6 +21,21 @@ export const THEATER_META = {
     latitude: 40.7357,
     longitude: -73.997,
   },
+  cinemavillage: {
+    latitude: 40.73405325694438,
+    longitude: -73.99335749814759,
+    address: '22 East 12th Street, New York, NY 10003',
+  },
+  spectacle: {
+    latitude: 40.7124693,
+    longitude: -73.9628461,
+    address: '124 S 3rd St, Brooklyn, NY 11249',
+  },
+  roxy: {
+    latitude: 40.7194085,
+    longitude: -74.0049093,
+    address: '2 Avenue of the Americas, Cellar Level, New York, NY 10013',
+  },
   moma: {
     latitude: 40.7615,
     longitude: -73.9776,

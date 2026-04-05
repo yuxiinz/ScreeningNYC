@@ -7,6 +7,7 @@ import { THEATER_META } from '../lib/ingest/config/theater_meta'
 import { normalizeScreeningMovieTitle } from '../lib/ingest/core/screening_title'
 import { APP_TIMEZONE } from '../lib/timezone'
 import { findLocalMovieByImportMatch } from '../lib/movie/match'
+import { shouldAttemptCanonicalTmdbLookup } from '../lib/movie/canonical-lookup'
 import {
   searchTmdbMovie,
   canonicalizeTitle,
@@ -91,6 +92,39 @@ const THEATER_CONFIGS: TheaterIngestConfig[] = [
       process.env.QUAD_SHOWTIMES_URL || 'https://quadcinema.com/all/',
     officialSiteUrl:
       process.env.QUAD_OFFICIAL_URL || 'https://quadcinema.com',
+  },
+  {
+    theaterName: 'Cinema Village',
+    theaterSlug: 'cinemavillage',
+    sourceName: 'cinemavillage',
+    sourceUrl:
+      process.env.CINEMAVILLAGE_SHOWTIMES_URL ||
+      'https://www.cinemavillage.com/calendar/',
+    officialSiteUrl:
+      process.env.CINEMAVILLAGE_OFFICIAL_URL ||
+      'https://www.cinemavillage.com/',
+  },
+  {
+    theaterName: 'Spectacle',
+    theaterSlug: 'spectacle',
+    sourceName: 'spectacle',
+    sourceUrl:
+      process.env.SPECTACLE_SHOWTIMES_URL ||
+      'https://www.spectacletheater.com/',
+    officialSiteUrl:
+      process.env.SPECTACLE_OFFICIAL_URL ||
+      'https://www.spectacletheater.com/',
+  },
+  {
+    theaterName: 'Roxy Cinema',
+    theaterSlug: 'roxy',
+    sourceName: 'roxy',
+    sourceUrl:
+      process.env.ROXY_SHOWTIMES_URL ||
+      'https://www.roxycinemanewyork.com/now-showing/',
+    officialSiteUrl:
+      process.env.ROXY_OFFICIAL_URL ||
+      'https://www.roxycinemanewyork.com/',
   },
   {
     theaterName: 'MoMA',
@@ -311,6 +345,7 @@ async function ingestOneTheater(
 
   const fingerprintsForCancel: string[] = []
   const seenFingerprints = new Set<string>()
+  const canonicalLookupAttemptedMovieIds = new Set<number>()
 
   let parsedCount = 0
   let dedupedCount = 0
@@ -392,17 +427,49 @@ async function ingestOneTheater(
       const existingMovie = await findLocalMovieByImportMatch(matchInput)
 
       if (existingMovie) {
-        movie =
-          (await mergeMovieMetadata(existingMovie.id, {
-            title: matchedMovieTitle || fallbackMovieTitle || existingMovie.title,
+        const fallbackData = {
+          title: matchedMovieTitle || fallbackMovieTitle || existingMovie.title,
+          titleCandidates: item.tmdbTitleCandidates,
+          directorText: item.directorText,
+          releaseYear: item.releaseYear,
+          runtimeMinutes: item.runtimeMinutes,
+          overview: item.overview,
+          posterUrl: item.posterUrl,
+          officialSiteUrl: item.sourceUrl,
+          genresText: config.theaterName,
+          preferTitle: item.preferMovieTitleForDisplay,
+        }
+
+        const shouldRetryCanonicalLookup =
+          Boolean(TMDB_API_KEY) &&
+          !canonicalLookupAttemptedMovieIds.has(existingMovie.id) &&
+          shouldAttemptCanonicalTmdbLookup(existingMovie, {
+            title: matchInput.title,
+            titleCandidates: matchInput.titleCandidates,
+            directorText: matchInput.directorText,
+            releaseYear: matchInput.releaseYear,
+          })
+
+        canonicalLookupAttemptedMovieIds.add(existingMovie.id)
+
+        if (shouldRetryCanonicalLookup) {
+          const tmdbMovie = await searchTmdbMovie({
+            title: canonicalTitle || item.movieTitle,
+            titleCandidates: item.tmdbTitleCandidates,
             directorText: item.directorText,
             releaseYear: item.releaseYear,
             runtimeMinutes: item.runtimeMinutes,
-            overview: item.overview,
-            posterUrl: item.posterUrl,
-            officialSiteUrl: item.sourceUrl,
-            genresText: config.theaterName,
-          })) || existingMovie
+            tmdbApiKey: TMDB_API_KEY,
+          })
+
+          if (tmdbMovie.tmdbId) {
+            movie = await upsertMovie(tmdbMovie, fallbackData)
+          } else {
+            movie = (await mergeMovieMetadata(existingMovie.id, fallbackData)) || existingMovie
+          }
+        } else {
+          movie = (await mergeMovieMetadata(existingMovie.id, fallbackData)) || existingMovie
+        }
       } else if (TMDB_API_KEY) {
         const tmdbMovie = await searchTmdbMovie({
           title: canonicalTitle || item.movieTitle,

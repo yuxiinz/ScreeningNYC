@@ -113,7 +113,7 @@ function yearMatches(inputYear?: number, movie?: Pick<Movie, 'releaseDate'> | nu
   const movieYear = movie ? getMovieReleaseYear(movie) : undefined
   if (!movieYear) return true
 
-  return movieYear === inputYear
+  return Math.abs(movieYear - inputYear) <= 1
 }
 
 function scoreMovieCandidate(

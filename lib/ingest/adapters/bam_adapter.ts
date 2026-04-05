@@ -19,6 +19,7 @@ const API_HEADERS = {
 
 type BamListEntry = {
   detailUrl: string
+  posterUrl?: string
 }
 
 type BamJsonLdOffer =
@@ -148,6 +149,44 @@ function getDetailUrl(
     root.find('a[href]').first().attr('href')
 
   return buildAbsoluteUrl(pageUrl, href)
+}
+
+function getListPosterUrl(
+  root: cheerio.Cheerio<AnyNode>,
+  pageUrl: string
+): string | undefined {
+  const src =
+    root.find('.bam-block-2x2-top img').first().attr('src') ||
+    root.find('.bam-block-2x1-left img').first().attr('src') ||
+    root.find('.bam-block-2x2-mobile-box img').first().attr('src') ||
+    root.find('picture img').first().attr('src') ||
+    root.find('img').first().attr('src')
+
+  return buildAbsoluteUrl(pageUrl, src)
+}
+
+function isBadBamPosterUrl(url?: string | null): boolean {
+  const cleaned = cleanText(url).toLowerCase()
+
+  if (!cleaned) {
+    return true
+  }
+
+  return cleaned.includes('bam_logo.gif') || cleaned.includes('/static/img/logo/')
+}
+
+export function chooseBamPosterUrl(params: {
+  detailPosterUrl?: string
+  listPosterUrl?: string
+}): string | undefined {
+  const detailPosterUrl = buildAbsoluteUrl(BAM_BASE_URL, params.detailPosterUrl)
+  const listPosterUrl = buildAbsoluteUrl(BAM_BASE_URL, params.listPosterUrl)
+
+  if (detailPosterUrl && !isBadBamPosterUrl(detailPosterUrl)) {
+    return detailPosterUrl
+  }
+
+  return listPosterUrl || detailPosterUrl || undefined
 }
 
 function stripPrimaryBillingPrefix(
@@ -301,7 +340,7 @@ function isFreeAdmission(
   )
 }
 
-function parseBamListPage(html: string, pageUrl: string): BamListEntry[] {
+export function parseBamListPage(html: string, pageUrl: string): BamListEntry[] {
   const $ = cheerio.load(html)
   const entries = new Map<string, BamListEntry>()
 
@@ -312,9 +351,13 @@ function parseBamListPage(html: string, pageUrl: string): BamListEntry[] {
 
     const detailUrl = getDetailUrl(root, pageUrl)
     if (!detailUrl) return
+    const posterUrl = getListPosterUrl(root, pageUrl)
 
     if (!entries.has(detailUrl)) {
-      entries.set(detailUrl, { detailUrl })
+      entries.set(detailUrl, {
+        detailUrl,
+        posterUrl,
+      })
     }
   })
 
@@ -323,7 +366,8 @@ function parseBamListPage(html: string, pageUrl: string): BamListEntry[] {
 
 function extractDetailBasics(
   $: cheerio.CheerioAPI,
-  detailUrl: string
+  detailUrl: string,
+  listPosterUrl?: string
 ): BamDetailMeta {
   const rawShownTitle =
     cleanText(decodeHtmlEntities($('h1').first().text())) ||
@@ -355,10 +399,13 @@ function extractDetailBasics(
   const overview =
     cleanHtmlText($('.heroInfoLeft .description').first().html()) ||
     cleanHtmlText($("meta[name='description']").attr('content'))
-  const posterUrl =
-    buildAbsoluteUrl(detailUrl, $("meta[property='og:image']").attr('content')) ||
-    buildAbsoluteUrl(detailUrl, $('link[rel="image_src"]').attr('content')) ||
-    buildAbsoluteUrl(detailUrl, $('.bam-block-hero-box img').first().attr('src'))
+  const posterUrl = chooseBamPosterUrl({
+    detailPosterUrl:
+      buildAbsoluteUrl(detailUrl, $("meta[property='og:image']").attr('content')) ||
+      buildAbsoluteUrl(detailUrl, $('link[rel="image_src"]').attr('content')) ||
+      buildAbsoluteUrl(detailUrl, $('.bam-block-hero-box img').first().attr('src')),
+    listPosterUrl,
+  })
 
   const ticketTexts = extractSectionTexts($, 'TICKET INFORMATION')
 
@@ -509,10 +556,11 @@ function dedupeShowtimes(rows: ScrapedShowtime[]): ScrapedShowtime[] {
   return deduped
 }
 
-async function scrapeBamDetailPage(detailUrl: string): Promise<ScrapedShowtime[]> {
+async function scrapeBamDetailPage(entry: BamListEntry): Promise<ScrapedShowtime[]> {
+  const detailUrl = entry.detailUrl
   const html = await fetchHtml(detailUrl)
   const $ = cheerio.load(html)
-  const meta = extractDetailBasics($, detailUrl)
+  const meta = extractDetailBasics($, detailUrl, entry.posterUrl)
 
   let rows = parseJsonLdShowtimes($, detailUrl, meta)
 
@@ -531,7 +579,7 @@ export async function scrapeBamShowtimes(
   const entries = parseBamListPage(html, config.sourceUrl)
 
   const settled = await Promise.allSettled(
-    entries.map((entry) => scrapeBamDetailPage(entry.detailUrl))
+    entries.map((entry) => scrapeBamDetailPage(entry))
   )
 
   const rows: ScrapedShowtime[] = []

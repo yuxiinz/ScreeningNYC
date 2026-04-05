@@ -4,6 +4,9 @@ import { scrapeMetrographShowtimes } from './metrograph_adapter'
 import { scrapeFilmForumShowtimes } from './filmforum_adapter'
 import { scrapeIfcCenter } from './ifc_adapter'
 import { scrapeQuadCinemaShowtimes } from './quad_adapter'
+import { scrapeCinemaVillageShowtimes } from './cinemavillage_adapter'
+import { scrapeSpectacleShowtimes } from './spectacle_adapter'
+import { scrapeRoxyShowtimes } from './roxy_adapter'
 import { scrapeMomaShowtimes } from './moma_adapter'
 import { scrapeAnthologyShowtimes } from './anthology_adapter'
 import { scrapeAngelikaShowtimes } from './angelika_adapter'
@@ -23,6 +26,12 @@ export function getShowtimeScraper(theaterSlug: string) {
       return scrapeIfcCenter
     case 'quad':
       return scrapeQuadCinemaShowtimes
+    case 'cinemavillage':
+      return scrapeCinemaVillageShowtimes
+    case 'spectacle':
+      return scrapeSpectacleShowtimes
+    case 'roxy':
+      return scrapeRoxyShowtimes
     case 'moma':
       return scrapeMomaShowtimes
     case 'momi':
