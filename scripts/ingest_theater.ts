@@ -6,6 +6,7 @@ import { getShowtimeScraper } from '../lib/ingest/adapters'
 import { THEATER_META } from '../lib/ingest/config/theater_meta'
 import { normalizeScreeningMovieTitle } from '../lib/ingest/core/screening_title'
 import { APP_TIMEZONE } from '../lib/timezone'
+import { findLocalMovieByImportMatch } from '../lib/movie/match'
 import {
   searchTmdbMovie,
   canonicalizeTitle,
@@ -286,10 +287,14 @@ async function ingestOneTheater(
     longitude: theaterMeta?.longitude,
   })
 
+  const scrapeStartedAt = Date.now()
   const scraped = await scraper({
     sourceUrl: config.sourceUrl,
     theaterSlug: config.theaterSlug,
   })
+  console.log(
+    `[${config.theaterSlug}] Scrape completed in ${Date.now() - scrapeStartedAt}ms`
+  )
 
   console.log(`[${config.theaterSlug}] Scraped ${scraped.length} raw showtimes`)
 
@@ -300,6 +305,8 @@ async function ingestOneTheater(
   let dedupedCount = 0
   let parseFailedCount = 0
   let upsertedCount = 0
+
+  const processingStartedAt = Date.now()
 
   for (const item of scraped) {
     const parsedStart = parseStartTime(item.startTimeRaw)
@@ -364,32 +371,55 @@ async function ingestOneTheater(
         directorText: item.directorText,
         genresText: 'Program',
       })
-    } else if (TMDB_API_KEY) {
-      const tmdbMovie = await searchTmdbMovie({
-        title: canonicalTitle || item.movieTitle,
+    } else {
+      const matchInput = {
+        title: fallbackMovieTitle || canonicalTitle || item.movieTitle,
         titleCandidates: item.tmdbTitleCandidates,
         directorText: item.directorText,
         releaseYear: item.releaseYear,
-        runtimeMinutes: item.runtimeMinutes,
-        tmdbApiKey: TMDB_API_KEY,
-      })
+      }
+      const existingMovie = await findLocalMovieByImportMatch(matchInput)
 
-      if (tmdbMovie.tmdbId) {
-        const tmdbMatchedTitle = canonicalizeTitle(
-          tmdbMovie.matchedQueryTitle || matchedMovieTitle || canonicalTitle
-        )
-
-        movie = await upsertMovie(tmdbMovie, {
-          title: tmdbMatchedTitle,
+      if (existingMovie) {
+        movie = existingMovie
+      } else if (TMDB_API_KEY) {
+        const tmdbMovie = await searchTmdbMovie({
+          title: canonicalTitle || item.movieTitle,
+          titleCandidates: item.tmdbTitleCandidates,
           directorText: item.directorText,
           releaseYear: item.releaseYear,
           runtimeMinutes: item.runtimeMinutes,
-          overview: item.overview,
-          posterUrl: item.posterUrl,
-          officialSiteUrl: item.sourceUrl,
-          genresText: config.theaterName,
-          preferTitle: item.preferMovieTitleForDisplay,
+          tmdbApiKey: TMDB_API_KEY,
         })
+
+        if (tmdbMovie.tmdbId) {
+          const tmdbMatchedTitle = canonicalizeTitle(
+            tmdbMovie.matchedQueryTitle || matchedMovieTitle || canonicalTitle
+          )
+
+          movie = await upsertMovie(tmdbMovie, {
+            title: tmdbMatchedTitle,
+            directorText: item.directorText,
+            releaseYear: item.releaseYear,
+            runtimeMinutes: item.runtimeMinutes,
+            overview: item.overview,
+            posterUrl: item.posterUrl,
+            officialSiteUrl: item.sourceUrl,
+            genresText: config.theaterName,
+            preferTitle: item.preferMovieTitleForDisplay,
+          })
+        } else {
+          movie = await upsertLocalMovie({
+            title: fallbackMovieTitle,
+            releaseYear: item.releaseYear,
+            runtimeMinutes: item.runtimeMinutes,
+            overview: item.overview,
+            posterUrl: item.posterUrl,
+            officialSiteUrl: item.sourceUrl,
+            directorText: item.directorText,
+            genresText: config.theaterName,
+          })
+        }
       } else {
         movie = await upsertLocalMovie({
           title: fallbackMovieTitle,
@@ -402,17 +432,6 @@ async function ingestOneTheater(
           genresText: config.theaterName,
         })
       }
-    } else {
-      movie = await upsertLocalMovie({
-        title: fallbackMovieTitle,
-        releaseYear: item.releaseYear,
-        runtimeMinutes: item.runtimeMinutes,
-        overview: item.overview,
-        posterUrl: item.posterUrl,
-        officialSiteUrl: item.sourceUrl,
-        directorText: item.directorText,
-        genresText: config.theaterName,
-      })
     }
 
     const fingerprint = buildFingerprint({
@@ -448,6 +467,10 @@ async function ingestOneTheater(
       `[${config.theaterSlug}] Upserted: ${movie.title} | ${formatLocalTime(parsedStart)} | ${formatName}`
     )
   }
+
+  console.log(
+    `[${config.theaterSlug}] Processing completed in ${Date.now() - processingStartedAt}ms`
+  )
 
   await markMissingShowtimesAsCanceled(theater.id, fingerprintsForCancel)
 

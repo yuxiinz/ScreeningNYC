@@ -75,12 +75,23 @@ function normalizeMomaTimeLabel(value?: string | null): string {
   let s = textOf(value)
   if (!s) return ''
 
+  s = s.replace(/\u2013|\u2014/g, '-')
   s = s.replace(/\ba\.\s*m\./gi, 'AM')
   s = s.replace(/\bp\.\s*m\./gi, 'PM')
   s = s.replace(/\ba\.m\./gi, 'AM')
   s = s.replace(/\bp\.m\./gi, 'PM')
   s = s.replace(/(\d)(am|pm)\b/gi, '$1 $2')
   s = s.replace(/(\d:\d{2})(am|pm)\b/gi, '$1 $2')
+  s = s.replace(/\s+to\s+/gi, '-')
+  s = s.replace(/\s*-\s*/g, '-')
+  const rangeMatch = s.match(/^(\d{1,2}(?::\d{2})?)\s*(AM|PM)?-(\d{1,2}(?::\d{2})?)\s*(AM|PM)?$/i)
+  if (rangeMatch) {
+    const startTime = rangeMatch[1]
+    const startSuffix = rangeMatch[2]
+    const endSuffix = rangeMatch[4]
+    const suffix = startSuffix || endSuffix || ''
+    s = `${startTime} ${suffix}`.trim()
+  }
   s = s.replace(/\s+/g, ' ').trim()
 
   return s
@@ -341,6 +352,7 @@ function parseListingPage(html: string): ListingRow[] {
       const parsedMeta = parseInlineMeta(metaText)
       const movieTitle = parsedMeta.movieTitle
       if (!movieTitle) return
+      if (/^image credit:/i.test(movieTitle)) return
 
       const timeNode = anchor.find('p').filter((___, pEl) => {
         const txt = textOf($(pEl).text())
