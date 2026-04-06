@@ -7,10 +7,28 @@ import { getCurrentUserId } from '@/lib/auth/require-user-id'
 import { prisma } from '@/lib/prisma'
 import { getDirectorStatesForUser } from '@/lib/user-directors/service'
 
-export default async function PeoplePage() {
+const PEOPLE_PAGE_SIZE = 120
+
+function parsePage(rawPage?: string) {
+  const page = Number.parseInt(rawPage || '1', 10)
+
+  if (!Number.isFinite(page) || page < 1) {
+    return 1
+  }
+
+  return page
+}
+
+export default async function PeoplePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>
+}) {
+  const params = await searchParams
+  const currentPage = parsePage(params.page)
   const currentUserId = await getCurrentUserId()
   const now = new Date()
-  const [totalCount, linkedCount, people] = await Promise.all([
+  const [totalCount, linkedCount] = await Promise.all([
     prisma.person.count(),
     prisma.person.count({
       where: {
@@ -31,22 +49,31 @@ export default async function PeoplePage() {
         },
       },
     }),
-    prisma.person.findMany({
-      select: {
-        id: true,
-        name: true,
-        photoUrl: true,
-      },
-      orderBy: {
-        name: 'asc',
-      },
-    }),
   ])
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / PEOPLE_PAGE_SIZE))
+  const safePage = Math.min(currentPage, totalPages)
+  const skip = (safePage - 1) * PEOPLE_PAGE_SIZE
+
+  const people = await prisma.person.findMany({
+    select: {
+      id: true,
+      name: true,
+      photoUrl: true,
+    },
+    orderBy: {
+      name: 'asc',
+    },
+    skip,
+    take: PEOPLE_PAGE_SIZE,
+  })
 
   const directorStates = await getDirectorStatesForUser(
     currentUserId,
     people.map((person) => person.id)
   )
+  const startIndex = totalCount === 0 ? 0 : skip + 1
+  const endIndex = Math.min(skip + people.length, totalCount)
 
   return (
     <>
@@ -60,43 +87,81 @@ export default async function PeoplePage() {
             {totalCount} director{totalCount === 1 ? '' : 's'} in database, and{' '}
             {linkedCount} of them currently linked to on-screen films in the database.
           </p>
+          <p className="m-0 mt-2 text-[0.88rem] leading-[1.5] text-text-muted">
+            Showing {startIndex}-{endIndex} of {totalCount}.
+          </p>
         </div>
 
         {people.length > 0 ? (
-          <div className="grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
-            {people.map((person) => (
-              <article
-                key={person.id}
-                className="rounded-card border border-border-default bg-card-bg p-4 shadow-card transition-colors hover:border-border-strong"
-              >
-                <Link
-                  href={`/people/${person.id}`}
-                  className="block text-inherit no-underline"
+          <>
+            <div className="grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
+              {people.map((person) => (
+                <article
+                  key={person.id}
+                  className="rounded-card border border-border-default bg-card-bg p-4 shadow-card transition-colors hover:border-border-strong"
                 >
-                  <div className="mb-4 aspect-[4/5] overflow-hidden rounded-card border border-border-subtle bg-page-bg">
-                    <PersonPhotoImage
-                      src={person.photoUrl || ''}
-                      alt={person.name}
-                      className="h-full w-full object-cover"
+                  <Link
+                    href={`/people/${person.id}`}
+                    prefetch={false}
+                    className="block text-inherit no-underline"
+                  >
+                    <div className="mb-4 aspect-[4/5] overflow-hidden rounded-card border border-border-subtle bg-page-bg">
+                      <PersonPhotoImage
+                        src={person.photoUrl || ''}
+                        alt={person.name}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+
+                    <h2 className="m-0 text-[1.02rem] font-bold leading-[1.3] text-text-primary">
+                      {person.name}
+                    </h2>
+                  </Link>
+
+                  {currentUserId ? (
+                    <DirectorListActions
+                      personId={person.id}
+                      initialInWant={directorStates.get(person.id)?.inWant || false}
+                      compact
+                      className="mt-4"
                     />
-                  </div>
+                  ) : null}
+                </article>
+              ))}
+            </div>
 
-                  <h2 className="m-0 text-[1.02rem] font-bold leading-[1.3] text-text-primary">
-                    {person.name}
-                  </h2>
-                </Link>
+            <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-border-default pt-5">
+              <span className="text-[0.85rem] tracking-[0.05em] text-text-muted">
+                PAGE {safePage} / {totalPages}
+              </span>
 
-                {currentUserId ? (
-                  <DirectorListActions
-                    personId={person.id}
-                    initialInWant={directorStates.get(person.id)?.inWant || false}
-                    compact
-                    className="mt-4"
-                  />
-                ) : null}
-              </article>
-            ))}
-          </div>
+              <div className="flex gap-4">
+                {safePage > 1 ? (
+                  <Link
+                    href={safePage === 2 ? '/people' : `/people?page=${safePage - 1}`}
+                    prefetch={false}
+                    className="border-b border-text-primary pb-0.5 text-[0.88rem] text-text-primary no-underline"
+                  >
+                    PREV
+                  </Link>
+                ) : (
+                  <span className="text-[0.88rem] text-text-disabled">PREV</span>
+                )}
+
+                {safePage < totalPages ? (
+                  <Link
+                    href={`/people?page=${safePage + 1}`}
+                    prefetch={false}
+                    className="border-b border-text-primary pb-0.5 text-[0.88rem] text-text-primary no-underline"
+                  >
+                    NEXT
+                  </Link>
+                ) : (
+                  <span className="text-[0.88rem] text-text-disabled">NEXT</span>
+                )}
+              </div>
+            </div>
+          </>
         ) : (
           <p className="text-text-empty">No directors available yet.</p>
         )}

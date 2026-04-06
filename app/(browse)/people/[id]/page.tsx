@@ -206,6 +206,7 @@ export default async function PersonDetailPage({
               <article key={movie.tmdbId} className="flex flex-col">
                 <Link
                   href={`/films/tmdb/${movie.tmdbId}`}
+                  prefetch={false}
                   className="block text-inherit no-underline"
                 >
                   <div className={POSTER_CARD_CLASS}>
