@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 
+import BackToTopButton from '@/components/BackToTopButton'
 import FilmSearchBox from '@/components/FilmSearchBox'
 import MovieListActions from '@/components/movie/MovieListActions'
 import PosterImage from '@/components/movie/PosterImage'
@@ -26,6 +27,50 @@ const TITLE_CLASS =
   'mb-2 min-h-[2.5em] overflow-hidden text-[0.95rem] font-bold leading-[1.25] uppercase [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]'
 const DIRECTOR_CLASS =
   'mb-1 min-h-[1.35em] overflow-hidden text-[0.78rem] leading-[1.35] text-text-tertiary [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:1]'
+const FILMS_PAGE_SIZE = 48
+
+type HomePageSearchParams = {
+  theaters?: string | string[]
+  page?: string | string[]
+}
+
+function getFirstSearchParamValue(value?: string | string[]) {
+  return Array.isArray(value) ? value[0] : value
+}
+
+function parsePage(rawPage?: string | string[]) {
+  const page = Number.parseInt(getFirstSearchParamValue(rawPage) || '1', 10)
+
+  if (!Number.isFinite(page) || page < 1) {
+    return 1
+  }
+
+  return page
+}
+
+function parseTheaterSlugs(value?: string | string[]) {
+  const rawValues = Array.isArray(value) ? value : value ? [value] : []
+
+  return rawValues
+    .flatMap((item) => item.split(','))
+    .map((slug) => slug.trim())
+    .filter(Boolean)
+}
+
+function buildHomePageHref(page: number, selectedTheaterSlugs: string[]) {
+  const params = new URLSearchParams()
+
+  if (page > 1) {
+    params.set('page', String(page))
+  }
+
+  if (selectedTheaterSlugs.length > 0) {
+    params.set('theaters', selectedTheaterSlugs.join(','))
+  }
+
+  const query = params.toString()
+  return query ? `/?${query}` : '/'
+}
 
 function getPosterImageClass(posterIsTmdb: boolean) {
   return [
@@ -37,22 +82,24 @@ function getPosterImageClass(posterIsTmdb: boolean) {
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ theaters?: string }>
+  searchParams: Promise<HomePageSearchParams>
 }) {
   const params = await searchParams
-  const selectedTheaterSlugs = [...new Set(
-    (params.theaters || '')
-      .split(',')
-      .map(s => s.trim())
-      .filter(Boolean)
-  )].sort()
+  const selectedTheaterSlugs = [...new Set(parseTheaterSlugs(params.theaters))].sort()
+  const currentPage = parsePage(params.page)
 
   const todayKey = getTodayInAppTimezone()
-  const [currentUserId, allTheaters, movies] = await Promise.all([
+  const [currentUserId, allTheaters, homeMovies] = await Promise.all([
     getCurrentUserId(),
     getCachedTheaterDirectory(),
-    getCachedHomeMovies(selectedTheaterSlugs, todayKey),
+    getCachedHomeMovies({
+      selectedTheaterSlugs,
+      todayKey,
+      page: currentPage,
+      pageSize: FILMS_PAGE_SIZE,
+    }),
   ])
+  const { movies, safePage, totalCount, totalPages } = homeMovies
 
   const theatersWithSlug = allTheaters.filter(
     (
@@ -69,12 +116,14 @@ export default async function HomePage({
     movies.map((movie) => movie.id)
   )
 
-  const filmCount = movies.length
+  const startIndex = totalCount === 0 ? 0 : (safePage - 1) * FILMS_PAGE_SIZE + 1
+  const endIndex =
+    totalCount === 0 ? 0 : Math.min(startIndex + movies.length - 1, totalCount)
 
   const subtitle =
     selectedTheaterNames.length > 0
-      ? `Now you can watch ${filmCount} scheduled film${filmCount === 1 ? '' : 's'} in cinema at ${selectedTheaterNames.join(', ')}.`
-      : `Now you can watch ${filmCount} scheduled film${filmCount === 1 ? '' : 's'} in cinema at NYC.`
+      ? `Now you can watch ${totalCount} scheduled film${totalCount === 1 ? '' : 's'} in cinema at ${selectedTheaterNames.join(', ')}.`
+      : `Now you can watch ${totalCount} scheduled film${totalCount === 1 ? '' : 's'} in cinema at NYC.`
 
   return (
     <>
@@ -94,6 +143,10 @@ export default async function HomePage({
 
           <p className="mb-[18px] text-[0.98rem] leading-[1.5] text-text-primary">
             {subtitle}
+          </p>
+
+          <p className="m-0 text-[0.88rem] leading-[1.5] text-text-muted">
+            Showing {startIndex}-{endIndex} of {totalCount}.
           </p>
         </div>
 
@@ -162,8 +215,43 @@ export default async function HomePage({
             )
           })}
         </div>
+
+        {totalPages > 1 ? (
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-border-default pt-5">
+            <span className="text-[0.85rem] tracking-[0.05em] text-text-muted">
+              PAGE {safePage} / {totalPages}
+            </span>
+
+            <div className="flex gap-4">
+              {safePage > 1 ? (
+                <Link
+                  href={buildHomePageHref(safePage - 1, selectedTheaterSlugs)}
+                  prefetch={false}
+                  className="border-b border-text-primary pb-0.5 text-[0.88rem] text-text-primary no-underline"
+                >
+                  PREV
+                </Link>
+              ) : (
+                <span className="text-[0.88rem] text-text-disabled">PREV</span>
+              )}
+
+              {safePage < totalPages ? (
+                <Link
+                  href={buildHomePageHref(safePage + 1, selectedTheaterSlugs)}
+                  prefetch={false}
+                  className="border-b border-text-primary pb-0.5 text-[0.88rem] text-text-primary no-underline"
+                >
+                  NEXT
+                </Link>
+              ) : (
+                <span className="text-[0.88rem] text-text-disabled">NEXT</span>
+              )}
+            </div>
+          </div>
+        ) : null}
       </main>
 
+      <BackToTopButton />
       <footer className="h-[100px]" />
     </>
   )

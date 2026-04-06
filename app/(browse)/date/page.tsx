@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 
+import BackToTopButton from '@/components/BackToTopButton'
 import DateSelector from '@/components/DateSelector'
 import PosterImage from '@/components/movie/PosterImage'
 import TheaterFilter from '@/components/TheaterFilter'
@@ -297,6 +298,7 @@ export default async function DatePage({
         </div>
       </main>
 
+      <BackToTopButton />
       <footer className="h-[100px]" />
     </>
   )

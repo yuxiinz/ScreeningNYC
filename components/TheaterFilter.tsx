@@ -42,6 +42,7 @@ export default function TheaterFilter({
 
   function updateUrl(nextSelected: string[]) {
     const params = new URLSearchParams(searchParams.toString())
+    params.delete('page')
 
     if (nextSelected.length === 0) {
       params.delete('theaters')

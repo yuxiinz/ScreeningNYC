@@ -1,5 +1,6 @@
 import Link from 'next/link'
 
+import BackToTopButton from '@/components/BackToTopButton'
 import DirectorSearchBox from '@/components/DirectorSearchBox'
 import DirectorListActions from '@/components/person/DirectorListActions'
 import PersonPhotoImage from '@/components/person/PersonPhotoImage'
@@ -166,6 +167,8 @@ export default async function PeoplePage({
           <p className="text-text-empty">No directors available yet.</p>
         )}
       </main>
+
+      <BackToTopButton />
     </>
   )
 }

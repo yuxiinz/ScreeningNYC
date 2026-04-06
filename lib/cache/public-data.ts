@@ -31,6 +31,13 @@ type CachedDateQueryInput = {
   todayKey: string
 }
 
+type CachedHomeQueryInput = {
+  selectedTheaterSlugs: string[]
+  todayKey: string
+  page: number
+  pageSize: number
+}
+
 export async function getCachedTheaterDirectory() {
   'use cache'
 
@@ -49,40 +56,56 @@ export async function getCachedTheaterDirectory() {
   })
 }
 
-export async function getCachedHomeMovies(
-  selectedTheaterSlugs: string[],
-  todayKey: string
-) {
+export async function getCachedHomeMovies({
+  selectedTheaterSlugs,
+  todayKey,
+  page,
+  pageSize,
+}: CachedHomeQueryInput) {
   'use cache'
 
   cacheLife(TODAY_SCHEDULE_CACHE)
   cacheTag(PUBLIC_CACHE_TAGS.home, PUBLIC_CACHE_TAGS.todaySensitive, todayKey)
 
   const now = new Date()
-
-  return prisma.movie.findMany({
-    where: {
-      showtimes: {
-        some: {
-          startTime: {
-            gt: now,
-          },
-          status: 'SCHEDULED',
-          ...(selectedTheaterSlugs.length > 0
-            ? {
-                theater: {
-                  slug: {
-                    in: selectedTheaterSlugs,
-                  },
-                },
-              }
-            : {}),
+  const movieWhere = {
+    showtimes: {
+      some: {
+        startTime: {
+          gt: now,
         },
+        status: 'SCHEDULED' as const,
+        ...(selectedTheaterSlugs.length > 0
+          ? {
+              theater: {
+                slug: {
+                  in: selectedTheaterSlugs,
+                },
+              },
+            }
+          : {}),
       },
     },
-    orderBy: {
-      updatedAt: 'desc',
-    },
+  }
+  const totalCount = await prisma.movie.count({
+    where: movieWhere,
+  })
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+  const safePage = Math.min(page, totalPages)
+  const skip = (safePage - 1) * pageSize
+
+  const movies = await prisma.movie.findMany({
+    where: movieWhere,
+    orderBy: [
+      {
+        updatedAt: 'desc',
+      },
+      {
+        id: 'desc',
+      },
+    ],
+    skip,
+    take: pageSize,
     select: {
       id: true,
       title: true,
@@ -94,6 +117,13 @@ export async function getCachedHomeMovies(
       letterboxdUrl: true,
     },
   })
+
+  return {
+    totalCount,
+    totalPages,
+    safePage,
+    movies,
+  }
 }
 
 export async function getCachedDateShowtimes({
