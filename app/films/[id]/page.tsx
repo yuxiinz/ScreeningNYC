@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { connection } from 'next/server'
 
 import BackButton from '@/components/BackButton'
 import MovieListActions from '@/components/movie/MovieListActions'
@@ -16,9 +15,9 @@ import {
 import {
   cleanDirectorText,
   getReleaseYear,
-  isTmdbPoster,
 } from '@/lib/movie/display'
 import { syncMoviePeopleFromTmdbId } from '@/lib/movie/relations'
+import { getShowtimeDisplayTitle } from '@/lib/showtime/display'
 import { isFreeTicketValue } from '@/lib/showtime/ticket'
 import { TmdbApiKeyMissingError } from '@/lib/tmdb/client'
 import { getMovieStatesForUser } from '@/lib/user-movies/service'
@@ -44,24 +43,6 @@ type MovieDetailShowtime = {
   format: {
     name: string
   } | null
-}
-
-function getPosterImageClass(posterIsTmdb: boolean) {
-  return [
-    'block h-full w-full bg-card-bg',
-    posterIsTmdb ? 'object-cover' : 'object-contain',
-  ].join(' ')
-}
-
-function getShowtimeDisplayTitle(shownTitle?: string | null, movieTitle?: string | null) {
-  const shown = (shownTitle || '').replace(/\s+/g, ' ').trim()
-  const movie = (movieTitle || '').replace(/\s+/g, ' ').trim()
-
-  if (!shown) return ''
-  if (!movie) return shown
-  if (shown.toLowerCase() === movie.toLowerCase()) return ''
-
-  return shown
 }
 
 function extractMetaFromOverview(input?: string | null) {
@@ -117,8 +98,6 @@ export default async function MovieDetailPage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  await connection()
-
   const { id } = await params
   const currentUserIdPromise = getCurrentUserId()
   const movieId = parseInt(id, 10)
@@ -160,7 +139,6 @@ export default async function MovieDetailPage({
     groupedByDate[date].push(showtime)
   })
 
-  const posterIsTmdb = isTmdbPoster(movie.posterUrl)
   const director = cleanDirectorText(movie.directorText)
   const directorPeople = peopleLinks.map((link) => link.person)
   const year = getReleaseYear(movie.releaseDate)
@@ -175,11 +153,7 @@ export default async function MovieDetailPage({
         <section className="mb-[60px] mt-[30px] flex flex-wrap items-start gap-10">
           <div className="flex aspect-[2/3] w-[320px] shrink-0 items-center justify-center overflow-hidden rounded-[12px] border border-border-subtle bg-card-bg shadow-poster">
             {movie.posterUrl ? (
-              <PosterImage
-                src={movie.posterUrl}
-                alt={movie.title}
-                className={getPosterImageClass(posterIsTmdb)}
-              />
+              <PosterImage src={movie.posterUrl} alt={movie.title} />
             ) : (
               <div className="px-5 text-center text-[0.9rem] text-text-empty">
                 No Poster

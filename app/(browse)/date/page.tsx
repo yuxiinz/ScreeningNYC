@@ -13,8 +13,12 @@ import {
 } from '@/lib/cache/public-data'
 import {
   cleanDirectorText,
-  isTmdbPoster,
 } from '@/lib/movie/display'
+import {
+  getFirstSearchParamValue,
+  parseTheaterSlugs,
+} from '@/lib/routing/search-params'
+import { getShowtimeDisplayTitle } from '@/lib/showtime/display'
 import { isFreeTicketValue } from '@/lib/showtime/ticket'
 import {
   APP_TIMEZONE,
@@ -38,37 +42,6 @@ function formatReadableDate(targetDate: string) {
   return DateTime.fromISO(targetDate, { zone: APP_TIMEZONE }).toFormat(
     'LLLL d, yyyy'
   )
-}
-
-function getPosterImageClass(posterIsTmdb: boolean) {
-  return [
-    'block h-full w-full bg-card-bg',
-    posterIsTmdb ? 'object-cover' : 'object-contain',
-  ].join(' ')
-}
-
-function getShowtimeDisplayTitle(shownTitle?: string | null, movieTitle?: string | null) {
-  const shown = (shownTitle || '').replace(/\s+/g, ' ').trim()
-  const movie = (movieTitle || '').replace(/\s+/g, ' ').trim()
-
-  if (!shown) return ''
-  if (!movie) return shown
-  if (shown.toLowerCase() === movie.toLowerCase()) return ''
-
-  return shown
-}
-
-function getFirstSearchParamValue(value?: string | string[]) {
-  return Array.isArray(value) ? value[0] : value
-}
-
-function parseTheaterSlugs(value?: string | string[]) {
-  const rawValues = Array.isArray(value) ? value : value ? [value] : []
-
-  return rawValues
-    .flatMap((item) => item.split(','))
-    .map((slug) => slug.trim())
-    .filter(Boolean)
 }
 
 function resolveSafeDate(value: string | string[] | undefined, fallbackDate: string) {
@@ -180,7 +153,6 @@ export default async function DatePage({
         <div className="flex flex-col gap-[60px]">
           {moviesOnDate.length > 0 ? (
             moviesOnDate.map(movie => {
-              const posterIsTmdb = isTmdbPoster(movie.posterUrl)
               const director = cleanDirectorText(movie.directorText, 'UNKNOWN')
 
               return (
@@ -194,11 +166,7 @@ export default async function DatePage({
                   >
                     <div className={POSTER_CARD_CLASS}>
                       {movie.posterUrl ? (
-                        <PosterImage
-                          src={movie.posterUrl}
-                          alt={movie.title}
-                          className={getPosterImageClass(posterIsTmdb)}
-                        />
+                        <PosterImage src={movie.posterUrl} alt={movie.title} />
                       ) : (
                         <div className="text-[0.9rem] text-text-empty">
                           No Poster

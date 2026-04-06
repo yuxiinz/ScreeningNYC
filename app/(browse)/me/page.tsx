@@ -1,9 +1,9 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
-import { auth } from '@/auth'
 import EmailReminderToggle from '@/components/auth/EmailReminderToggle'
 import LogoutButton from '@/components/auth/LogoutButton'
+import { requireUserIdForPage } from '@/lib/auth/require-user-id'
 import { prisma } from '@/lib/prisma'
 
 function formatDate(date: Date) {
@@ -16,14 +16,10 @@ const LINK_CARD_CLASS =
   'group block rounded-panel border border-border-default bg-card-bg p-5 shadow-card transition-colors hover:border-text-primary'
 
 export default async function MePage() {
-  const session = await auth()
-
-  if (!session?.user?.id) {
-    redirect('/login?redirectTo=/me')
-  }
+  const userId = await requireUserIdForPage('/me')
 
   const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
+    where: { id: userId },
     select: {
       id: true,
       email: true,

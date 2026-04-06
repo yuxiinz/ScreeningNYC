@@ -7,19 +7,10 @@ import DirectorListActions from '@/components/person/DirectorListActions'
 import PersonPhotoImage from '@/components/person/PersonPhotoImage'
 import { getCurrentUserId } from '@/lib/auth/require-user-id'
 import { prisma } from '@/lib/prisma'
+import { parsePositivePage } from '@/lib/routing/search-params'
 import { getDirectorStatesForUser } from '@/lib/user-directors/service'
 
 const PEOPLE_PAGE_SIZE = 120
-
-function parsePage(rawPage?: string) {
-  const page = Number.parseInt(rawPage || '1', 10)
-
-  if (!Number.isFinite(page) || page < 1) {
-    return 1
-  }
-
-  return page
-}
 
 export default async function PeoplePage({
   searchParams,
@@ -27,7 +18,7 @@ export default async function PeoplePage({
   searchParams: Promise<{ page?: string }>
 }) {
   const params = await searchParams
-  const currentPage = parsePage(params.page)
+  const currentPage = parsePositivePage(params.page)
   const currentUserId = await getCurrentUserId()
   const now = new Date()
   const [totalCount, linkedCount] = await Promise.all([

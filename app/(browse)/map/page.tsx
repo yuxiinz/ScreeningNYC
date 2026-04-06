@@ -4,6 +4,8 @@ import { connection } from 'next/server'
 import { getMapTheaters } from '@/lib/cache/public-data'
 
 export default async function MapPage() {
+  // This page has no request-time APIs of its own, so keep connection()
+  // to avoid freezing theater data into a prerendered build snapshot.
   await connection()
 
   const theaters = await getMapTheaters()

@@ -1,11 +1,9 @@
 // app/(browse)/page.tsx
 
-import Link from 'next/link'
-
 import BackToTopButton from '@/components/BackToTopButton'
 import FilmSearchBox from '@/components/FilmSearchBox'
+import MovieGridCard from '@/components/movie/MovieGridCard'
 import MovieListActions from '@/components/movie/MovieListActions'
-import PosterImage from '@/components/movie/PosterImage'
 import PaginationControls from '@/components/PaginationControls'
 import TheaterFilter from '@/components/TheaterFilter'
 import MovieExternalLinks from '@/components/movie/MovieExternalLinks'
@@ -14,55 +12,15 @@ import {
   getCachedTheaterDirectory,
 } from '@/lib/cache/public-data'
 import { getCurrentUserId } from '@/lib/auth/require-user-id'
-import {
-  cleanDirectorText,
-  getReleaseYear,
-  isTmdbPoster,
-} from '@/lib/movie/display'
+import { parsePositivePage, parseTheaterSlugs } from '@/lib/routing/search-params'
 import { getTodayInAppTimezone } from '@/lib/timezone'
 import { getMovieStatesForUser } from '@/lib/user-movies/service'
 
-const POSTER_CARD_CLASS =
-  'mb-3 flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-card border border-border-subtle bg-card-bg shadow-card'
-const TITLE_CLASS =
-  'mb-2 min-h-[2.5em] overflow-hidden text-[0.95rem] font-bold leading-[1.25] uppercase [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]'
-const DIRECTOR_CLASS =
-  'mb-1 min-h-[1.35em] overflow-hidden text-[0.78rem] leading-[1.35] text-text-tertiary [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:1]'
 const FILMS_PAGE_SIZE = 48
 
 type HomePageSearchParams = {
   theaters?: string | string[]
   page?: string | string[]
-}
-
-function getFirstSearchParamValue(value?: string | string[]) {
-  return Array.isArray(value) ? value[0] : value
-}
-
-function parsePage(rawPage?: string | string[]) {
-  const page = Number.parseInt(getFirstSearchParamValue(rawPage) || '1', 10)
-
-  if (!Number.isFinite(page) || page < 1) {
-    return 1
-  }
-
-  return page
-}
-
-function parseTheaterSlugs(value?: string | string[]) {
-  const rawValues = Array.isArray(value) ? value : value ? [value] : []
-
-  return rawValues
-    .flatMap((item) => item.split(','))
-    .map((slug) => slug.trim())
-    .filter(Boolean)
-}
-
-function getPosterImageClass(posterIsTmdb: boolean) {
-  return [
-    'block h-full w-full bg-card-bg',
-    posterIsTmdb ? 'object-cover' : 'object-contain',
-  ].join(' ')
 }
 
 export default async function HomePage({
@@ -72,7 +30,7 @@ export default async function HomePage({
 }) {
   const params = await searchParams
   const selectedTheaterSlugs = [...new Set(parseTheaterSlugs(params.theaters))].sort()
-  const currentPage = parsePage(params.page)
+  const currentPage = parsePositivePage(params.page)
 
   const todayKey = getTodayInAppTimezone()
   const [currentUserId, allTheaters, homeMovies] = await Promise.all([
@@ -138,48 +96,20 @@ export default async function HomePage({
 
         <div className="grid gap-7 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
           {movies.map(movie => {
-            const year = getReleaseYear(movie.releaseDate)
-            const posterIsTmdb = isTmdbPoster(movie.posterUrl)
-            const director = cleanDirectorText(
-              movie.directorText,
-              'UNKNOWN DIRECTOR'
-            )
             const movieState = movieStates.get(movie.id) || {
               inWant: false,
               inWatched: false,
             }
 
             return (
-              <article key={movie.id} className="flex flex-col">
-                <Link
-                  href={`/films/${movie.id}`}
-                  className="block text-inherit no-underline"
-                >
-                  <div className={POSTER_CARD_CLASS}>
-                    {movie.posterUrl ? (
-                      <PosterImage
-                        src={movie.posterUrl}
-                        alt={movie.title}
-                        className={getPosterImageClass(posterIsTmdb)}
-                      />
-                    ) : (
-                      <div className="text-[0.9rem] text-text-empty">
-                        No Poster
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="px-0.5">
-                    <h3 className={TITLE_CLASS}>{movie.title}</h3>
-
-                    <p className={DIRECTOR_CLASS}>{director}</p>
-
-                    <p className="m-0 min-h-[1.35em] text-[0.76rem] leading-[1.35] text-text-soft">
-                      {year ?? ''}
-                    </p>
-                  </div>
-                </Link>
-
+              <MovieGridCard
+                key={movie.id}
+                href={`/films/${movie.id}`}
+                title={movie.title}
+                posterUrl={movie.posterUrl}
+                directorText={movie.directorText}
+                releaseDate={movie.releaseDate}
+              >
                 {currentUserId ? (
                   <MovieListActions
                     movieId={movie.id}
@@ -197,7 +127,7 @@ export default async function HomePage({
                   size="sm"
                   className="mt-3 px-0.5 text-[0.68rem] font-bold"
                 />
-              </article>
+              </MovieGridCard>
             )
           })}
         </div>

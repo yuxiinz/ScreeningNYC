@@ -3,10 +3,13 @@
 
 import { useEffect, useRef, useState } from 'react'
 
+import { isTmdbPoster } from '@/lib/movie/display'
+
 type PosterImageProps = {
   src: string
   alt: string
   className?: string
+  fit?: 'auto' | 'contain' | 'cover'
 }
 
 const ANTHOLOGY_FALLBACK_MARKUP = `
@@ -72,10 +75,23 @@ function getFallbackSrc(src: string) {
   return DEFAULT_FALLBACK_SRC
 }
 
+function getObjectFitClass(src: string, fit: NonNullable<PosterImageProps['fit']>) {
+  if (fit === 'contain') {
+    return 'object-contain'
+  }
+
+  if (fit === 'cover') {
+    return 'object-cover'
+  }
+
+  return isTmdbPoster(src) ? 'object-cover' : 'object-contain'
+}
+
 export default function PosterImage({
   src,
   alt,
   className,
+  fit = 'auto',
 }: PosterImageProps) {
   const [currentSrc, setCurrentSrc] = useState(() => normalizeSrc(src))
   const imageRef = useRef<HTMLImageElement | null>(null)
@@ -103,7 +119,13 @@ export default function PosterImage({
       ref={imageRef}
       src={currentSrc}
       alt={alt}
-      className={className}
+      className={[
+        'block h-full w-full bg-card-bg',
+        getObjectFitClass(currentSrc, fit),
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
       loading="lazy"
       decoding="async"
       onError={() => {

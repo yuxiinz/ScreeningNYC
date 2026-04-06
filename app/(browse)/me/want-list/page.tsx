@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 
 import MovieCsvImportButton from '@/components/movie/MovieCsvImportButton'
 import MovieListActions from '@/components/movie/MovieListActions'
@@ -7,11 +6,10 @@ import MovieExternalLinks from '@/components/movie/MovieExternalLinks'
 import PosterImage from '@/components/movie/PosterImage'
 import DirectorListActions from '@/components/person/DirectorListActions'
 import PersonPhotoImage from '@/components/person/PersonPhotoImage'
-import { getCurrentUserId } from '@/lib/auth/require-user-id'
+import { requireUserIdForPage } from '@/lib/auth/require-user-id'
 import {
   cleanDirectorText,
   getReleaseYear,
-  isTmdbPoster,
 } from '@/lib/movie/display'
 import {
   getMovieStatesForUser,
@@ -31,13 +29,6 @@ const DIRECTOR_PHOTO_CLASS =
 const TAB_CLASS =
   'border-b-2 pb-[6px] text-[0.86rem] font-semibold tracking-[0.06em] transition-colors'
 
-function getPosterImageClass(posterIsTmdb: boolean) {
-  return [
-    'block h-full w-full bg-card-bg',
-    posterIsTmdb ? 'object-cover' : 'object-contain',
-  ].join(' ')
-}
-
 function getHeadline(totalCount: number, onScreenNowCount: number) {
   return `There ${totalCount === 1 ? 'is' : 'are'} ${totalCount} film${totalCount === 1 ? '' : 's'} you want to watch in theaters, ${onScreenNowCount} of them ${onScreenNowCount === 1 ? 'is' : 'are'} on screen in NYC now!`
 }
@@ -51,11 +42,7 @@ export default async function WantListPage({
 }: {
   searchParams: Promise<{ tab?: string }>
 }) {
-  const userId = await getCurrentUserId()
-
-  if (!userId) {
-    redirect('/login?redirectTo=/me/want-list')
-  }
+  const userId = await requireUserIdForPage('/me/want-list')
 
   const params = await searchParams
   const activeTab = params.tab === 'directors' ? 'directors' : 'films'
@@ -120,7 +107,6 @@ export default async function WantListPage({
         filmData.items.length > 0 ? (
         <div className="flex flex-col gap-6">
           {filmData.items.map((item) => {
-            const posterIsTmdb = isTmdbPoster(item.movie.posterUrl)
             const director = cleanDirectorText(item.movie.directorText, 'UNKNOWN')
             const year = getReleaseYear(item.movie.releaseDate)
             const nextShowtime = item.movie.showtimes[0]
@@ -140,11 +126,7 @@ export default async function WantListPage({
                 >
                   <div className={POSTER_CARD_CLASS}>
                     {item.movie.posterUrl ? (
-                      <PosterImage
-                        src={item.movie.posterUrl}
-                        alt={item.movie.title}
-                        className={getPosterImageClass(posterIsTmdb)}
-                      />
+                      <PosterImage src={item.movie.posterUrl} alt={item.movie.title} />
                     ) : (
                       <div className="px-3 text-center text-[0.82rem] text-text-empty">
                         No Poster

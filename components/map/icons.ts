@@ -1,4 +1,4 @@
-// components/map/types.ts
+// components/map/icons.ts
 
 import L from 'leaflet'
 

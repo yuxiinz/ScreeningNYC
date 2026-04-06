@@ -1,29 +1,13 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import BackButton from '@/components/BackButton'
-import PosterImage from '@/components/movie/PosterImage'
+import MovieGridCard from '@/components/movie/MovieGridCard'
 import DirectorListActions from '@/components/person/DirectorListActions'
-import {
-  cleanDirectorText,
-  getReleaseYear,
-  isTmdbPoster,
-} from '@/lib/movie/display'
 import { fetchTmdbDirectorFilmography } from '@/lib/people/tmdb'
 import { getCurrentUserId } from '@/lib/auth/require-user-id'
 import { prisma } from '@/lib/prisma'
 import { TmdbApiKeyMissingError } from '@/lib/tmdb/client'
 import { getDirectorStatesForUser } from '@/lib/user-directors/service'
-
-const POSTER_CARD_CLASS =
-  'mb-3 flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-card border border-border-subtle bg-card-bg shadow-card'
-
-function getPosterImageClass(posterIsTmdb: boolean) {
-  return [
-    'block h-full w-full bg-card-bg',
-    posterIsTmdb ? 'object-cover' : 'object-contain',
-  ].join(' ')
-}
 
 export default async function PersonDetailPage({
   params,
@@ -150,45 +134,16 @@ export default async function PersonDetailPage({
 
         {localMovies.length > 0 ? (
           <div className="grid gap-7 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
-            {localMovies.map((movie) => {
-              const year = getReleaseYear(movie.releaseDate)
-              const posterIsTmdb = isTmdbPoster(movie.posterUrl)
-
-              return (
-                <article key={movie.id} className="flex flex-col">
-                  <Link
-                    href={`/films/${movie.id}`}
-                    className="block text-inherit no-underline"
-                  >
-                    <div className={POSTER_CARD_CLASS}>
-                      {movie.posterUrl ? (
-                        <PosterImage
-                          src={movie.posterUrl}
-                          alt={movie.title}
-                          className={getPosterImageClass(posterIsTmdb)}
-                        />
-                      ) : (
-                        <div className="text-[0.9rem] text-text-empty">No Poster</div>
-                      )}
-                    </div>
-
-                    <div className="px-0.5">
-                      <h3 className="mb-2 min-h-[2.5em] overflow-hidden text-[0.95rem] font-bold leading-[1.25] uppercase [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
-                        {movie.title}
-                      </h3>
-
-                      <p className="mb-1 min-h-[1.35em] overflow-hidden text-[0.78rem] leading-[1.35] text-text-tertiary [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:1]">
-                        {cleanDirectorText(movie.directorText, 'UNKNOWN DIRECTOR')}
-                      </p>
-
-                      <p className="m-0 min-h-[1.35em] text-[0.76rem] leading-[1.35] text-text-soft">
-                        {year ?? ''}
-                      </p>
-                    </div>
-                  </Link>
-                </article>
-              )
-            })}
+            {localMovies.map((movie) => (
+              <MovieGridCard
+                key={movie.id}
+                href={`/films/${movie.id}`}
+                title={movie.title}
+                posterUrl={movie.posterUrl}
+                directorText={movie.directorText}
+                releaseDate={movie.releaseDate}
+              />
+            ))}
           </div>
         ) : (
           <p className="text-text-empty">No local films available.</p>
@@ -203,39 +158,15 @@ export default async function PersonDetailPage({
 
           <div className="grid gap-7 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
             {tmdbOnlyMovies.map((movie) => (
-              <article key={movie.tmdbId} className="flex flex-col">
-                <Link
-                  href={`/films/tmdb/${movie.tmdbId}`}
-                  prefetch={false}
-                  className="block text-inherit no-underline"
-                >
-                  <div className={POSTER_CARD_CLASS}>
-                    {movie.posterUrl ? (
-                      <PosterImage
-                        src={movie.posterUrl}
-                        alt={movie.title}
-                        className={getPosterImageClass(true)}
-                      />
-                    ) : (
-                      <div className="text-[0.9rem] text-text-empty">No Poster</div>
-                    )}
-                  </div>
-
-                  <div className="px-0.5">
-                    <h3 className="mb-2 min-h-[2.5em] overflow-hidden text-[0.95rem] font-bold leading-[1.25] uppercase [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
-                      {movie.title}
-                    </h3>
-
-                    <p className="mb-1 min-h-[1.35em] text-[0.78rem] leading-[1.35] text-text-tertiary">
-                      TMDB
-                    </p>
-
-                    <p className="m-0 min-h-[1.35em] text-[0.76rem] leading-[1.35] text-text-soft">
-                      {movie.year ?? ''}
-                    </p>
-                  </div>
-                </Link>
-              </article>
+              <MovieGridCard
+                key={movie.tmdbId}
+                href={`/films/tmdb/${movie.tmdbId}`}
+                prefetch={false}
+                title={movie.title}
+                posterUrl={movie.posterUrl}
+                secondaryText="TMDB"
+                year={movie.year}
+              />
             ))}
           </div>
         </section>

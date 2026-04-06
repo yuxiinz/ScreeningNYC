@@ -1,16 +1,14 @@
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
 
 import MovieCsvImportButton from '@/components/movie/MovieCsvImportButton'
 import MovieListActions from '@/components/movie/MovieListActions'
 import MovieExternalLinks from '@/components/movie/MovieExternalLinks'
 import PosterImage from '@/components/movie/PosterImage'
 import WatchedReviewEditor from '@/components/movie/WatchedReviewEditor'
-import { getCurrentUserId } from '@/lib/auth/require-user-id'
+import { requireUserIdForPage } from '@/lib/auth/require-user-id'
 import {
   cleanDirectorText,
   getReleaseYear,
-  isTmdbPoster,
 } from '@/lib/movie/display'
 import {
   getMovieStatesForUser,
@@ -20,13 +18,6 @@ import {
 const POSTER_CARD_CLASS =
   'flex aspect-[2/3] w-32 shrink-0 items-center justify-center overflow-hidden rounded-card border border-border-subtle bg-card-bg shadow-poster'
 
-function getPosterImageClass(posterIsTmdb: boolean) {
-  return [
-    'block h-full w-full bg-card-bg',
-    posterIsTmdb ? 'object-cover' : 'object-contain',
-  ].join(' ')
-}
-
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat('en-US', {
     dateStyle: 'medium',
@@ -34,11 +25,7 @@ function formatDate(date: Date) {
 }
 
 export default async function WatchedPage() {
-  const userId = await getCurrentUserId()
-
-  if (!userId) {
-    redirect('/login?redirectTo=/me/watched')
-  }
+  const userId = await requireUserIdForPage('/me/watched')
 
   const data = await getWatchedListPageData(userId)
   const movieStates = await getMovieStatesForUser(
@@ -67,7 +54,6 @@ export default async function WatchedPage() {
       {data.items.length > 0 ? (
         <div className="flex flex-col gap-6">
           {data.items.map((item) => {
-            const posterIsTmdb = isTmdbPoster(item.movie.posterUrl)
             const director = cleanDirectorText(item.movie.directorText, 'UNKNOWN')
             const year = getReleaseYear(item.movie.releaseDate)
             const movieState = movieStates.get(item.movie.id) || {
@@ -87,11 +73,7 @@ export default async function WatchedPage() {
                   >
                     <div className={POSTER_CARD_CLASS}>
                       {item.movie.posterUrl ? (
-                        <PosterImage
-                          src={item.movie.posterUrl}
-                          alt={item.movie.title}
-                          className={getPosterImageClass(posterIsTmdb)}
-                        />
+                        <PosterImage src={item.movie.posterUrl} alt={item.movie.title} />
                       ) : (
                         <div className="px-3 text-center text-[0.82rem] text-text-empty">
                           No Poster

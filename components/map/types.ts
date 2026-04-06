@@ -1,4 +1,4 @@
-// components/map/icons.ts
+// components/map/types.ts
 
 export type TheaterForMap = {
   id: number
