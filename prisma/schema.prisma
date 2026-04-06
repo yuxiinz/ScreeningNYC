@@ -348,6 +348,8 @@ enum ShowtimeStatus {
 }
 
 enum MoviePersonKind {
+  // CAST stays in the schema for future/manual data, but the current app only
+  // syncs, queries, and displays DIRECTOR links.
   DIRECTOR
   CAST
 }

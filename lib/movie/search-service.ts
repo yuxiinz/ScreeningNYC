@@ -1,5 +1,8 @@
 import { getReleaseYear } from '@/lib/movie/display'
-import type { MovieSearchResult, MovieSearchStatus } from '@/lib/movie/search'
+import type {
+  MovieSearchResult,
+  MovieSearchStatus,
+} from '@/lib/movie/search-types'
 import { prisma } from '@/lib/prisma'
 
 export type LocalMovieSearchItem = MovieSearchResult & {

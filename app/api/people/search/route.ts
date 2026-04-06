@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 
-import type { DirectorSearchResult } from '@/lib/people/search'
+import type { DirectorSearchResult } from '@/lib/people/search-types'
 import { searchLocalDirectors } from '@/lib/people/search-service'
 
 export async function GET(request: Request) {

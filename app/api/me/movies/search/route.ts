@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
 
 import { AuthRequiredError, requireUserId } from '@/lib/auth/require-user-id'
-import type { MeMovieSearchLocalResult, MeMovieSearchResponse } from '@/lib/movie/search'
+import type {
+  MeMovieSearchLocalResult,
+  MeMovieSearchResponse,
+} from '@/lib/movie/search-types'
 import { searchLocalMovies } from '@/lib/movie/search-service'
 import {
   searchTmdbCandidates,

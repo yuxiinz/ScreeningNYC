@@ -4,7 +4,7 @@ import { AuthRequiredError, requireUserId } from '@/lib/auth/require-user-id'
 import type {
   DirectorSearchResult,
   MeDirectorSearchResponse,
-} from '@/lib/people/search'
+} from '@/lib/people/search-types'
 import { searchLocalDirectors } from '@/lib/people/search-service'
 import {
   searchTmdbDirectorCandidates,

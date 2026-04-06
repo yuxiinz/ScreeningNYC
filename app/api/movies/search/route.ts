@@ -1,4 +1,4 @@
-import type { MovieSearchResult } from '@/lib/movie/search'
+import type { MovieSearchResult } from '@/lib/movie/search-types'
 import { searchLocalMovies } from '@/lib/movie/search-service'
 import { NextResponse } from 'next/server'
 

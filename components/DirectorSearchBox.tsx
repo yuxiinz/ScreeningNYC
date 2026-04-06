@@ -8,7 +8,7 @@ import type {
   DirectorSearchResult,
   MeDirectorSearchExternalResult,
   MeDirectorSearchResponse,
-} from '@/lib/people/search'
+} from '@/lib/people/search-types'
 
 type DirectorSearchBoxProps = {
   isAuthenticated?: boolean

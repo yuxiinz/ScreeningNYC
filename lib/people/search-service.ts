@@ -1,4 +1,4 @@
-import type { DirectorSearchResult } from '@/lib/people/search'
+import type { DirectorSearchResult } from '@/lib/people/search-types'
 import { prisma } from '@/lib/prisma'
 
 export async function searchLocalDirectors(

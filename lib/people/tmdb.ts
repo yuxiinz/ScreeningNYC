@@ -1,8 +1,9 @@
 import axios from 'axios'
 
-import type {
-  ExternalPersonMovie,
-  MoviePersonSyncInput,
+import {
+  SUPPORTED_MOVIE_PERSON_KIND,
+  type ExternalPersonMovie,
+  type MoviePersonSyncInput,
 } from '@/lib/people/types'
 import {
   buildTmdbImageUrl,
@@ -57,7 +58,7 @@ export function mapTmdbMovieCreditsToPeople(
       name: person.name || 'Unknown',
       gender: person.gender ?? null,
       photoUrl: buildTmdbImageUrl(person.profile_path, 'w500'),
-      kind: 'DIRECTOR' as const,
+      kind: SUPPORTED_MOVIE_PERSON_KIND,
       billingOrder: index,
     }))
 }

@@ -11,7 +11,7 @@ import type {
   MeMovieSearchLocalResult,
   MeMovieSearchResponse,
   MovieSearchResult,
-} from '@/lib/movie/search'
+} from '@/lib/movie/search-types'
 
 type FilmSearchBoxProps = {
   isAuthenticated?: boolean

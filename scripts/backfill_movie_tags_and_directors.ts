@@ -82,33 +82,33 @@ async function main() {
 
       syncedCount += 1
       console.log(
-        `[backfill_people] synced movie ${movie.id}: ${movie.title}${movie.tmdbId ? ` (tmdb ${movie.tmdbId})` : ''}`
+        `[backfill_movie_tags_and_directors] synced movie ${movie.id}: ${movie.title}${movie.tmdbId ? ` (tmdb ${movie.tmdbId})` : ''}`
       )
     } catch (error) {
       failedCount += 1
 
       if (error instanceof TmdbApiKeyMissingError) {
         console.warn(
-          `[backfill_people] skipped TMDB sync for movie ${movie.id}: TMDB_API_KEY is not configured`
+          `[backfill_movie_tags_and_directors] skipped TMDB sync for movie ${movie.id}: TMDB_API_KEY is not configured`
         )
         continue
       }
 
       console.error(
-        `[backfill_people] failed movie ${movie.id}: ${movie.title}`,
+        `[backfill_movie_tags_and_directors] failed movie ${movie.id}: ${movie.title}`,
         error
       )
     }
   }
 
   console.log(
-    `[backfill_people] completed. synced=${syncedCount} failed=${failedCount}`
+    `[backfill_movie_tags_and_directors] completed. synced=${syncedCount} failed=${failedCount}`
   )
 }
 
 main()
   .catch((error) => {
-    console.error('[backfill_people] fatal error', error)
+    console.error('[backfill_movie_tags_and_directors] fatal error', error)
     process.exitCode = 1
   })
   .finally(async () => {
