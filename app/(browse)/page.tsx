@@ -1,5 +1,7 @@
 // app/(browse)/page.tsx
 
+import Link from 'next/link'
+
 import BackToTopButton from '@/components/BackToTopButton'
 import FilmSearchBox from '@/components/FilmSearchBox'
 import MovieGridCard from '@/components/movie/MovieGridCard'
@@ -70,8 +72,27 @@ export default async function HomePage({
       ? `${filmCountLabel} at ${selectedTheaterNames.join(', ')}.`
       : `${filmCountLabel} across NYC theaters.`
   const unauthenticatedSubtitleSuffix = currentUserId
-    ? ''
-    : ' Create an account or log in to save films to your want list and get email reminders when they screen in NYC.'
+    ? null
+    : (
+        <>
+          {' '}
+          <Link
+            href="/register"
+            className="border-b border-current transition-opacity hover:opacity-80"
+          >
+            Create an account
+          </Link>{' '}
+          or{' '}
+          <Link
+            href="/login"
+            className="border-b border-current transition-opacity hover:opacity-80"
+          >
+            log in
+          </Link>{' '}
+          to save films to your want list and get email reminders when they
+          screen in NYC.
+        </>
+      )
 
   return (
     <>

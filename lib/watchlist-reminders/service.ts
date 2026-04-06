@@ -3,6 +3,7 @@ import { DateTime } from 'luxon'
 import { sendEmail } from '@/lib/auth/email'
 import { getReminderBaseUrl, isMagicLinkConfigured } from '@/lib/auth/env'
 import { prisma } from '@/lib/prisma'
+import { getUpcomingShowtimeWhere } from '@/lib/showtime/queries'
 import { APP_TIMEZONE, getDateKeyInAppTimezone } from '@/lib/timezone'
 
 type ReminderRunOptions = {
@@ -87,15 +88,6 @@ function getExecutionMode(options: ReminderRunOptions, now: Date) {
   return isFridayNoonWindow(now) || (options.force && getLocalNow(now).weekday === 5)
     ? 'summary'
     : 'transition'
-}
-
-function getUpcomingShowtimeWhere(now: Date) {
-  return {
-    startTime: {
-      gt: now,
-    },
-    status: 'SCHEDULED' as const,
-  }
 }
 
 function getEmailEnabledUserFilter() {

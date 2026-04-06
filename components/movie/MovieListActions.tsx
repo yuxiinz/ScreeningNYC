@@ -3,7 +3,12 @@
 import { useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 
+import {
+  buildListActionButtonClass,
+  toggleListAction,
+} from '@/components/list-actions/shared'
 import RatingChain from '@/components/movie/RatingChain'
+import { getErrorMessageFromResponse } from '@/lib/api/client-response'
 import { getReviewWordCount } from '@/lib/user-movies/review'
 
 type MovieListActionsProps = {
@@ -15,37 +20,6 @@ type MovieListActionsProps = {
 }
 
 type PendingAction = 'want' | 'watched' | null
-
-type MutationErrorPayload = {
-  message?: string
-}
-
-function buildButtonClass(
-  isActive: boolean,
-  tone: 'default' | 'positive',
-  compact: boolean
-) {
-  return [
-    'rounded-panel border font-bold tracking-[0.06em] transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-    compact ? 'px-2.5 py-1.5 text-[0.68rem]' : 'px-3 py-2 text-[0.76rem]',
-    tone === 'positive'
-      ? isActive
-        ? 'border-accent-positive bg-accent-positive text-page-bg'
-        : 'border-border-input text-text-secondary hover:border-accent-positive hover:text-accent-positive'
-      : isActive
-        ? 'border-text-primary bg-text-primary text-page-bg'
-        : 'border-border-input text-text-secondary hover:border-text-primary hover:text-text-primary',
-  ].join(' ')
-}
-
-async function getErrorMessage(response: Response, fallbackMessage: string) {
-  try {
-    const payload = (await response.json()) as MutationErrorPayload
-    return payload.message || fallbackMessage
-  } catch {
-    return fallbackMessage
-  }
-}
 
 export default function MovieListActions({
   movieId,
@@ -72,17 +46,13 @@ export default function MovieListActions({
     setError('')
 
     try {
-      const response = await fetch(`/api/me/movies/${movieId}/want`, {
-        method: inWant ? 'DELETE' : 'PUT',
+      const nextInWant = await toggleListAction({
+        endpoint: `/api/me/movies/${movieId}/want`,
+        fallbackError: 'Could not update want list.',
+        isActive: inWant,
       })
 
-      if (!response.ok) {
-        throw new Error(
-          await getErrorMessage(response, 'Could not update want list.')
-        )
-      }
-
-      setInWant(!inWant)
+      setInWant(nextInWant)
 
       if (inWant && pathname === '/me/want-list') {
         router.refresh()
@@ -117,7 +87,10 @@ export default function MovieListActions({
 
       if (!response.ok) {
         throw new Error(
-          await getErrorMessage(response, 'Could not update watched list.')
+          await getErrorMessageFromResponse(
+            response,
+            'Could not update watched list.'
+          )
         )
       }
 
@@ -160,7 +133,10 @@ export default function MovieListActions({
 
       if (!response.ok) {
         throw new Error(
-          await getErrorMessage(response, 'Could not update watched list.')
+          await getErrorMessageFromResponse(
+            response,
+            'Could not update watched list.'
+          )
         )
       }
 
@@ -186,17 +162,13 @@ export default function MovieListActions({
     setError('')
 
     try {
-      const response = await fetch(`/api/me/movies/${movieId}/want`, {
-        method: 'DELETE',
+      const nextInWant = await toggleListAction({
+        endpoint: `/api/me/movies/${movieId}/want`,
+        fallbackError: 'Could not update want list.',
+        isActive: true,
       })
 
-      if (!response.ok) {
-        throw new Error(
-          await getErrorMessage(response, 'Could not update want list.')
-        )
-      }
-
-      setInWant(false)
+      setInWant(nextInWant)
       setRemoveWantDialogOpen(false)
 
       if (pathname === '/me/want-list') {
@@ -224,7 +196,10 @@ export default function MovieListActions({
             }
           }}
           disabled={pendingAction !== null}
-          className={buildButtonClass(inWant, 'default', compact)}
+          className={buildListActionButtonClass({
+            compact,
+            isActive: inWant,
+          })}
         >
           {inWant ? 'IN WANT LIST' : 'WANT'}
         </button>
@@ -237,7 +212,11 @@ export default function MovieListActions({
             }
           }}
           disabled={pendingAction !== null}
-          className={buildButtonClass(inWatched, 'positive', compact)}
+          className={buildListActionButtonClass({
+            compact,
+            isActive: inWatched,
+            tone: 'positive',
+          })}
         >
           {inWatched ? 'WATCHED' : 'MARK WATCHED'}
         </button>

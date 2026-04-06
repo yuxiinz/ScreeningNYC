@@ -4,27 +4,25 @@ import { useRouter } from 'next/navigation'
 
 import SearchBoxShell from '@/components/search/SearchBoxShell'
 import useEntitySearch from '@/components/search/useEntitySearch'
+import {
+  getEmptyClientEntitySearchResults,
+  resolveClientEntityRoute,
+  searchClientEntityRoute,
+  type ClientEntitySearchResults,
+} from '@/lib/api/client-search'
 import type {
   DirectorSearchResult,
   MeDirectorSearchExternalResult,
-  MeDirectorSearchResponse,
 } from '@/lib/people/search-types'
 
 type DirectorSearchBoxProps = {
   isAuthenticated?: boolean
 }
 
-type SearchResultsState = {
-  localResults: DirectorSearchResult[]
-  externalResults: MeDirectorSearchExternalResult[]
-}
-
-function getEmptyResults(): SearchResultsState {
-  return {
-    localResults: [],
-    externalResults: [],
-  }
-}
+type SearchResultsState = ClientEntitySearchResults<
+  DirectorSearchResult,
+  MeDirectorSearchExternalResult
+>
 
 function getFilmCountLabel(filmCount: number) {
   return `${filmCount} film${filmCount === 1 ? '' : 's'} in database`
@@ -34,47 +32,19 @@ async function searchDirectors(
   query: string,
   isAuthenticated: boolean
 ): Promise<SearchResultsState> {
-  const endpoint = isAuthenticated
-    ? `/api/me/people/search?q=${encodeURIComponent(query)}`
-    : `/api/people/search?q=${encodeURIComponent(query)}`
-  const response = await fetch(endpoint)
+  return searchClientEntityRoute({
+    authenticatedEndpoint: '/api/me/people/search',
+    errorMessage: 'Could not search directors right now.',
+    invalidPayloadLabel: 'Director search API',
+    isAuthenticated,
+    publicEndpoint: '/api/people/search',
+    query,
+    transformPublicResults: (people: DirectorSearchResult[]) => people,
+  })
+}
 
-  if (!response.ok) {
-    const text = await response.text()
-    console.error('Director search API returned non OK response:', text)
-    throw new Error('Could not search directors right now.')
-  }
-
-  const data = await response.json()
-
-  if (isAuthenticated) {
-    const authenticatedResults = data as Partial<MeDirectorSearchResponse>
-
-    if (
-      Array.isArray(authenticatedResults.localResults) &&
-      Array.isArray(authenticatedResults.externalResults)
-    ) {
-      return {
-        localResults: authenticatedResults.localResults,
-        externalResults: authenticatedResults.externalResults,
-      }
-    }
-
-    console.error('Authenticated director search returned invalid payload:', data)
-
-    return getEmptyResults()
-  }
-
-  if (Array.isArray(data)) {
-    return {
-      localResults: data,
-      externalResults: [],
-    }
-  }
-
-  console.error('Director search API did not return an array:', data)
-
-  return getEmptyResults()
+function getEmptyResults(): SearchResultsState {
+  return getEmptyClientEntitySearchResults()
 }
 
 export default function DirectorSearchBox({
@@ -94,33 +64,24 @@ export default function DirectorSearchBox({
     results,
     setQuery,
     wrapperRef,
-  } = useEntitySearch({
+  } = useEntitySearch<DirectorSearchResult, MeDirectorSearchExternalResult>({
     getEmptyResults,
     getExternalKey: (person) => person.tmdbId,
     isAuthenticated,
     resolveErrorMessage: 'Could not create a director page right now.',
     resolveExternal: async (person) => {
-      const response = await fetch('/api/me/people/resolve', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const personId = await resolveClientEntityRoute({
+        body: {
           tmdbId: person.tmdbId,
-        }),
+        },
+        endpoint: '/api/me/people/resolve',
+        errorMessage: 'Could not create a director page right now.',
+        idKey: 'personId',
+        invalidPayloadErrorMessage:
+          'Resolved director did not return a person id.',
       })
 
-      if (!response.ok) {
-        throw new Error('Could not create a director page right now.')
-      }
-
-      const data = (await response.json()) as { personId?: number }
-
-      if (!data.personId) {
-        throw new Error('Resolved director did not return a person id.')
-      }
-
-      router.push(`/people/${data.personId}`)
+      router.push(`/people/${personId}`)
     },
     search: searchDirectors,
     searchErrorMessage: 'Could not search directors right now.',
@@ -186,7 +147,9 @@ export default function DirectorSearchBox({
               }}
               className={[
                 'w-full cursor-pointer bg-transparent px-[14px] py-3 text-left text-text-primary transition-colors hover:bg-card-bg disabled:cursor-wait disabled:opacity-70',
-                isLast ? 'border-none' : 'border-0 border-b border-solid border-border-subtle',
+                isLast
+                  ? 'border-none'
+                  : 'border-0 border-b border-solid border-border-subtle',
               ].join(' ')}
             >
               <div className="text-[0.92rem] font-medium leading-[1.3]">

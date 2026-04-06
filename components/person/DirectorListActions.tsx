@@ -3,34 +3,16 @@
 import { useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 
+import {
+  buildListActionButtonClass,
+  toggleListAction,
+} from '@/components/list-actions/shared'
+
 type DirectorListActionsProps = {
   personId: number
   initialInWant: boolean
   compact?: boolean
   className?: string
-}
-
-type MutationErrorPayload = {
-  message?: string
-}
-
-function buildButtonClass(isActive: boolean, compact: boolean) {
-  return [
-    'rounded-panel border font-bold tracking-[0.06em] transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-    compact ? 'px-2.5 py-1.5 text-[0.68rem]' : 'px-3 py-2 text-[0.76rem]',
-    isActive
-      ? 'border-text-primary bg-text-primary text-page-bg'
-      : 'border-border-input text-text-secondary hover:border-text-primary hover:text-text-primary',
-  ].join(' ')
-}
-
-async function getErrorMessage(response: Response, fallbackMessage: string) {
-  try {
-    const payload = (await response.json()) as MutationErrorPayload
-    return payload.message || fallbackMessage
-  } catch {
-    return fallbackMessage
-  }
 }
 
 export default function DirectorListActions({
@@ -50,17 +32,13 @@ export default function DirectorListActions({
     setError('')
 
     try {
-      const response = await fetch(`/api/me/people/${personId}/want`, {
-        method: inWant ? 'DELETE' : 'PUT',
+      const nextInWant = await toggleListAction({
+        endpoint: `/api/me/people/${personId}/want`,
+        fallbackError: 'Could not update director want list.',
+        isActive: inWant,
       })
 
-      if (!response.ok) {
-        throw new Error(
-          await getErrorMessage(response, 'Could not update director want list.')
-        )
-      }
-
-      setInWant(!inWant)
+      setInWant(nextInWant)
 
       if (pathname === '/me/want-list') {
         router.refresh()
@@ -86,7 +64,10 @@ export default function DirectorListActions({
           }
         }}
         disabled={pending}
-        className={buildButtonClass(inWant, compact)}
+        className={buildListActionButtonClass({
+          compact,
+          isActive: inWant,
+        })}
       >
         {inWant ? 'UNMARK' : 'WANT'}
       </button>

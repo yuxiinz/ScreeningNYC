@@ -2,10 +2,7 @@ import { Prisma } from '@prisma/client'
 
 import { prisma } from '@/lib/prisma'
 import { fetchTmdbMoviePeople } from '@/lib/people/tmdb'
-import {
-  SUPPORTED_MOVIE_PERSON_KIND,
-  type MoviePersonSyncInput,
-} from '@/lib/people/types'
+import type { MoviePersonSyncInput } from '@/lib/people/types'
 import { normalizeWhitespace } from '@/lib/ingest/core/text'
 
 function slugifyTagName(name: string) {
@@ -259,7 +256,7 @@ export async function syncMoviePeopleFromTmdbId(movieId: number, tmdbId: number)
   // The schema still allows CAST links, but automated TMDB sync is
   // intentionally director-only until the app exposes broader person flows.
   await syncMoviePeople(movieId, people, {
-    replaceKinds: [SUPPORTED_MOVIE_PERSON_KIND],
+    replaceKinds: ['DIRECTOR'],
   })
 }
 

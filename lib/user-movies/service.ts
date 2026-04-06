@@ -339,6 +339,8 @@ export async function getWantListPageData(userId: string) {
   }
 }
 
+export type WantListPageData = Awaited<ReturnType<typeof getWantListPageData>>
+
 export async function getWatchedListPageData(userId: string) {
   const items = await prisma.userMovieWatch.findMany({
     where: {

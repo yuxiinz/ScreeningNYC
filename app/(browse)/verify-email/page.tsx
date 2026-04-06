@@ -1,14 +1,11 @@
 import Link from 'next/link'
 
 import ResendVerificationForm from '@/components/auth/ResendVerificationForm'
+import { getFirstSearchParamValue } from '@/lib/routing/search-params'
 
 type VerifyEmailPageSearchParams = {
   email?: string | string[]
   status?: string | string[]
-}
-
-function getFirstValue(value?: string | string[]) {
-  return Array.isArray(value) ? value[0] : value
 }
 
 function getStatusMessage(status?: string) {
@@ -41,8 +38,8 @@ export default async function VerifyEmailPage({
   searchParams: Promise<VerifyEmailPageSearchParams>
 }) {
   const params = await searchParams
-  const email = getFirstValue(params.email) || ''
-  const status = getFirstValue(params.status) || ''
+  const email = getFirstSearchParamValue(params.email) || ''
+  const status = getFirstSearchParamValue(params.status) || ''
   const message = getStatusMessage(status)
   const isSuccess = status === 'verified' || status === 'sent' || status === 'resent'
 

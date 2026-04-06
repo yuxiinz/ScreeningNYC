@@ -3,18 +3,15 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/auth'
 import LoginPanel from '@/components/auth/LoginPanel'
 import { getAuthFeatureFlags } from '@/lib/auth/env'
+import { getFirstSearchParamValue } from '@/lib/routing/search-params'
 
 type LoginPageSearchParams = {
   email?: string | string[]
   redirectTo?: string | string[]
 }
 
-function getFirstValue(value?: string | string[]) {
-  return Array.isArray(value) ? value[0] : value
-}
-
 function getSafeRedirectTo(value?: string | string[]) {
-  const candidate = getFirstValue(value)
+  const candidate = getFirstSearchParamValue(value)
 
   if (!candidate || !candidate.startsWith('/')) {
     return '/me'
@@ -41,7 +38,7 @@ export default async function LoginPage({
     <main className="mx-auto max-w-[560px]">
       <LoginPanel
         redirectTo={getSafeRedirectTo(params.redirectTo)}
-        initialEmail={getFirstValue(params.email) || ''}
+        initialEmail={getFirstSearchParamValue(params.email) || ''}
         googleEnabled={authFeatures.google}
         magicLinkEnabled={authFeatures.magicLink}
       />

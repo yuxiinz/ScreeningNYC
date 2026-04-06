@@ -6,10 +6,15 @@ import { useRouter } from 'next/navigation'
 
 import SearchBoxShell from '@/components/search/SearchBoxShell'
 import useEntitySearch from '@/components/search/useEntitySearch'
+import {
+  getEmptyClientEntitySearchResults,
+  resolveClientEntityRoute,
+  searchClientEntityRoute,
+  type ClientEntitySearchResults,
+} from '@/lib/api/client-search'
 import type {
   MeMovieSearchExternalResult,
   MeMovieSearchLocalResult,
-  MeMovieSearchResponse,
   MovieSearchResult,
 } from '@/lib/movie/search-types'
 
@@ -17,67 +22,33 @@ type FilmSearchBoxProps = {
   isAuthenticated?: boolean
 }
 
-type SearchResultsState = {
-  localResults: MeMovieSearchLocalResult[]
-  externalResults: MeMovieSearchExternalResult[]
-}
-
-function getEmptyResults(): SearchResultsState {
-  return {
-    localResults: [],
-    externalResults: [],
-  }
-}
+type SearchResultsState = ClientEntitySearchResults<
+  MeMovieSearchLocalResult,
+  MeMovieSearchExternalResult
+>
 
 async function searchMovies(
   query: string,
   isAuthenticated: boolean
 ): Promise<SearchResultsState> {
-  const endpoint = isAuthenticated
-    ? `/api/me/movies/search?q=${encodeURIComponent(query)}`
-    : `/api/movies/search?q=${encodeURIComponent(query)}`
-  const response = await fetch(endpoint)
-
-  if (!response.ok) {
-    const text = await response.text()
-    console.error('Search API returned non OK response:', text)
-    throw new Error('Could not search films right now.')
-  }
-
-  const data = await response.json()
-
-  if (isAuthenticated) {
-    const authenticatedResults = data as Partial<MeMovieSearchResponse>
-
-    if (
-      Array.isArray(authenticatedResults.localResults) &&
-      Array.isArray(authenticatedResults.externalResults)
-    ) {
-      return {
-        localResults: authenticatedResults.localResults,
-        externalResults: authenticatedResults.externalResults,
-      }
-    }
-
-    console.error('Authenticated search API returned invalid payload:', data)
-
-    return getEmptyResults()
-  }
-
-  if (Array.isArray(data)) {
-    return {
-      localResults: data.map((movie: MovieSearchResult) => ({
+  return searchClientEntityRoute({
+    authenticatedEndpoint: '/api/me/movies/search',
+    errorMessage: 'Could not search films right now.',
+    invalidPayloadLabel: 'Movie search API',
+    isAuthenticated,
+    publicEndpoint: '/api/movies/search',
+    query,
+    transformPublicResults: (movies: MovieSearchResult[]) =>
+      movies.map((movie) => ({
         ...movie,
         inWant: false,
         inWatched: false,
       })),
-      externalResults: [],
-    }
-  }
+  })
+}
 
-  console.error('Search API did not return an array:', data)
-
-  return getEmptyResults()
+function getEmptyResults(): SearchResultsState {
+  return getEmptyClientEntitySearchResults()
 }
 
 export default function FilmSearchBox({
@@ -97,33 +68,23 @@ export default function FilmSearchBox({
     results,
     setQuery,
     wrapperRef,
-  } = useEntitySearch({
+  } = useEntitySearch<MeMovieSearchLocalResult, MeMovieSearchExternalResult>({
     getEmptyResults,
     getExternalKey: (movie) => movie.tmdbId,
     isAuthenticated,
     resolveErrorMessage: 'Could not create a film page right now.',
     resolveExternal: async (movie) => {
-      const response = await fetch('/api/me/movies/resolve', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const movieId = await resolveClientEntityRoute({
+        body: {
           tmdbId: movie.tmdbId,
-        }),
+        },
+        endpoint: '/api/me/movies/resolve',
+        errorMessage: 'Could not create a film page right now.',
+        idKey: 'movieId',
+        invalidPayloadErrorMessage: 'Resolved film did not return a movie id.',
       })
 
-      if (!response.ok) {
-        throw new Error('Could not create a film page right now.')
-      }
-
-      const data = (await response.json()) as { movieId?: number }
-
-      if (!data.movieId) {
-        throw new Error('Resolved film did not return a movie id.')
-      }
-
-      router.push(`/films/${data.movieId}`)
+      router.push(`/films/${movieId}`)
     },
     search: searchMovies,
     searchErrorMessage: 'Could not search films right now.',

@@ -7,6 +7,9 @@ import BackButton from '@/components/BackButton'
 import MovieListActions from '@/components/movie/MovieListActions'
 import MovieExternalLinks from '@/components/movie/MovieExternalLinks'
 import PosterImage from '@/components/movie/PosterImage'
+import ShowtimeRow, {
+  type ShowtimeRowItem,
+} from '@/components/showtime/ShowtimeRow'
 import { getCurrentUserId } from '@/lib/auth/require-user-id'
 import {
   getCachedMovieDetail,
@@ -17,33 +20,15 @@ import {
   getReleaseYear,
 } from '@/lib/movie/display'
 import { syncMoviePeopleFromTmdbId } from '@/lib/movie/relations'
-import { getShowtimeDisplayTitle } from '@/lib/showtime/display'
-import { isFreeTicketValue } from '@/lib/showtime/ticket'
 import { TmdbApiKeyMissingError } from '@/lib/tmdb/client'
 import { getMovieStatesForUser } from '@/lib/user-movies/service'
 import {
   formatDateKeyInAppTimezone,
-  formatTimeInAppTimezone,
   getDateKeyInAppTimezone,
   getTodayInAppTimezone,
 } from '@/lib/timezone'
 
-const SHOWTIME_ROW_CLASS =
-  'flex flex-wrap items-start justify-between gap-4 rounded-panel border border-border-default bg-card-bg px-5 py-[15px]'
-const SHOWTIME_META_CLASS = 'flex flex-wrap items-baseline gap-5'
-type MovieDetailShowtime = {
-  id: number
-  startTime: Date
-  runtimeMinutes: number | null
-  ticketUrl: string | null
-  shownTitle: string | null
-  theater: {
-    name: string
-  }
-  format: {
-    name: string
-  } | null
-}
+type MovieDetailShowtime = ShowtimeRowItem
 
 function extractMetaFromOverview(input?: string | null) {
   const text = (input || '').replace(/\s+/g, ' ').trim()
@@ -228,57 +213,13 @@ export default async function MovieDetailPage({
 
                 <div className="flex flex-col gap-2.5">
                   {showtimes.map((showtime: MovieDetailShowtime) => (
-                    <div key={showtime.id} className={SHOWTIME_ROW_CLASS}>
-                      <div className="min-w-0 flex-1">
-                        {getShowtimeDisplayTitle(showtime.shownTitle, movie.title) && (
-                          <p className="mb-1 text-[0.82rem] leading-[1.4] text-text-soft">
-                            {getShowtimeDisplayTitle(showtime.shownTitle, movie.title)}
-                          </p>
-                        )}
-
-                        <div className={SHOWTIME_META_CLASS}>
-                          <span className="font-mono text-[1.2rem] font-bold">
-                            {formatTimeInAppTimezone(showtime.startTime)}
-                          </span>
-
-                          <span className="text-[0.9rem] text-text-muted">
-                            {showtime.theater.name.toUpperCase()}
-                          </span>
-
-                          {(showtime.runtimeMinutes || movie.runtimeMinutes) && (
-                            <span className="text-[0.85rem] text-text-dim">
-                              {showtime.runtimeMinutes || movie.runtimeMinutes} MIN
-                            </span>
-                          )}
-
-                          {(showtime.format?.name || displayFormat) && (
-                            <span className="text-[0.85rem] text-text-dim">
-                              {(showtime.format?.name || displayFormat).toUpperCase()}
-                            </span>
-                          )}
-                        </div>
-
-                      </div>
-
-                      {isFreeTicketValue(showtime.ticketUrl) ? (
-                        <span className="whitespace-nowrap text-[0.8rem] font-bold text-accent-positive">
-                          FREE
-                        </span>
-                      ) : showtime.ticketUrl ? (
-                        <a
-                          href={showtime.ticketUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="whitespace-nowrap border-b border-text-primary text-[0.8rem] text-text-primary opacity-75 no-underline"
-                        >
-                          TICKETS ↗
-                        </a>
-                      ) : (
-                        <span className="whitespace-nowrap text-[0.8rem] text-text-disabled">
-                          SOLD OUT
-                        </span>
-                      )}
-                    </div>
+                    <ShowtimeRow
+                      key={showtime.id}
+                      movieTitle={movie.title}
+                      showtime={showtime}
+                      fallbackRuntimeMinutes={movie.runtimeMinutes}
+                      fallbackFormatName={displayFormat}
+                    />
                   ))}
                 </div>
               </div>

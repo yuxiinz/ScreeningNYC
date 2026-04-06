@@ -4,6 +4,7 @@ import type { ChangeEvent } from 'react'
 import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+import { getErrorMessageFromResponse } from '@/lib/api/client-response'
 import type { MovieImportSummary } from '@/lib/user-movies/import'
 
 type MovieCsvImportButtonProps = {
@@ -18,15 +19,6 @@ type ImportResponsePayload = MovieImportSummary & {
 
 function getProviderLabel(provider: MovieImportSummary['provider']) {
   return provider === 'douban' ? 'Douban' : 'Letterboxd'
-}
-
-async function getErrorMessage(response: Response, fallbackMessage: string) {
-  try {
-    const payload = (await response.json()) as { message?: string }
-    return payload.message || fallbackMessage
-  } catch {
-    return fallbackMessage
-  }
 }
 
 export default function MovieCsvImportButton({
@@ -66,7 +58,10 @@ export default function MovieCsvImportButton({
 
       if (!response.ok) {
         throw new Error(
-          await getErrorMessage(response, 'Could not import this file right now.')
+          await getErrorMessageFromResponse(
+            response,
+            'Could not import this file right now.'
+          )
         )
       }
 

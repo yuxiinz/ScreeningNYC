@@ -3,6 +3,7 @@
 import { useState } from 'react'
 
 import RatingChain from '@/components/movie/RatingChain'
+import { getErrorMessageFromResponse } from '@/lib/api/client-response'
 import { getReviewWordCount } from '@/lib/user-movies/review'
 
 type WatchedReviewEditorProps = {
@@ -10,21 +11,6 @@ type WatchedReviewEditorProps = {
   initialRating: number | null
   initialReviewText?: string | null
   className?: string
-}
-
-type MutationErrorPayload = {
-  message?: string
-  rating?: number | null
-  reviewText?: string | null
-}
-
-async function getErrorMessage(response: Response, fallbackMessage: string) {
-  try {
-    const payload = (await response.json()) as MutationErrorPayload
-    return payload.message || fallbackMessage
-  } catch {
-    return fallbackMessage
-  }
 }
 
 function normalizeClientReviewText(reviewText: string) {
@@ -78,7 +64,10 @@ export default function WatchedReviewEditor({
 
       if (!response.ok) {
         throw new Error(
-          await getErrorMessage(response, 'Could not save rating and review.')
+          await getErrorMessageFromResponse(
+            response,
+            'Could not save rating and review.'
+          )
         )
       }
 

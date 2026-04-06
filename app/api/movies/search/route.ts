@@ -1,22 +1,22 @@
+import { handlePublicSearchRoute } from '@/lib/api/search-route'
 import type { MovieSearchResult } from '@/lib/movie/search-types'
 import { searchLocalMovies } from '@/lib/movie/search-service'
-import { NextResponse } from 'next/server'
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url)
-  const q = searchParams.get('q')?.trim()
+export async function GET(request: Request) {
+  return handlePublicSearchRoute({
+    request,
+    emptyResponse: [] as MovieSearchResult[],
+    internalErrorMessage: 'Could not search movies right now.',
+    logLabel: '[api][movies][search][GET]',
+    run: async (query) => {
+      const localResults = await searchLocalMovies(query)
 
-  if (!q || q.length < 2) {
-    return NextResponse.json([])
-  }
-
-  const localResults = await searchLocalMovies(q)
-  const result: MovieSearchResult[] = localResults.map((movie) => ({
-    id: movie.id,
-    title: movie.title,
-    year: movie.year,
-    status: movie.status,
-  }))
-
-  return NextResponse.json(result)
+      return localResults.map((movie) => ({
+        id: movie.id,
+        title: movie.title,
+        year: movie.year,
+        status: movie.status,
+      }))
+    },
+  })
 }

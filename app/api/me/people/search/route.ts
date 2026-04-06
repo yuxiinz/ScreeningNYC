@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server'
-
-import { AuthRequiredError, requireUserId } from '@/lib/auth/require-user-id'
+import {
+  handleAuthenticatedSearchRoute,
+  searchExternalResults,
+} from '@/lib/api/search-route'
 import type {
   DirectorSearchResult,
   MeDirectorSearchResponse,
@@ -8,74 +9,35 @@ import type {
 import { searchLocalDirectors } from '@/lib/people/search-service'
 import {
   searchTmdbDirectorCandidates,
-  TmdbApiKeyMissingError,
-  type TmdbDirectorCandidate,
 } from '@/lib/people/resolve'
 
-function buildUnauthorizedResponse(error: AuthRequiredError) {
-  return NextResponse.json(
-    {
-      code: 'UNAUTHORIZED',
-      message: error.message,
-    },
-    { status: 401 }
-  )
-}
-
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
-  const query = searchParams.get('q')?.trim() || ''
-
-  if (query.length < 2) {
-    const emptyResponse: MeDirectorSearchResponse = {
-      localResults: [],
-      externalResults: [],
-    }
-
-    return NextResponse.json(emptyResponse)
+  const emptyResponse: MeDirectorSearchResponse = {
+    localResults: [],
+    externalResults: [],
   }
 
-  try {
-    await requireUserId()
+  return handleAuthenticatedSearchRoute({
+    request,
+    emptyResponse,
+    internalErrorMessage: 'Could not search directors right now.',
+    logLabel: '[api][me][people][search][GET]',
+    run: async (query) => {
+      const localResults: DirectorSearchResult[] =
+        await searchLocalDirectors(query)
 
-    const localResults: DirectorSearchResult[] = await searchLocalDirectors(query)
-    let externalResults: TmdbDirectorCandidate[] = []
+      const externalResults = await searchExternalResults({
+        query,
+        localResults,
+        getLocalTmdbId: (person) => person.tmdbId,
+        searchExternal: searchTmdbDirectorCandidates,
+        getExternalTmdbId: (candidate) => candidate.tmdbId,
+      })
 
-    try {
-      const localTmdbIds = new Set(
-        localResults
-          .map((person) => person.tmdbId)
-          .filter((tmdbId): tmdbId is number => typeof tmdbId === 'number')
-      )
-
-      externalResults = (await searchTmdbDirectorCandidates(query)).filter(
-        (candidate) => !localTmdbIds.has(candidate.tmdbId)
-      )
-    } catch (error) {
-      if (!(error instanceof TmdbApiKeyMissingError)) {
-        throw error
+      return {
+        localResults,
+        externalResults,
       }
-    }
-
-    const response: MeDirectorSearchResponse = {
-      localResults,
-      externalResults,
-    }
-
-    return NextResponse.json(response)
-  } catch (error) {
-    if (error instanceof AuthRequiredError) {
-      return buildUnauthorizedResponse(error)
-    }
-
-    console.error('[api][me][people][search][GET]', error)
-
-    return NextResponse.json(
-      {
-        code: 'INTERNAL_ERROR',
-        message: 'Could not search directors right now.',
-      },
-      { status: 500 }
-    )
-  }
+    },
+  })
 }

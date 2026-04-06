@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { getUpcomingShowtimeWhere } from '@/lib/showtime/queries'
 
 export type DirectorCollectionState = {
   inWant: boolean
@@ -6,15 +7,6 @@ export type DirectorCollectionState = {
 
 function getUniquePersonIds(personIds: number[]) {
   return [...new Set(personIds.filter((personId) => Number.isInteger(personId) && personId > 0))]
-}
-
-function getUpcomingShowtimeWhere(now: Date = new Date()) {
-  return {
-    startTime: {
-      gt: now,
-    },
-    status: 'SCHEDULED' as const,
-  }
 }
 
 async function getDirectorUpcomingMovieIds(personId: number, now: Date = new Date()) {
@@ -267,3 +259,7 @@ export async function getWantDirectorListPageData(userId: string) {
     items: normalizedItems,
   }
 }
+
+export type WantDirectorListPageData = Awaited<
+  ReturnType<typeof getWantDirectorListPageData>
+>
