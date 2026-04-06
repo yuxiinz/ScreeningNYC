@@ -6,6 +6,7 @@ import BackToTopButton from '@/components/BackToTopButton'
 import FilmSearchBox from '@/components/FilmSearchBox'
 import MovieListActions from '@/components/movie/MovieListActions'
 import PosterImage from '@/components/movie/PosterImage'
+import PaginationControls from '@/components/PaginationControls'
 import TheaterFilter from '@/components/TheaterFilter'
 import MovieExternalLinks from '@/components/movie/MovieExternalLinks'
 import {
@@ -55,21 +56,6 @@ function parseTheaterSlugs(value?: string | string[]) {
     .flatMap((item) => item.split(','))
     .map((slug) => slug.trim())
     .filter(Boolean)
-}
-
-function buildHomePageHref(page: number, selectedTheaterSlugs: string[]) {
-  const params = new URLSearchParams()
-
-  if (page > 1) {
-    params.set('page', String(page))
-  }
-
-  if (selectedTheaterSlugs.length > 0) {
-    params.set('theaters', selectedTheaterSlugs.join(','))
-  }
-
-  const query = params.toString()
-  return query ? `/?${query}` : '/'
 }
 
 function getPosterImageClass(posterIsTmdb: boolean) {
@@ -217,37 +203,7 @@ export default async function HomePage({
         </div>
 
         {totalPages > 1 ? (
-          <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-border-default pt-5">
-            <span className="text-[0.85rem] tracking-[0.05em] text-text-muted">
-              PAGE {safePage} / {totalPages}
-            </span>
-
-            <div className="flex gap-4">
-              {safePage > 1 ? (
-                <Link
-                  href={buildHomePageHref(safePage - 1, selectedTheaterSlugs)}
-                  prefetch={false}
-                  className="border-b border-text-primary pb-0.5 text-[0.88rem] text-text-primary no-underline"
-                >
-                  PREV
-                </Link>
-              ) : (
-                <span className="text-[0.88rem] text-text-disabled">PREV</span>
-              )}
-
-              {safePage < totalPages ? (
-                <Link
-                  href={buildHomePageHref(safePage + 1, selectedTheaterSlugs)}
-                  prefetch={false}
-                  className="border-b border-text-primary pb-0.5 text-[0.88rem] text-text-primary no-underline"
-                >
-                  NEXT
-                </Link>
-              ) : (
-                <span className="text-[0.88rem] text-text-disabled">NEXT</span>
-              )}
-            </div>
-          </div>
+          <PaginationControls currentPage={safePage} totalPages={totalPages} />
         ) : null}
       </main>
 

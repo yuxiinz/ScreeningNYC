@@ -2,6 +2,7 @@ import Link from 'next/link'
 
 import BackToTopButton from '@/components/BackToTopButton'
 import DirectorSearchBox from '@/components/DirectorSearchBox'
+import PaginationControls from '@/components/PaginationControls'
 import DirectorListActions from '@/components/person/DirectorListActions'
 import PersonPhotoImage from '@/components/person/PersonPhotoImage'
 import { getCurrentUserId } from '@/lib/auth/require-user-id'
@@ -131,37 +132,7 @@ export default async function PeoplePage({
               ))}
             </div>
 
-            <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-border-default pt-5">
-              <span className="text-[0.85rem] tracking-[0.05em] text-text-muted">
-                PAGE {safePage} / {totalPages}
-              </span>
-
-              <div className="flex gap-4">
-                {safePage > 1 ? (
-                  <Link
-                    href={safePage === 2 ? '/people' : `/people?page=${safePage - 1}`}
-                    prefetch={false}
-                    className="border-b border-text-primary pb-0.5 text-[0.88rem] text-text-primary no-underline"
-                  >
-                    PREV
-                  </Link>
-                ) : (
-                  <span className="text-[0.88rem] text-text-disabled">PREV</span>
-                )}
-
-                {safePage < totalPages ? (
-                  <Link
-                    href={`/people?page=${safePage + 1}`}
-                    prefetch={false}
-                    className="border-b border-text-primary pb-0.5 text-[0.88rem] text-text-primary no-underline"
-                  >
-                    NEXT
-                  </Link>
-                ) : (
-                  <span className="text-[0.88rem] text-text-disabled">NEXT</span>
-                )}
-              </div>
-            </div>
+            <PaginationControls currentPage={safePage} totalPages={totalPages} />
           </>
         ) : (
           <p className="text-text-empty">No directors available yet.</p>
