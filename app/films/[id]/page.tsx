@@ -128,7 +128,7 @@ export default async function MovieDetailPage({
   }
 
   const todayKey = getTodayInAppTimezone()
-  let movie = await getCachedMovieDetail(movieId, todayKey)
+  const movie = await getCachedMovieDetail(movieId, todayKey)
 
   if (!movie) return notFound()
 
