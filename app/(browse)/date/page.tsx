@@ -7,10 +7,13 @@ import PosterImage from '@/components/movie/PosterImage'
 import TheaterFilter from '@/components/TheaterFilter'
 import MovieExternalLinks from '@/components/movie/MovieExternalLinks'
 import {
+  getCachedDateShowtimes,
+  getCachedTheaterDirectory,
+} from '@/lib/cache/public-data'
+import {
   cleanDirectorText,
   isTmdbPoster,
 } from '@/lib/movie/display'
-import { prisma } from '@/lib/prisma'
 import { isFreeTicketValue } from '@/lib/showtime/ticket'
 import {
   APP_TIMEZONE,
@@ -91,30 +94,15 @@ export default async function DatePage({
   const nowNy = DateTime.now().setZone(APP_TIMEZONE)
   const today = getTodayInAppTimezone(nowNy.toJSDate())
   const targetDate = resolveSafeDate(params.date, today)
-  const selectedTheaterSlugs = parseTheaterSlugs(params.theaters)
-
-  const startOfDayNy = DateTime.fromISO(targetDate, {
-    zone: APP_TIMEZONE,
-  }).startOf('day')
-  const endOfDayNy = DateTime.fromISO(targetDate, {
-    zone: APP_TIMEZONE,
-  }).endOf('day')
-
-  const queryStartNy = startOfDayNy < nowNy ? nowNy : startOfDayNy
-
-  const queryStart = queryStartNy.toUTC().toJSDate()
-  const queryEnd = endOfDayNy.toUTC().toJSDate()
-
-  const allTheaters = await prisma.theater.findMany({
-    orderBy: {
-      name: 'asc',
-    },
-    select: {
-      id: true,
-      slug: true,
-      name: true,
-    },
-  })
+  const selectedTheaterSlugs = [...new Set(parseTheaterSlugs(params.theaters))].sort()
+  const [allTheaters, showtimes] = await Promise.all([
+    getCachedTheaterDirectory(),
+    getCachedDateShowtimes({
+      selectedTheaterSlugs,
+      targetDate,
+      todayKey: today,
+    }),
+  ])
 
   const theatersWithSlug = allTheaters.filter(
     (
@@ -126,39 +114,6 @@ export default async function DatePage({
   const selectedTheaterNames = theatersWithSlug
     .filter(theater => selectedTheaterSlugs.includes(theater.slug))
     .map(theater => theater.name)
-
-  const showtimes = await prisma.showtime.findMany({
-    where: {
-      startTime: {
-        gte: queryStart,
-        lte: queryEnd,
-      },
-      status: 'SCHEDULED',
-      ...(selectedTheaterSlugs.length > 0
-        ? {
-            theater: {
-              slug: {
-                in: selectedTheaterSlugs,
-              },
-            },
-          }
-        : {}),
-    },
-    select: {
-      id: true,
-      movieId: true,
-      startTime: true,
-      runtimeMinutes: true,
-      ticketUrl: true,
-      shownTitle: true,
-      movie: true,
-      theater: true,
-      format: true,
-    },
-    orderBy: {
-      startTime: 'asc',
-    },
-  })
 
   type ShowtimeItem = typeof showtimes[number]
   type GroupedMovie = ShowtimeItem['movie'] & {

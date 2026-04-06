@@ -15,8 +15,6 @@ import { prisma } from '@/lib/prisma'
 import { TmdbApiKeyMissingError } from '@/lib/tmdb/client'
 import { getDirectorStatesForUser } from '@/lib/user-directors/service'
 
-export const dynamic = 'force-dynamic'
-
 const POSTER_CARD_CLASS =
   'mb-3 flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-card border border-border-subtle bg-card-bg shadow-card'
 

@@ -31,3 +31,14 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           NODE_ENV: production
+
+      - name: Revalidate today-sensitive cache
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          REVALIDATE_BASE_URL: ${{ secrets.REMINDER_BASE_URL }}
+        run: |
+          curl --fail --silent --show-error \
+            -X POST "${REVALIDATE_BASE_URL:-https://www.screeningnyc.com}/api/cache/revalidate" \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -H "Content-Type: application/json" \
+            --data '{"tags":["today-sensitive"]}'

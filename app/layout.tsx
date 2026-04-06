@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import './globals.css'
 import { Analytics } from '@vercel/analytics/next'
 
@@ -14,10 +15,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased">
-      <body className="flex min-h-full flex-col bg-page-bg font-sans text-text-primary">
-        {children}
-        <Analytics />
-      </body>
+      <Suspense fallback={null}>
+        <body className="flex min-h-full flex-col bg-page-bg font-sans text-text-primary">
+          {children}
+          <Analytics />
+        </body>
+      </Suspense>
     </html>
   )
 }

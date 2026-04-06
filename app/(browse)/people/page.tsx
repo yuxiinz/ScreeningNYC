@@ -7,12 +7,10 @@ import { getCurrentUserId } from '@/lib/auth/require-user-id'
 import { prisma } from '@/lib/prisma'
 import { getDirectorStatesForUser } from '@/lib/user-directors/service'
 
-export const dynamic = 'force-dynamic'
-
 export default async function PeoplePage() {
+  const currentUserId = await getCurrentUserId()
   const now = new Date()
-  const [currentUserId, totalCount, linkedCount, people] = await Promise.all([
-    getCurrentUserId(),
+  const [totalCount, linkedCount, people] = await Promise.all([
     prisma.person.count(),
     prisma.person.count({
       where: {
@@ -44,6 +42,7 @@ export default async function PeoplePage() {
       },
     }),
   ])
+
   const directorStates = await getDirectorStatesForUser(
     currentUserId,
     people.map((person) => person.id)

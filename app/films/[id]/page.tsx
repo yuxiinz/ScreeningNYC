@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { connection } from 'next/server'
 
 import BackButton from '@/components/BackButton'
 import MovieListActions from '@/components/movie/MovieListActions'
@@ -9,12 +10,15 @@ import MovieExternalLinks from '@/components/movie/MovieExternalLinks'
 import PosterImage from '@/components/movie/PosterImage'
 import { getCurrentUserId } from '@/lib/auth/require-user-id'
 import {
+  getCachedMovieDetail,
+  getMovieDirectorPeople,
+} from '@/lib/cache/public-data'
+import {
   cleanDirectorText,
   getReleaseYear,
   isTmdbPoster,
 } from '@/lib/movie/display'
 import { syncMoviePeopleFromTmdbId } from '@/lib/movie/relations'
-import { prisma } from '@/lib/prisma'
 import { isFreeTicketValue } from '@/lib/showtime/ticket'
 import { TmdbApiKeyMissingError } from '@/lib/tmdb/client'
 import { getMovieStatesForUser } from '@/lib/user-movies/service'
@@ -22,9 +26,8 @@ import {
   formatDateKeyInAppTimezone,
   formatTimeInAppTimezone,
   getDateKeyInAppTimezone,
+  getTodayInAppTimezone,
 } from '@/lib/timezone'
-
-export const dynamic = 'force-dynamic'
 
 const SHOWTIME_ROW_CLASS =
   'flex flex-wrap items-start justify-between gap-4 rounded-panel border border-border-default bg-card-bg px-5 py-[15px]'
@@ -109,54 +112,13 @@ function extractMetaFromOverview(input?: string | null) {
   }
 }
 
-async function getMovieDetail(movieId: number) {
-  return prisma.movie.findUnique({
-    where: { id: movieId },
-    include: {
-      peopleLinks: {
-        where: {
-          kind: 'DIRECTOR',
-        },
-        select: {
-          billingOrder: true,
-          person: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-        },
-        orderBy: {
-          billingOrder: 'asc',
-        },
-      },
-      showtimes: {
-        select: {
-          id: true,
-          startTime: true,
-          runtimeMinutes: true,
-          ticketUrl: true,
-          shownTitle: true,
-          theater: true,
-          format: true,
-        },
-        where: {
-          startTime: {
-            gt: new Date(),
-          },
-          status: 'SCHEDULED',
-        },
-        orderBy: { startTime: 'asc' },
-      },
-    },
-  })
-}
-
 export default async function MovieDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>
 }) {
+  await connection()
+
   const { id } = await params
   const currentUserIdPromise = getCurrentUserId()
   const movieId = parseInt(id, 10)
@@ -165,22 +127,23 @@ export default async function MovieDetailPage({
     notFound()
   }
 
-  let movie = await getMovieDetail(movieId)
+  const todayKey = getTodayInAppTimezone()
+  let movie = await getCachedMovieDetail(movieId, todayKey)
 
   if (!movie) return notFound()
 
-  if (movie.tmdbId && movie.peopleLinks.length === 0) {
+  let peopleLinks = await getMovieDirectorPeople(movieId)
+
+  if (movie.tmdbId && peopleLinks.length === 0) {
     try {
       await syncMoviePeopleFromTmdbId(movie.id, movie.tmdbId)
-      movie = await getMovieDetail(movieId)
+      peopleLinks = await getMovieDirectorPeople(movieId)
     } catch (error) {
       if (!(error instanceof TmdbApiKeyMissingError)) {
         throw error
       }
     }
   }
-
-  if (!movie) return notFound()
 
   const currentUserId = await currentUserIdPromise
   const movieStates = await getMovieStatesForUser(currentUserId, [movie.id])
@@ -199,7 +162,7 @@ export default async function MovieDetailPage({
 
   const posterIsTmdb = isTmdbPoster(movie.posterUrl)
   const director = cleanDirectorText(movie.directorText)
-  const directorPeople = movie.peopleLinks.map((link) => link.person)
+  const directorPeople = peopleLinks.map((link) => link.person)
   const year = getReleaseYear(movie.releaseDate)
   const overviewMeta = extractMetaFromOverview(movie.overview)
   const displayFormat = overviewMeta.inferredFormat || ''

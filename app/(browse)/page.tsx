@@ -7,16 +7,18 @@ import MovieListActions from '@/components/movie/MovieListActions'
 import PosterImage from '@/components/movie/PosterImage'
 import TheaterFilter from '@/components/TheaterFilter'
 import MovieExternalLinks from '@/components/movie/MovieExternalLinks'
+import {
+  getCachedHomeMovies,
+  getCachedTheaterDirectory,
+} from '@/lib/cache/public-data'
 import { getCurrentUserId } from '@/lib/auth/require-user-id'
 import {
   cleanDirectorText,
   getReleaseYear,
   isTmdbPoster,
 } from '@/lib/movie/display'
-import { prisma } from '@/lib/prisma'
+import { getTodayInAppTimezone } from '@/lib/timezone'
 import { getMovieStatesForUser } from '@/lib/user-movies/service'
-
-export const dynamic = 'force-dynamic'
 
 const POSTER_CARD_CLASS =
   'mb-3 flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-card border border-border-subtle bg-card-bg shadow-card'
@@ -38,48 +40,18 @@ export default async function HomePage({
   searchParams: Promise<{ theaters?: string }>
 }) {
   const params = await searchParams
-  const selectedTheaterSlugs = (params.theaters || '')
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean)
+  const selectedTheaterSlugs = [...new Set(
+    (params.theaters || '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+  )].sort()
 
-  const now = new Date()
+  const todayKey = getTodayInAppTimezone()
   const [currentUserId, allTheaters, movies] = await Promise.all([
     getCurrentUserId(),
-    prisma.theater.findMany({
-      orderBy: {
-        name: 'asc',
-      },
-      select: {
-        id: true,
-        slug: true,
-        name: true,
-      },
-    }),
-    prisma.movie.findMany({
-      where: {
-        showtimes: {
-          some: {
-            startTime: {
-              gt: now,
-            },
-            status: 'SCHEDULED',
-            ...(selectedTheaterSlugs.length > 0
-              ? {
-                  theater: {
-                    slug: {
-                      in: selectedTheaterSlugs,
-                    },
-                  },
-                }
-              : {}),
-          },
-        },
-      },
-      orderBy: {
-        updatedAt: 'desc',
-      },
-    }),
+    getCachedTheaterDirectory(),
+    getCachedHomeMovies(selectedTheaterSlugs, todayKey),
   ])
 
   const theatersWithSlug = allTheaters.filter(

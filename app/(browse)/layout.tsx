@@ -1,3 +1,5 @@
+import { connection } from 'next/server'
+
 import { auth } from '@/auth'
 import Header from '@/components/Header'
 
@@ -6,6 +8,8 @@ export default async function BrowseLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  await connection()
+
   const session = await auth()
   const isAuthenticated = Boolean(session?.user?.id)
 

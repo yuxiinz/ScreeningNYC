@@ -6,8 +6,6 @@ import {
 } from '@/lib/movie/resolve'
 import { TmdbApiKeyMissingError } from '@/lib/tmdb/client'
 
-export const dynamic = 'force-dynamic'
-
 export default async function TmdbFilmRedirectPage({
   params,
 }: {

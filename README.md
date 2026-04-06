@@ -98,6 +98,7 @@ Create `.env`:
 DATABASE_URL="postgresql://..."
 TMDB_API_KEY="..."
 AUTH_SECRET="..."
+CRON_SECRET="..."
 APP_BASE_URL="http://localhost:3000"
 REMINDER_BASE_URL="https://www.screeningnyc.com"
 EMAIL_FROM="auth@example.com"
@@ -108,6 +109,7 @@ GOOGLE_CLIENT_SECRET="..."
 
 `TMDB_API_KEY` is optional.
 `AUTH_SECRET`, `EMAIL_FROM`, and `RESEND_API_KEY` are required for auth email flows.
+`CRON_SECRET` is required for the cache revalidation endpoint used by scheduled jobs.
 `REMINDER_BASE_URL` is optional and lets reminder emails point at the public site even when local auth still uses `APP_BASE_URL`.
 `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` are required for Google SSO.
 
@@ -183,9 +185,19 @@ npm run build
 
 - Vercel handles application deployment on push.
 - GitHub Actions `ci.yml` runs install, Prisma client generation, Next route type generation, typecheck, lint, and build.
-- GitHub Actions `daily_ingest.yml` runs the daily ingest job and expects `DATABASE_URL` and `TMDB_API_KEY` secrets.
-- GitHub Actions `cleanup_showtimes.yml` runs every 15 minutes and deletes expired showtimes from `Showtime`.
+- GitHub Actions `daily_ingest.yml` runs the daily ingest job, then revalidates public cache tags. It expects `DATABASE_URL`, `TMDB_API_KEY`, `CRON_SECRET`, and `REMINDER_BASE_URL` secrets.
+- GitHub Actions `cleanup_showtimes.yml` runs every 15 minutes, deletes expired showtimes from `Showtime`, then revalidates today-sensitive cache tags. It expects `DATABASE_URL`, `CRON_SECRET`, and `REMINDER_BASE_URL` secrets.
 - GitHub Actions `watchlist_reminders.yml` runs around noon in `America/New_York` and sends either a Friday summary or a newly-on-screen reminder email.
+
+Manual map cache refresh:
+
+```bash
+curl --fail \
+  -X POST https://www.screeningnyc.com/api/cache/revalidate \
+  -H "Authorization: Bearer $CRON_SECRET" \
+  -H "Content-Type: application/json" \
+  --data '{"tags":["map-public","theater-directory"]}'
+```
 
 ## Notes
 
