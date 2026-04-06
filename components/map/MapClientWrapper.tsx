@@ -4,7 +4,6 @@
 
 import { useState } from 'react'
 import { MapContainer, TileLayer } from 'react-leaflet'
-import 'leaflet/dist/leaflet.css'
 
 import type { TheaterForMap } from './types'
 import { getIconSize } from './icons'

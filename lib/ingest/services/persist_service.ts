@@ -50,6 +50,7 @@ export class MovieIdentityConflictError extends Error {
 }
 
 let showtimeShownTitleColumnSupportPromise: Promise<boolean> | null = null
+const SHOWTIME_CANCEL_LOOKAHEAD_DAYS = 120
 
 function normalizeWhitespace(input?: string | null): string {
   return (input || '').replace(/\s+/g, ' ').replace(/\u00a0/g, ' ').trim()
@@ -820,6 +821,7 @@ export async function upsertShowtime(params: {
 }) {
   const shownTitleSupported = await supportsShowtimeShownTitleColumn()
   const updateData = {
+    movieId: params.movieId,
     runtimeMinutes: params.runtimeMinutes,
     endTime: params.endTime,
     ticketUrl: params.ticketUrl,
@@ -861,12 +863,15 @@ export async function markMissingShowtimesAsCanceled(
   currentFingerprints: string[]
 ) {
   const now = new Date()
-  const future30Days = DateTime.now().setZone(APP_TIMEZONE).plus({ days: 30 }).toJSDate()
+  const futureLookahead = DateTime.now()
+    .setZone(APP_TIMEZONE)
+    .plus({ days: SHOWTIME_CANCEL_LOOKAHEAD_DAYS })
+    .toJSDate()
 
   await prisma.showtime.updateMany({
     where: {
       theaterId,
-      startTime: { gte: now, lte: future30Days },
+      startTime: { gte: now, lte: futureLookahead },
       status: 'SCHEDULED',
       fingerprint: {
         notIn: currentFingerprints.length > 0 ? currentFingerprints : ['__never_match__'],

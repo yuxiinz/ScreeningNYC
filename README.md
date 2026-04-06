@@ -189,16 +189,6 @@ npm run build
 - GitHub Actions `cleanup_showtimes.yml` runs every 15 minutes, deletes expired showtimes from `Showtime`, then revalidates today-sensitive cache tags. It expects `DATABASE_URL`, `CRON_SECRET`, and `REMINDER_BASE_URL` secrets.
 - GitHub Actions `watchlist_reminders.yml` runs around noon in `America/New_York` and sends either a Friday summary or a newly-on-screen reminder email.
 
-Manual map cache refresh:
-
-```bash
-curl --fail \
-  -X POST https://www.screeningnyc.com/api/cache/revalidate \
-  -H "Authorization: Bearer $CRON_SECRET" \
-  -H "Content-Type: application/json" \
-  --data '{"tags":["map-public","theater-directory"]}'
-```
-
 ## Notes
 
 - The route group `app/(browse)` is an internal App Router grouping. It does not change public URLs.

@@ -7,7 +7,6 @@ import { APP_TIMEZONE, getDateKeyInAppTimezone } from '@/lib/timezone'
 export const PUBLIC_CACHE_TAGS = {
   home: 'home-public',
   theaterDirectory: 'theater-directory',
-  map: 'map-public',
   date: 'date-public',
   movieDetail: 'movie-detail-public',
   todaySensitive: 'today-sensitive',
@@ -204,12 +203,7 @@ export async function getCachedDateShowtimes({
   })
 }
 
-export async function getCachedMapTheaters() {
-  'use cache'
-
-  cacheLife('max')
-  cacheTag(PUBLIC_CACHE_TAGS.theaterDirectory, PUBLIC_CACHE_TAGS.map)
-
+export async function getMapTheaters() {
   const rawTheaters = await prisma.theater.findMany({
     select: {
       id: true,

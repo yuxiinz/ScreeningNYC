@@ -188,6 +188,35 @@ async function mergeMovieJoinTables(fromId: number, toId: number, db: DbClient) 
   })
 }
 
+async function mergeShowtimeNotificationDeliveries(
+  fromShowtimeId: number,
+  toShowtimeId: number,
+  db: DbClient
+) {
+  await db.$executeRaw`
+    insert into "WatchlistNotificationDelivery" (
+      "watchlistItemId",
+      "showtimeId",
+      "resendMessageId",
+      "sentToEmail",
+      "sentAt"
+    )
+    select
+      "watchlistItemId",
+      ${toShowtimeId},
+      "resendMessageId",
+      "sentToEmail",
+      "sentAt"
+    from "WatchlistNotificationDelivery"
+    where "showtimeId" = ${fromShowtimeId}
+    on conflict ("watchlistItemId", "showtimeId") do nothing
+  `
+
+  await db.watchlistNotificationDelivery.deleteMany({
+    where: { showtimeId: fromShowtimeId },
+  })
+}
+
 async function mergeShowtimes(
   fromId: number,
   toId: number,
@@ -198,6 +227,7 @@ async function mergeShowtimes(
     where: { movieId: fromId },
     select: {
       id: true,
+      fingerprint: true,
       startTime: true,
       shownTitle: true,
       ticketUrl: true,
@@ -235,19 +265,25 @@ async function mergeShowtimes(
     },
   })
 
-  const fingerprintOwners = new Map<
-    string,
-    (typeof targetShowtimes)[number]
-  >()
+  const targetByFingerprint = new Map<string, (typeof targetShowtimes)[number]>()
 
   for (const showtime of targetShowtimes) {
     if (showtime.fingerprint) {
-      fingerprintOwners.set(showtime.fingerprint, showtime)
+      targetByFingerprint.set(showtime.fingerprint, showtime)
     }
   }
 
-  let moved = 0
-  let deduped = 0
+  const groupedByFingerprint = new Map<
+    string,
+    {
+      target?: (typeof targetShowtimes)[number]
+      sources: Array<
+        (typeof sourceShowtimes)[number] & {
+          newFingerprint: string
+        }
+      >
+    }
+  >()
 
   for (const showtime of sourceShowtimes) {
     const newFingerprint = buildFingerprint({
@@ -257,61 +293,79 @@ async function mergeShowtimes(
       formatName: showtime.format?.name || 'Standard',
     })
 
-    const existingShowtime = fingerprintOwners.get(newFingerprint)
+    const existingGroup = groupedByFingerprint.get(newFingerprint)
 
-    if (existingShowtime && existingShowtime.id !== showtime.id) {
-      await db.showtime.update({
-        where: { id: existingShowtime.id },
-        data: buildMergedShowtimeData(existingShowtime, showtime),
+    if (existingGroup) {
+      existingGroup.sources.push({
+        ...showtime,
+        newFingerprint,
       })
+      continue
+    }
 
-      await db.$executeRaw`
-        insert into "WatchlistNotificationDelivery" (
-          "watchlistItemId",
-          "showtimeId",
-          "resendMessageId",
-          "sentToEmail",
-          "sentAt"
-        )
-        select
-          "watchlistItemId",
-          ${existingShowtime.id},
-          "resendMessageId",
-          "sentToEmail",
-          "sentAt"
-        from "WatchlistNotificationDelivery"
-        where "showtimeId" = ${showtime.id}
-        on conflict ("watchlistItemId", "showtimeId") do nothing
-      `
+    groupedByFingerprint.set(newFingerprint, {
+      target: targetByFingerprint.get(newFingerprint),
+      sources: [
+        {
+          ...showtime,
+          newFingerprint,
+        },
+      ],
+    })
+  }
 
-      await db.watchlistNotificationDelivery.deleteMany({
-        where: { showtimeId: showtime.id },
-      })
+  let moved = 0
+  let deduped = 0
 
-      await db.showtime.delete({ where: { id: showtime.id } })
+  for (const [newFingerprint, group] of groupedByFingerprint.entries()) {
+    const sortedSources = [...group.sources].sort((a, b) => {
+      const scoreDiff = scoreShowtimeMetadata(b) - scoreShowtimeMetadata(a)
+      if (scoreDiff !== 0) {
+        return scoreDiff
+      }
 
+      return a.id - b.id
+    })
+
+    const keeper = group.target || sortedSources[0]
+    let mergedShowtimeData = {
+      shownTitle: keeper.shownTitle,
+      ticketUrl: keeper.ticketUrl,
+      sourceUrl: keeper.sourceUrl,
+      sourceShowtimeId: keeper.sourceShowtimeId,
+      runtimeMinutes: keeper.runtimeMinutes,
+      endTime: keeper.endTime,
+    }
+
+    for (const source of sortedSources) {
+      if (!group.target && source.id === keeper.id) {
+        continue
+      }
+
+      mergedShowtimeData = buildMergedShowtimeData(mergedShowtimeData, source)
+
+      await mergeShowtimeNotificationDeliveries(source.id, keeper.id, db)
+      await db.showtime.delete({ where: { id: source.id } })
       deduped += 1
+    }
+
+    if (group.target) {
+      await db.showtime.update({
+        where: { id: keeper.id },
+        data: mergedShowtimeData,
+      })
       continue
     }
 
     await db.showtime.update({
-      where: { id: showtime.id },
+      where: { id: keeper.id },
       data: {
         movieId: toId,
         fingerprint: newFingerprint,
+        ...mergedShowtimeData,
       },
     })
 
-    fingerprintOwners.set(newFingerprint, {
-      id: showtime.id,
-      fingerprint: newFingerprint,
-      shownTitle: showtime.shownTitle,
-      ticketUrl: showtime.ticketUrl,
-      sourceUrl: showtime.sourceUrl,
-      sourceShowtimeId: showtime.sourceShowtimeId,
-      runtimeMinutes: showtime.runtimeMinutes,
-      endTime: showtime.endTime,
-    })
     moved += 1
   }
 
