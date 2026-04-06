@@ -1,5 +1,7 @@
 // app/(browse)/page.tsx
 
+import Link from 'next/link'
+
 import BackToTopButton from '@/components/BackToTopButton'
 import FilmSearchBox from '@/components/FilmSearchBox'
 import MovieGridCard from '@/components/movie/MovieGridCard'
@@ -63,11 +65,12 @@ export default async function HomePage({
   const startIndex = totalCount === 0 ? 0 : (safePage - 1) * FILMS_PAGE_SIZE + 1
   const endIndex =
     totalCount === 0 ? 0 : Math.min(startIndex + movies.length - 1, totalCount)
+  const filmCountLabel = `${totalCount} scheduled film${totalCount === 1 ? '' : 's'}`
 
   const subtitle =
     selectedTheaterNames.length > 0
-      ? `Now you can watch ${totalCount} scheduled film${totalCount === 1 ? '' : 's'} in cinema at ${selectedTheaterNames.join(', ')}.`
-      : `Now you can watch ${totalCount} scheduled film${totalCount === 1 ? '' : 's'} in cinema at NYC.`
+      ? `${filmCountLabel} at ${selectedTheaterNames.join(', ')}.`
+      : `${filmCountLabel} across NYC theaters.`
 
   return (
     <>
@@ -76,6 +79,31 @@ export default async function HomePage({
       </div>
 
       <main className="mx-auto max-w-[var(--container-wide)]">
+        {!currentUserId ? (
+          <section className="mb-7 rounded-card border border-border-input bg-[linear-gradient(135deg,rgba(17,17,17,0.96),rgba(0,181,29,0.14))] px-5 py-4 shadow-card">
+            <p className="mb-2 text-[0.74rem] font-semibold tracking-[0.08em] text-text-dim">
+              PERSONAL WATCHLIST
+            </p>
+            <p className="m-0 max-w-[780px] text-[1rem] leading-[1.7] text-text-primary">
+              <Link
+                href="/register"
+                className="border-b border-text-primary font-semibold text-text-primary transition-colors hover:text-accent-positive"
+              >
+                Create an account
+              </Link>{' '}
+              or{' '}
+              <Link
+                href="/login"
+                className="border-b border-text-primary font-semibold text-text-primary transition-colors hover:text-accent-positive"
+              >
+                log in
+              </Link>{' '}
+              to save films to your want list and get email reminders when they
+              screen in NYC.
+            </p>
+          </section>
+        ) : null}
+
         <div className="mb-7">
           <TheaterFilter
             theaters={theatersWithSlug.map(theater => ({
