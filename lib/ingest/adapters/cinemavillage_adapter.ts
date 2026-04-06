@@ -9,6 +9,10 @@ import { buildAbsoluteUrl } from '../core/url'
 import { parseRuntimeMinutes, parseYear } from '../core/meta'
 import { buildShowtimeRaw, parseShowtime } from '../core/datetime'
 import { parseScreeningTitle } from '../core/screening_title'
+import {
+  responseLooksBlocked,
+  SourceAccessBlockedError,
+} from '../core/source_access'
 import { APP_TIMEZONE } from '../../timezone'
 
 const CINEMA_VILLAGE_BASE_URL = 'https://www.cinemavillage.com'
@@ -51,6 +55,12 @@ type CinemaVillageSession = {
   cookie?: string
 }
 
+type CinemaVillageHtmlResponse = {
+  status: number
+  html: string
+  blocked: boolean
+}
+
 function absoluteUrl(value?: string | null): string | undefined {
   return buildAbsoluteUrl(CINEMA_VILLAGE_BASE_URL, value)
 }
@@ -87,36 +97,8 @@ async function fetchCinemaVillageHtml(
   session: CinemaVillageSession,
   referer = `${CINEMA_VILLAGE_BASE_URL}/`
 ): Promise<string> {
-  const headers = {
-    ...CINEMA_VILLAGE_HEADERS,
-    Referer: referer,
-    ...(session.cookie ? { Cookie: session.cookie } : {}),
-  }
-
-  try {
+  async function requestHtml(): Promise<CinemaVillageHtmlResponse> {
     const response = await axios.get<string>(url, {
-      timeout: 20000,
-      headers,
-      responseType: 'text',
-    })
-
-    const nextCookie = buildCookieHeader(response.headers['set-cookie'])
-    if (nextCookie) {
-      session.cookie = nextCookie
-    }
-
-    return response.data
-  } catch (error) {
-    if (!axios.isAxiosError(error) || error.response?.status !== 403) {
-      throw error
-    }
-
-    const refreshedSession = await initCinemaVillageSession()
-    if (refreshedSession.cookie) {
-      session.cookie = refreshedSession.cookie
-    }
-
-    const retryResponse = await axios.get<string>(url, {
       timeout: 20000,
       headers: {
         ...CINEMA_VILLAGE_HEADERS,
@@ -124,15 +106,59 @@ async function fetchCinemaVillageHtml(
         ...(session.cookie ? { Cookie: session.cookie } : {}),
       },
       responseType: 'text',
+      validateStatus: () => true,
     })
 
-    const nextCookie = buildCookieHeader(retryResponse.headers['set-cookie'])
+    const nextCookie = buildCookieHeader(response.headers['set-cookie'])
     if (nextCookie) {
       session.cookie = nextCookie
     }
 
-    return retryResponse.data
+    const html = typeof response.data === 'string' ? response.data : ''
+
+    return {
+      status: response.status,
+      html,
+      blocked: responseLooksBlocked({
+        status: response.status,
+        headers: response.headers as Record<string, unknown>,
+        body: html,
+      }),
+    }
   }
+
+  const firstResponse = await requestHtml()
+
+  if (!firstResponse.blocked && firstResponse.status >= 200 && firstResponse.status < 300) {
+    return firstResponse.html
+  }
+
+  if (!firstResponse.blocked) {
+    throw new Error(`[cinemavillage] Request failed: ${firstResponse.status} ${url}`)
+  }
+
+  const refreshedSession = await initCinemaVillageSession()
+  if (refreshedSession.cookie) {
+    session.cookie = refreshedSession.cookie
+  }
+
+  const retryResponse = await requestHtml()
+
+  if (!retryResponse.blocked && retryResponse.status >= 200 && retryResponse.status < 300) {
+    return retryResponse.html
+  }
+
+  if (retryResponse.blocked) {
+    throw new SourceAccessBlockedError({
+      theaterSlug: 'cinemavillage',
+      sourceUrl: url,
+      status: retryResponse.status,
+      detail:
+        'Cinema Village appears to be blocking the automation request via Cloudflare/WAF. GitHub-hosted runners are the most common trigger.',
+    })
+  }
+
+  throw new Error(`[cinemavillage] Request failed: ${retryResponse.status} ${url}`)
 }
 
 function stripAccessibilitySuffix(value?: string | null): string {

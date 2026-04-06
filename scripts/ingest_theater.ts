@@ -6,6 +6,7 @@ import { getShowtimeScraper } from '../lib/ingest/adapters'
 import { THEATER_META } from '../lib/ingest/config/theater_meta'
 import { normalizeScreeningMovieTitle } from '../lib/ingest/core/screening_title'
 import { isProgramContent } from '../lib/ingest/core/program_content'
+import { isSourceAccessBlockedError } from '../lib/ingest/core/source_access'
 import { APP_TIMEZONE } from '../lib/timezone'
 import { findLocalMovieByImportMatch } from '../lib/movie/match'
 import { shouldAttemptCanonicalTmdbLookup } from '../lib/movie/canonical-lookup'
@@ -48,11 +49,14 @@ type TheaterRunStats = {
   parseFailedCount: number
   upsertedCount: number
   success: boolean
+  skipped?: boolean
   durationMs: number
   error?: string
+  skipReason?: string
 }
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY || ''
+const SOFT_SKIP_BLOCKED_SOURCES = process.env.GITHUB_ACTIONS === 'true'
 const THEATER_SLUG_GROUPS: Record<string, string[]> = {
   angelika: ['angelikanyc', 'angelikaev', 'angelika123'],
   nitehawk: ['nitehawkwilliamsburg', 'nitehawkprospectpark'],
@@ -592,6 +596,12 @@ async function main() {
     )
   }
 
+  if (SOFT_SKIP_BLOCKED_SOURCES) {
+    console.log(
+      '[ingest] GitHub Actions detected. Theater sources blocked by Cloudflare/WAF will be skipped without canceling existing showtimes.'
+    )
+  }
+
   console.log(`Preparing to ingest ${enabledConfigs.length} theater(s):`)
   for (const config of enabledConfigs) {
     console.log(`  ${config.theaterSlug}`)
@@ -604,6 +614,26 @@ async function main() {
       const result = await ingestOneTheater(config)
       results.push(result)
     } catch (error) {
+      if (SOFT_SKIP_BLOCKED_SOURCES && isSourceAccessBlockedError(error)) {
+        const skippedResult: TheaterRunStats = {
+          theaterSlug: String(config.theaterSlug),
+          theaterName: config.theaterName,
+          rawCount: 0,
+          parsedCount: 0,
+          dedupedCount: 0,
+          parseFailedCount: 0,
+          upsertedCount: 0,
+          success: false,
+          skipped: true,
+          durationMs: 0,
+          skipReason: toErrorMessage(error),
+        }
+
+        results.push(skippedResult)
+        console.warn(`[${config.theaterSlug}] Ingestion skipped: ${skippedResult.skipReason}`)
+        continue
+      }
+
       const failedResult: TheaterRunStats = {
         theaterSlug: String(config.theaterSlug),
         theaterName: config.theaterName,
@@ -625,7 +655,9 @@ async function main() {
   console.log('\n========== Ingest summary ==========')
 
   for (const result of results) {
-    if (result.success) {
+    if (result.skipped) {
+      console.log(`[${result.theaterSlug}] skipped | reason=${result.skipReason}`)
+    } else if (result.success) {
       console.log(
         `[${result.theaterSlug}] success | raw=${result.rawCount} | parsed=${result.parsedCount} | deduped=${result.dedupedCount} | parseFailed=${result.parseFailedCount} | upserted=${result.upsertedCount} | durationMs=${result.durationMs}`
       )
@@ -650,7 +682,7 @@ async function main() {
     ].join(' | ')
   )
 
-  const failedCount = results.filter((r) => !r.success).length
+  const failedCount = results.filter((r) => !r.success && !r.skipped).length
 
   if (failedCount > 0) {
     process.exitCode = 1
