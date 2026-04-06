@@ -26,14 +26,6 @@ export function normalizeMovieName(input?: string | null): string {
     .trim()
 }
 
-function normalizeRawMovieName(input?: string | null): string {
-  return canonicalizeTitle(input || '')
-    .toLowerCase()
-    .replace(/[’']/g, '')
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim()
-}
-
 export function normalizeDirectorName(input?: string | null): string {
   return (input || '')
     .replace(/^directed by\s*/i, '')
@@ -206,6 +198,16 @@ function pickBestMovieMatch(
   return bestScore >= minScore ? bestMatch : null
 }
 
+function mergeUniqueMovies(...movieGroups: Movie[][]) {
+  const deduped = new Map<number, Movie>()
+
+  movieGroups.flat().forEach((movie) => {
+    deduped.set(movie.id, movie)
+  })
+
+  return [...deduped.values()]
+}
+
 async function findMoviesByExactTitleCandidates(
   titleCandidates: string[],
   db: DbClient
@@ -277,9 +279,12 @@ async function findMoviesByLooseTitleCandidates(
 function shouldAttemptNormalizedTitleFallback(titleCandidates: string[]) {
   return titleCandidates.some((candidate) => {
     const normalized = normalizeMovieName(candidate)
-    const rawNormalized = normalizeRawMovieName(candidate)
+    const canonical = canonicalizeTitle(candidate)
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim()
 
-    return Boolean(normalized && rawNormalized && normalized !== rawNormalized)
+    return Boolean(normalized && canonical && normalized !== canonical)
   })
 }
 
@@ -392,23 +397,30 @@ export async function findLocalMovieByImportMatch(
   }
 
   const exactMatches = await findMoviesByExactTitleCandidates(titleCandidates, db)
-  const exactBestMatch = pickBestMovieMatch(exactMatches, input, 90)
+  const normalizedMatches = await findMoviesByNormalizedTitleCandidates(
+    titleCandidates,
+    db
+  )
+  const exactBestMatch = pickBestMovieMatch(
+    mergeUniqueMovies(exactMatches, normalizedMatches),
+    input,
+    90
+  )
 
   if (exactBestMatch) {
     return exactBestMatch
   }
 
   const looseMatches = await findMoviesByLooseTitleCandidates(titleCandidates, db)
-  const looseBestMatch = pickBestMovieMatch(looseMatches, input, 60)
+  const looseBestMatch = pickBestMovieMatch(
+    mergeUniqueMovies(looseMatches, normalizedMatches),
+    input,
+    60
+  )
 
   if (looseBestMatch) {
     return looseBestMatch
   }
-
-  const normalizedMatches = await findMoviesByNormalizedTitleCandidates(
-    titleCandidates,
-    db
-  )
 
   return pickBestMovieMatch(normalizedMatches, input, 90)
 }

@@ -190,6 +190,48 @@ function uniqueText(values: Array<string | undefined>): string[] | undefined {
   return unique.length ? unique : undefined
 }
 
+function extractSrcsetUrl(value?: string | null): string | undefined {
+  const cleaned = cleanText(value)
+  if (!cleaned) return undefined
+
+  const firstCandidate = cleaned.split(',')[0]
+  const url = cleanText(firstCandidate?.split(/\s+/)[0])
+
+  return url || undefined
+}
+
+function getPosterUrlFromElement(
+  $: cheerio.CheerioAPI,
+  selector: string
+): string | undefined {
+  const element = $(selector).first()
+
+  if (!element.length) {
+    return undefined
+  }
+
+  return absoluteUrl(
+    element.attr('content') ||
+      element.attr('src') ||
+      element.attr('data-src') ||
+      element.attr('data-lazyload') ||
+      element.attr('data-videoposter') ||
+      extractSrcsetUrl(element.attr('srcset'))
+  )
+}
+
+function getCinemaVillagePosterUrl($: cheerio.CheerioAPI): string | undefined {
+  return (
+    getPosterUrlFromElement($, "meta[property='og:image']") ||
+    getPosterUrlFromElement($, "link[rel='image_src']") ||
+    getPosterUrlFromElement($, 'img.rev-slidebg') ||
+    getPosterUrlFromElement($, '.tp-videolayer') ||
+    getPosterUrlFromElement($, '.movie-poster img') ||
+    getPosterUrlFromElement($, 'picture img') ||
+    getPosterUrlFromElement($, 'img')
+  )
+}
+
 function parseCalendarPage(html: string): CinemaVillageListing[] {
   const $ = cheerio.load(html)
   const rows: CinemaVillageListing[] = []
@@ -289,11 +331,7 @@ function parseDetailPage(
     releaseYear: titleParse.releaseYear || parseYear(movieInfo),
     runtimeMinutes: parseRuntimeMinutes(movieInfo),
     overview: cleanText($('.sum .sum-txt').first().text()) || undefined,
-    posterUrl:
-      absoluteUrl($("meta[property='og:image']").attr('content')) ||
-      absoluteUrl($('img.rev-slidebg').first().attr('src')) ||
-      absoluteUrl($('.movie-poster img').first().attr('src')) ||
-      absoluteUrl($('img').first().attr('src')),
+    posterUrl: getCinemaVillagePosterUrl($),
     ticketUrl: absoluteUrl($('.movie-action a[href]').first().attr('href')),
     rawFormat: titleParse.rawFormat,
     tmdbTitleCandidates: titleParse.tmdbTitleCandidates,

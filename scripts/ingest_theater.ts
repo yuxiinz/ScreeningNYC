@@ -5,6 +5,7 @@ import { DateTime } from 'luxon'
 import { getShowtimeScraper } from '../lib/ingest/adapters'
 import { THEATER_META } from '../lib/ingest/config/theater_meta'
 import { normalizeScreeningMovieTitle } from '../lib/ingest/core/screening_title'
+import { isProgramContent } from '../lib/ingest/core/program_content'
 import { APP_TIMEZONE } from '../lib/timezone'
 import { findLocalMovieByImportMatch } from '../lib/movie/match'
 import { shouldAttemptCanonicalTmdbLookup } from '../lib/movie/canonical-lookup'
@@ -255,37 +256,6 @@ function getRequestedTheaterSlugs(): string[] {
     .filter(Boolean)
 
   return [...new Set(requested.flatMap((slug) => THEATER_SLUG_GROUPS[slug] || [slug]))]
-}
-
-function normalizeWhitespace(input?: string | null): string {
-  return (input || '').replace(/\s+/g, ' ').trim()
-}
-
-function isProgramContent(input: {
-  title?: string
-  overview?: string
-}): boolean {
-  const t = normalizeWhitespace(input.title).toLowerCase()
-  const o = normalizeWhitespace(input.overview).toLowerCase()
-
-  return (
-    t.includes('tribute') ||
-    t.includes('program') ||
-    t.includes('shorts') ||
-    t.includes('double feature') ||
-    t.includes('episodes') ||
-    t.includes('panel') ||
-    t.includes('secret screening') ||
-    t.includes('members only') ||
-    t.includes('award-winning shorts') ||
-    t.includes('presents') ||
-    o.includes('program of shorts') ||
-    o.includes('festival') ||
-    o.includes('retrospective') ||
-    o.includes('presents a program') ||
-    o.includes('as part of') ||
-    o.includes('special thanks to')
-  )
 }
 
 function toErrorMessage(error: unknown): string {

@@ -146,6 +146,63 @@ test('findLocalMovieByImportMatch tolerates one-year release differences', async
   assert.equal(match?.id, 2422)
 })
 
+test('findLocalMovieByImportMatch prefers canonical tmdb movie over exact local duplicate', async () => {
+  const { findLocalMovieByImportMatch } = await loadMatchModule()
+
+  const localDuplicate = {
+    id: 48090,
+    title: 'Palestine ‘36',
+    originalTitle: null,
+    directorText: 'Annemarie Jacir',
+    releaseDate: new Date('2025-01-01T00:00:00.000Z'),
+    tmdbId: null,
+    posterUrl: 'https://www.bam.org/globalassets/programs/cinema/2026fy/0326/p36.jpg',
+  }
+
+  const canonicalMovie = {
+    id: 2422,
+    title: 'Palestine 36',
+    originalTitle: 'Palestine 36',
+    directorText: 'Annemarie Jacir',
+    releaseDate: new Date('2025-10-31T00:00:00.000Z'),
+    tmdbId: 1432596,
+    posterUrl: 'https://image.tmdb.org/t/p/w500/example.jpg',
+  }
+
+  let findManyCalls = 0
+
+  const db = {
+    movie: {
+      findUnique: async () => null,
+      findFirst: async () => null,
+      findMany: async () => {
+        findManyCalls += 1
+
+        if (findManyCalls === 1) {
+          return [localDuplicate]
+        }
+
+        if (findManyCalls === 2) {
+          return [canonicalMovie]
+        }
+
+        return []
+      },
+    },
+  }
+
+  const match = await findLocalMovieByImportMatch(
+    {
+      title: 'Palestine ‘36',
+      directorText: 'Annemarie Jacir',
+      releaseYear: 2025,
+    },
+    db as never
+  )
+
+  assert.equal(match?.id, 2422)
+})
+
 test('chooseMergedReleaseDate prefers tmdb dates over local year-only placeholders', async () => {
   const { chooseMergedReleaseDate } = await loadPersistServiceModule()
 
