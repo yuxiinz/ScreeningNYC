@@ -3,7 +3,7 @@ export type ClientEntitySearchResults<TLocal, TExternal> = {
   externalResults: TExternal[]
 }
 
-type SearchRouteOptions<TLocal, TExternal, TPublicLocal> = {
+type SearchRouteOptions<TLocal, TPublicLocal> = {
   authenticatedEndpoint: string
   errorMessage: string
   invalidPayloadLabel: string
@@ -57,7 +57,7 @@ export async function searchClientEntityRoute<TLocal, TExternal, TPublicLocal>({
   publicEndpoint,
   query,
   transformPublicResults,
-}: SearchRouteOptions<TLocal, TExternal, TPublicLocal>): Promise<
+}: SearchRouteOptions<TLocal, TPublicLocal>): Promise<
   ClientEntitySearchResults<TLocal, TExternal>
 > {
   const endpoint = isAuthenticated

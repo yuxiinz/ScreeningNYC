@@ -192,6 +192,15 @@ export default async function MovieDetailPage({
             />
           ) : null}
 
+          <div className="mb-7">
+            <Link
+              href={`/market/films/${movie.id}`}
+              className="rounded-panel border border-border-input px-4 py-3 text-[0.78rem] font-semibold tracking-[0.08em] text-text-secondary transition-colors hover:border-text-primary hover:text-text-primary"
+            >
+              MARKETPLACE
+            </Link>
+          </div>
+
           <p className="m-0 whitespace-pre-line text-base leading-[1.75] text-text-body">
             {overviewMeta.body || movie.overview || 'No overview available.'}
           </p>

@@ -41,6 +41,7 @@ export default async function MePage() {
           watchlistItems: true,
           directorWatchlistItems: true,
           watchedMovies: true,
+          marketplacePosts: true,
         },
       },
     },
@@ -124,6 +125,14 @@ export default async function MePage() {
           <p className="mb-2 text-[2rem] font-black">{user._count.watchedMovies}</p>
           <p className="m-0 text-[0.88rem] leading-[1.6] text-text-secondary group-hover:text-text-primary">
             Open your watched list and manage the films you have already marked as seen.
+          </p>
+        </Link>
+
+        <Link href="/me/market" className={LINK_CARD_CLASS}>
+          <h2 className="mb-4 text-[1.15rem] font-bold">My market</h2>
+          <p className="mb-2 text-[2rem] font-black">{user._count.marketplacePosts}</p>
+          <p className="m-0 text-[0.88rem] leading-[1.6] text-text-secondary group-hover:text-text-primary">
+            Open your BUY and SELL posts for upcoming showtimes and manage active trades.
           </p>
         </Link>
       </section>

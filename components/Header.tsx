@@ -39,6 +39,9 @@ export default function Header({
           <Link href="/date" className={linkClassName('/date')}>
             DATE
           </Link>
+          <Link href="/market" className={linkClassName('/market', ['/market/'])}>
+            MARKET
+          </Link>
           <Link href="/map" className={linkClassName('/map')}>
             MAP
           </Link>
