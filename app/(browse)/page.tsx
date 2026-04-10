@@ -4,6 +4,7 @@ import Link from 'next/link'
 
 import BackToTopButton from '@/components/BackToTopButton'
 import FilmSearchBox from '@/components/FilmSearchBox'
+import HomeMovieGridSync from '@/components/HomeMovieGridSync'
 import MovieGridCard from '@/components/movie/MovieGridCard'
 import MovieListActions from '@/components/movie/MovieListActions'
 import PaginationControls from '@/components/PaginationControls'
@@ -14,13 +15,19 @@ import {
   getCachedTheaterDirectory,
 } from '@/lib/cache/public-data'
 import { getCurrentUserId } from '@/lib/auth/require-user-id'
-import { parsePositivePage, parseTheaterSlugs } from '@/lib/routing/search-params'
+import {
+  HOME_GRID_ROWS_PER_PAGE,
+  parseHomeGridColumns,
+  parsePositivePage,
+  parseTheaterSlugs,
+} from '@/lib/routing/search-params'
 import { getTodayInAppTimezone } from '@/lib/timezone'
 import { getMovieStatesForUser } from '@/lib/user-movies/service'
 
-const FILMS_PAGE_SIZE = 48
+const HOME_MOVIE_GRID_ID = 'home-movie-grid'
 
 type HomePageSearchParams = {
+  cols?: string | string[]
   theaters?: string | string[]
   page?: string | string[]
 }
@@ -32,6 +39,8 @@ export default async function HomePage({
 }) {
   const params = await searchParams
   const selectedTheaterSlugs = [...new Set(parseTheaterSlugs(params.theaters))].sort()
+  const gridColumns = parseHomeGridColumns(params.cols)
+  const pageSize = gridColumns * HOME_GRID_ROWS_PER_PAGE
   const currentPage = parsePositivePage(params.page)
 
   const todayKey = getTodayInAppTimezone()
@@ -42,7 +51,7 @@ export default async function HomePage({
       selectedTheaterSlugs,
       todayKey,
       page: currentPage,
-      pageSize: FILMS_PAGE_SIZE,
+      pageSize,
     }),
   ])
   const { movies, safePage, totalCount, totalPages } = homeMovies
@@ -62,7 +71,7 @@ export default async function HomePage({
     movies.map((movie) => movie.id)
   )
 
-  const startIndex = totalCount === 0 ? 0 : (safePage - 1) * FILMS_PAGE_SIZE + 1
+  const startIndex = totalCount === 0 ? 0 : (safePage - 1) * pageSize + 1
   const endIndex =
     totalCount === 0 ? 0 : Math.min(startIndex + movies.length - 1, totalCount)
   const filmCountLabel = `${totalCount} scheduled film${totalCount === 1 ? '' : 's'}`
@@ -101,6 +110,8 @@ export default async function HomePage({
       </div>
 
       <main className="mx-auto max-w-[var(--container-wide)]">
+        <HomeMovieGridSync gridId={HOME_MOVIE_GRID_ID} />
+
         <div className="mb-7">
           <TheaterFilter
             theaters={theatersWithSlug.map(theater => ({
@@ -120,7 +131,10 @@ export default async function HomePage({
           </p>
         </div>
 
-        <div className="grid gap-7 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
+        <div
+          id={HOME_MOVIE_GRID_ID}
+          className="grid gap-7 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]"
+        >
           {movies.map(movie => {
             const movieState = movieStates.get(movie.id) || {
               inWant: false,

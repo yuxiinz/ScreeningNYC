@@ -67,23 +67,24 @@ export async function getCachedHomeMovies({
   cacheTag(PUBLIC_CACHE_TAGS.home, PUBLIC_CACHE_TAGS.todaySensitive, todayKey)
 
   const now = new Date()
+  const upcomingShowtimeWhere = {
+    startTime: {
+      gt: now,
+    },
+    status: 'SCHEDULED' as const,
+    ...(selectedTheaterSlugs.length > 0
+      ? {
+          theater: {
+            slug: {
+              in: selectedTheaterSlugs,
+            },
+          },
+        }
+      : {}),
+  }
   const movieWhere = {
     showtimes: {
-      some: {
-        startTime: {
-          gt: now,
-        },
-        status: 'SCHEDULED' as const,
-        ...(selectedTheaterSlugs.length > 0
-          ? {
-              theater: {
-                slug: {
-                  in: selectedTheaterSlugs,
-                },
-              },
-            }
-          : {}),
-      },
+      some: upcomingShowtimeWhere,
     },
   }
   const totalCount = await prisma.movie.count({
@@ -93,29 +94,51 @@ export async function getCachedHomeMovies({
   const safePage = Math.min(page, totalPages)
   const skip = (safePage - 1) * pageSize
 
-  const movies = await prisma.movie.findMany({
-    where: movieWhere,
+  const orderedMovieGroups = await prisma.showtime.groupBy({
+    by: ['movieId'],
+    where: upcomingShowtimeWhere,
+    _min: {
+      startTime: true,
+    },
     orderBy: [
       {
-        updatedAt: 'desc',
+        _min: {
+          startTime: 'asc',
+        },
       },
       {
-        id: 'desc',
+        movieId: 'asc',
       },
     ],
     skip,
     take: pageSize,
-    select: {
-      id: true,
-      title: true,
-      releaseDate: true,
-      posterUrl: true,
-      directorText: true,
-      imdbUrl: true,
-      doubanUrl: true,
-      letterboxdUrl: true,
-    },
   })
+  const movieIds = orderedMovieGroups.map((group) => group.movieId)
+
+  const movieRows =
+    movieIds.length === 0
+      ? []
+      : await prisma.movie.findMany({
+          where: {
+            id: {
+              in: movieIds,
+            },
+          },
+          select: {
+            id: true,
+            title: true,
+            releaseDate: true,
+            posterUrl: true,
+            directorText: true,
+            imdbUrl: true,
+            doubanUrl: true,
+            letterboxdUrl: true,
+          },
+        })
+  const movieById = new Map(movieRows.map((movie) => [movie.id, movie]))
+  const movies = movieIds
+    .map((movieId) => movieById.get(movieId))
+    .filter((movie): movie is (typeof movieRows)[number] => Boolean(movie))
 
   return {
     totalCount,
