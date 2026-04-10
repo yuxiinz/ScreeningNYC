@@ -95,7 +95,7 @@ export default async function PersonDetailPage({
 
   return (
     <main className="mx-auto max-w-[var(--container-wide)]">
-      <BackButton />
+      <BackButton fallbackHref="/people" />
 
       <section className="mb-10 mt-8">
         <h1 className="m-0 mb-3 text-[clamp(2rem,5vw,3.4rem)] font-black leading-[1.05] text-text-primary">

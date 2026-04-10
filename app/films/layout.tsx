@@ -1,6 +1,6 @@
 import SiteShell from '@/components/SiteShell'
 
-export default function BrowseLayout({
+export default function FilmsLayout({
   children,
 }: Readonly<{
   children: React.ReactNode

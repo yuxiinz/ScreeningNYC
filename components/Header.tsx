@@ -33,7 +33,7 @@ export default function Header({
 
       <nav className="mt-5 flex flex-wrap items-center justify-between gap-4">
         <div className="flex gap-[30px]">
-          <Link href="/" className={linkClassName('/')}>
+          <Link href="/" className={linkClassName('/', ['/films/'])}>
             FILMS
           </Link>
           <Link href="/date" className={linkClassName('/date')}>

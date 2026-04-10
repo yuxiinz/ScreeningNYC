@@ -4,12 +4,33 @@
 
 import { useRouter } from 'next/navigation'
 
-export default function BackButton() {
+type BackButtonProps = {
+  fallbackHref?: string
+}
+
+function hasBrowserHistory() {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  return window.history.length > 1
+}
+
+export default function BackButton({
+  fallbackHref = '/',
+}: BackButtonProps) {
   const router = useRouter()
 
   return (
     <button
-      onClick={() => router.back()}
+      onClick={() => {
+        if (hasBrowserHistory()) {
+          router.back()
+          return
+        }
+
+        router.push(fallbackHref)
+      }}
       className="cursor-pointer border-none bg-transparent p-0 text-base text-text-primary"
     >
       ← BACK
