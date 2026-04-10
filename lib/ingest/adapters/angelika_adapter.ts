@@ -1,5 +1,5 @@
-import axios from 'axios'
 import type { ScrapedShowtime, TheaterAdapterConfig } from './types'
+import { fetchJson } from '@/lib/http/server-fetch'
 import { parseFormat, parseRuntimeMinutes, parseYear } from '../core/meta'
 import { parseScreeningTitle } from '../core/screening_title'
 import { cleanText, decodeHtmlEntities, normalizeWhitespace } from '../core/text'
@@ -120,7 +120,7 @@ async function getAngelikaAccessToken(): Promise<string> {
     return cachedAccessToken.token
   }
 
-  const response = await axios.get<AngelikaSettingsResponse>(
+  const response = await fetchJson<AngelikaSettingsResponse>(
     `${ANGELIKA_API_BASE_URL}/settings/${ANGELIKA_COUNTRY_ID}`,
     {
       timeout: 20000,
@@ -274,7 +274,7 @@ export async function scrapeAngelikaShowtimes(
   const theater = getTheaterConfig(config.theaterSlug)
   const token = await getAngelikaAccessToken()
 
-  const response = await axios.get<AngelikaNowShowingResponse>(
+  const response = await fetchJson<AngelikaNowShowingResponse>(
     `${ANGELIKA_API_BASE_URL}/films`,
     {
       timeout: 30000,

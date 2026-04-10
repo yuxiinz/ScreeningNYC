@@ -1,8 +1,8 @@
-import axios from 'axios'
 import * as cheerio from 'cheerio'
 import { DateTime } from 'luxon'
 import type { ScrapedShowtime, TheaterAdapterConfig } from './types'
 import { fetchHtml } from '../core/http'
+import { fetchJson } from '@/lib/http/server-fetch'
 import { parseFormat, parseRuntimeMinutes, parseYear } from '../core/meta'
 import { parseScreeningTitle } from '../core/screening_title'
 import { buildAbsoluteUrl } from '../core/url'
@@ -245,7 +245,7 @@ async function fetchFutureShowtimes(
       page,
     })
 
-    const response = await axios.get<NitehawkShowtime[]>(url, {
+    const response = await fetchJson<NitehawkShowtime[]>(url, {
       timeout: 30000,
       headers: API_HEADERS,
     })
@@ -296,7 +296,7 @@ async function fetchShowsByIds(
       'include[]': chunk,
     })
 
-    const response = await axios.get<NitehawkShow[]>(url, {
+    const response = await fetchJson<NitehawkShow[]>(url, {
       timeout: 30000,
       headers: API_HEADERS,
     })

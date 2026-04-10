@@ -1,9 +1,9 @@
 // lib/ingest/adapters/cinemavillage_adapter.ts
 
-import axios from 'axios'
 import * as cheerio from 'cheerio'
 import { DateTime } from 'luxon'
 import type { ScrapedShowtime, TheaterAdapterConfig } from './types'
+import { fetchText } from '@/lib/http/server-fetch'
 import { cleanText, decodeHtmlEntities, normalizeWhitespace } from '../core/text'
 import { buildAbsoluteUrl } from '../core/url'
 import { parseRuntimeMinutes, parseYear } from '../core/meta'
@@ -78,14 +78,13 @@ function buildCookieHeader(setCookieHeader: unknown): string | undefined {
 
 async function initCinemaVillageSession(): Promise<CinemaVillageSession> {
   try {
-    const response = await axios.get<string>(`${CINEMA_VILLAGE_BASE_URL}/`, {
+    const response = await fetchText(`${CINEMA_VILLAGE_BASE_URL}/`, {
       timeout: 20000,
       headers: CINEMA_VILLAGE_HEADERS,
-      responseType: 'text',
     })
 
     return {
-      cookie: buildCookieHeader(response.headers['set-cookie']),
+      cookie: buildCookieHeader(response.setCookie),
     }
   } catch {
     return {}
@@ -98,30 +97,31 @@ async function fetchCinemaVillageHtml(
   referer = `${CINEMA_VILLAGE_BASE_URL}/`
 ): Promise<string> {
   async function requestHtml(): Promise<CinemaVillageHtmlResponse> {
-    const response = await axios.get<string>(url, {
+    const response = await fetchText(url, {
       timeout: 20000,
       headers: {
         ...CINEMA_VILLAGE_HEADERS,
         Referer: referer,
         ...(session.cookie ? { Cookie: session.cookie } : {}),
       },
-      responseType: 'text',
       validateStatus: () => true,
     })
 
-    const nextCookie = buildCookieHeader(response.headers['set-cookie'])
+    const nextCookie = buildCookieHeader(response.setCookie)
     if (nextCookie) {
       session.cookie = nextCookie
     }
 
-    const html = typeof response.data === 'string' ? response.data : ''
+    const html = response.data
 
     return {
       status: response.status,
       html,
       blocked: responseLooksBlocked({
         status: response.status,
-        headers: response.headers as Record<string, unknown>,
+        headers: {
+          'cf-mitigated': response.headers.get('cf-mitigated'),
+        },
         body: html,
       }),
     }

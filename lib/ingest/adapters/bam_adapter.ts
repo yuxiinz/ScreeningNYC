@@ -1,8 +1,8 @@
-import axios from 'axios'
 import * as cheerio from 'cheerio'
 import type { AnyNode } from 'domhandler'
 import type { ScrapedShowtime, TheaterAdapterConfig } from './types'
 import { fetchHtml } from '../core/http'
+import { fetchJson } from '@/lib/http/server-fetch'
 import { parseFormat, parseRuntimeMinutes, parseYear } from '../core/meta'
 import { buildAbsoluteUrl } from '../core/url'
 import { cleanText, decodeHtmlEntities } from '../core/text'
@@ -488,7 +488,7 @@ async function fetchPerformanceRows(
   }
 
   const apiUrl = `${BAM_BASE_URL}/api/BAMApi/GetPerformancesByProduction?ProductionPageId=${match[1]}`
-  const response = await axios.get<string[]>(apiUrl, {
+  const response = await fetchJson<string[]>(apiUrl, {
     timeout: 20000,
     headers: API_HEADERS,
   })

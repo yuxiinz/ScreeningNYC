@@ -1,5 +1,4 @@
-import axios from 'axios'
-
+import { fetchJson, isHttpError } from '@/lib/http/server-fetch'
 import { syncMovieDirectorsFromTmdbId } from '@/lib/movie/relations'
 import { prisma } from '@/lib/prisma'
 import {
@@ -92,7 +91,7 @@ export async function searchTmdbDirectorCandidates(
 
   const apiKey = getTmdbApiKey()
 
-  const response = await axios.get<TmdbSearchPersonResponse>(
+  const response = await fetchJson<TmdbSearchPersonResponse>(
     'https://api.themoviedb.org/3/search/person',
     {
       timeout: 20000,
@@ -121,13 +120,13 @@ async function fetchTmdbDirectorById(tmdbId: number) {
 
   try {
     const [detailResponse, creditsResponse] = await Promise.all([
-      axios.get<TmdbPersonDetailResponse>(`https://api.themoviedb.org/3/person/${tmdbId}`, {
+      fetchJson<TmdbPersonDetailResponse>(`https://api.themoviedb.org/3/person/${tmdbId}`, {
         timeout: 20000,
         params: {
           api_key: apiKey,
         },
       }),
-      axios.get<TmdbPersonMovieCreditsResponse>(
+      fetchJson<TmdbPersonMovieCreditsResponse>(
         `https://api.themoviedb.org/3/person/${tmdbId}/movie_credits`,
         {
           timeout: 20000,
@@ -156,7 +155,7 @@ async function fetchTmdbDirectorById(tmdbId: number) {
       directedMovieTmdbIds: getDirectedMovieTmdbIds(credits),
     }
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.status === 404) {
+    if (isHttpError(error) && error.status === 404) {
       throw new TmdbPersonNotFoundError()
     }
 

@@ -1,7 +1,7 @@
-import axios from 'axios'
 import * as cheerio from 'cheerio'
 import { DateTime } from 'luxon'
 import type { ScrapedShowtime, TheaterAdapterConfig } from './types'
+import { fetchJson } from '@/lib/http/server-fetch'
 import { fetchHtml } from '../core/http'
 import { cleanText, decodeHtmlEntities, normalizeWhitespace } from '../core/text'
 import { buildAbsoluteUrl } from '../core/url'
@@ -488,10 +488,10 @@ async function fetchVistaAccessToken(): Promise<string | null> {
   })
 
   try {
-    const response = await axios.post<VistaTokenResponse>(
+    const response = await fetchJson<VistaTokenResponse>(
       VISTA_AUTH_URL,
-      body.toString(),
       {
+        body: body.toString(),
         timeout: 20000,
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -508,7 +508,7 @@ async function fetchVistaAccessToken(): Promise<string | null> {
 
 async function fetchVistaScreeningDates(token: string): Promise<string[]> {
   try {
-    const response = await axios.get<VistaScreeningDatesResponse>(
+    const response = await fetchJson<VistaScreeningDatesResponse>(
       `${VISTA_API_BASE}/film-screening-dates`,
       {
         timeout: 20000,
@@ -535,7 +535,7 @@ async function fetchVistaShowtimesByDate(
   businessDate: string
 ): Promise<VistaShowtimesByDateResponse | null> {
   try {
-    const response = await axios.get<VistaShowtimesByDateResponse>(
+    const response = await fetchJson<VistaShowtimesByDateResponse>(
       `${VISTA_API_BASE}/showtimes/by-business-date/${businessDate}`,
       {
         timeout: 20000,

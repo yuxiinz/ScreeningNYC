@@ -1,4 +1,3 @@
-import axios from 'axios'
 import * as cheerio from 'cheerio'
 import type { ScrapedShowtime, TheaterAdapterConfig } from './types'
 import { fetchHtml } from '../core/http'
@@ -6,6 +5,7 @@ import { parseFormat, parseRuntimeMinutes, parseYear } from '../core/meta'
 import { parseScreeningTitle } from '../core/screening_title'
 import { cleanText, decodeHtmlEntities } from '../core/text'
 import { buildAbsoluteUrl, pickFirstAbsoluteUrl } from '../core/url'
+import { fetchJson } from '@/lib/http/server-fetch'
 
 const JAPAN_SOCIETY_BASE_URL = 'https://japansociety.org'
 const DEFAULT_JAPAN_SOCIETY_API_URL =
@@ -387,10 +387,9 @@ function buildSourceShowtimeId(
 }
 
 async function fetchJapanSocietyEvents(sourceUrl: string): Promise<JapanSocietyEvent[]> {
-  const response = await axios.get<JapanSocietyEvent[]>(sourceUrl, {
+  const response = await fetchJson<JapanSocietyEvent[]>(sourceUrl, {
     timeout: 20000,
     headers: API_HEADERS,
-    responseType: 'json',
   })
 
   return Array.isArray(response.data) ? response.data : []

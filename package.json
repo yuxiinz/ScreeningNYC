@@ -23,7 +23,6 @@
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
     "@vercel/analytics": "^2.0.1",
-    "axios": "^1.13.6",
     "bcryptjs": "^3.0.3",
     "cheerio": "^1.2.0",
     "csv-parse": "^6.2.1",

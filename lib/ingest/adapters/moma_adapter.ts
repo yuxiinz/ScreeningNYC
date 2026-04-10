@@ -1,9 +1,9 @@
 // lib/ingest/adapters/moma_adapter.ts
 
-import axios from 'axios'
 import * as cheerio from 'cheerio'
 import type { AnyNode } from 'domhandler'
 import type { ScrapedShowtime, TheaterAdapterConfig } from './types'
+import { fetchText } from '@/lib/http/server-fetch'
 import { fetchHtml } from '../core/http'
 import { formatShowtimeRaw, parseShowtime } from '../core/datetime'
 import { parseFormat, parseRuntimeMinutes, parseYear } from '../core/meta'
@@ -421,15 +421,15 @@ function parseListingPage(html: string): ListingRow[] {
 
 async function fetchDetailPage(url: string): Promise<DetailFetchResult> {
   try {
-    const res = await axios.get<string>(url, {
+    const res = await fetchText(url, {
       timeout: 20000,
       headers: DETAIL_HEADERS,
-      responseType: 'text',
       validateStatus: () => true,
     })
 
-    const body = typeof res.data === 'string' ? res.data : ''
-    const cfMitigated = String(res.headers['cf-mitigated'] || '').toLowerCase() === 'challenge'
+    const body = res.data
+    const cfMitigated =
+      String(res.headers.get('cf-mitigated') || '').toLowerCase() === 'challenge'
     const looksBlocked =
       res.status === 403 ||
       cfMitigated ||

@@ -1,5 +1,4 @@
-import axios from 'axios'
-
+import { fetchJson } from '@/lib/http/server-fetch'
 import {
   type ExternalDirectorMovie,
   type MovieDirectorSyncInput,
@@ -67,7 +66,7 @@ export async function fetchTmdbMovieDirectors(
 ): Promise<MovieDirectorSyncInput[]> {
   const apiKey = getTmdbApiKey()
 
-  const response = await axios.get<TmdbMovieCreditsResponse>(
+  const response = await fetchJson<TmdbMovieCreditsResponse>(
     `https://api.themoviedb.org/3/movie/${tmdbMovieId}/credits`,
     {
       timeout: 20000,
@@ -86,7 +85,7 @@ export async function fetchTmdbDirectorFilmography(
 ): Promise<ExternalDirectorMovie[]> {
   const apiKey = getTmdbApiKey()
 
-  const response = await axios.get<TmdbPersonMovieCreditsResponse>(
+  const response = await fetchJson<TmdbPersonMovieCreditsResponse>(
     `https://api.themoviedb.org/3/person/${tmdbPersonId}/movie_credits`,
     {
       timeout: 20000,

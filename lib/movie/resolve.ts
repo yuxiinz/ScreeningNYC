@@ -1,6 +1,6 @@
-import axios from 'axios'
 import type { Movie } from '@prisma/client'
 
+import { fetchJson, isHttpError } from '@/lib/http/server-fetch'
 import {
   mergeMovieImportLinks,
   type FallbackMovieData,
@@ -124,7 +124,7 @@ export async function searchTmdbCandidates(
 
   const apiKey = getTmdbApiKey()
 
-  const response = await axios.get<TmdbSearchMovieResponse>(
+  const response = await fetchJson<TmdbSearchMovieResponse>(
     'https://api.themoviedb.org/3/search/movie',
     {
       timeout: 20000,
@@ -157,19 +157,19 @@ async function fetchTmdbMovieById(tmdbId: number): Promise<TmdbMovie> {
 
   try {
     const [detailResponse, creditsResponse, externalIdsResponse] = await Promise.all([
-      axios.get<TmdbMovieDetailResponse>(`https://api.themoviedb.org/3/movie/${tmdbId}`, {
+      fetchJson<TmdbMovieDetailResponse>(`https://api.themoviedb.org/3/movie/${tmdbId}`, {
         timeout: 20000,
         params: {
           api_key: apiKey,
         },
       }),
-      axios.get<TmdbCreditsResponse>(`https://api.themoviedb.org/3/movie/${tmdbId}/credits`, {
+      fetchJson<TmdbCreditsResponse>(`https://api.themoviedb.org/3/movie/${tmdbId}/credits`, {
         timeout: 20000,
         params: {
           api_key: apiKey,
         },
       }),
-      axios.get<TmdbExternalIdsResponse>(
+      fetchJson<TmdbExternalIdsResponse>(
         `https://api.themoviedb.org/3/movie/${tmdbId}/external_ids`,
         {
           timeout: 20000,
@@ -226,7 +226,7 @@ async function fetchTmdbMovieById(tmdbId: number): Promise<TmdbMovie> {
       directorCredits: mapTmdbMovieCreditsToDirectors(credits),
     }
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.status === 404) {
+    if (isHttpError(error) && error.status === 404) {
       throw new TmdbMovieNotFoundError()
     }
 

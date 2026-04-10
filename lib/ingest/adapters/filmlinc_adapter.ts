@@ -1,5 +1,5 @@
-import axios from 'axios'
 import type { ScrapedShowtime, TheaterAdapterConfig } from './types'
+import { fetchJson } from '@/lib/http/server-fetch'
 import { parseRuntimeMinutes } from '../core/meta'
 import { parseScreeningTitle } from '../core/screening_title'
 import { cleanText, decodeHtmlEntities } from '../core/text'
@@ -328,7 +328,7 @@ export function mapFlcApiFilmToShowtimes(
 }
 
 async function fetchFlcShowtimes(apiUrl: string): Promise<FlcApiFilm[]> {
-  const response = await axios.get<FlcShowtimesApiResponse>(apiUrl, {
+  const response = await fetchJson<FlcShowtimesApiResponse>(apiUrl, {
     timeout: 20000,
     headers: API_HEADERS,
   })
@@ -341,15 +341,15 @@ async function fetchFlcFilmDetail(slug: string): Promise<FlcFilmDetail | null> {
   if (!cleanedSlug) return null
 
   try {
-    const response = await axios.post<FlcGraphQlResponse>(
+    const response = await fetchJson<FlcGraphQlResponse>(
       process.env.FLC_GRAPHQL_URL || DEFAULT_FLC_GRAPHQL_URL,
       {
-        query: FLC_FILM_DETAIL_QUERY,
-        variables: {
-          id: `/films/${cleanedSlug}/`,
+        jsonBody: {
+          query: FLC_FILM_DETAIL_QUERY,
+          variables: {
+            id: `/films/${cleanedSlug}/`,
+          },
         },
-      },
-      {
         timeout: 20000,
         headers: GRAPHQL_HEADERS,
       }

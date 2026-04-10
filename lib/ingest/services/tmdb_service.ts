@@ -1,12 +1,12 @@
 // lib/ingest/services/tmdb_service.ts
 
-import axios from 'axios'
 import { normalizeScreeningMovieTitle } from '../core/screening_title'
 import {
   normalizeWhitespace,
   stripLeadingBullets,
   isLikelyProgramTitle,
 } from '../core/text'
+import { fetchJson } from '@/lib/http/server-fetch'
 import { mapTmdbMovieCreditsToDirectors } from '@/lib/people/tmdb'
 import type { MovieDirectorSyncInput } from '@/lib/people/types'
 import { buildTmdbImageUrl } from '@/lib/tmdb/client'
@@ -347,7 +347,7 @@ export async function searchTmdbMovie(params: SearchTmdbParams): Promise<TmdbMov
   let bestScore = Number.NEGATIVE_INFINITY
 
   for (const query of candidateQueries) {
-    const searchRes = await axios.get<TmdbSearchMovieResponse>(
+    const searchRes = await fetchJson<TmdbSearchMovieResponse>(
       'https://api.themoviedb.org/3/search/movie',
       {
         timeout: 20000,
@@ -370,14 +370,14 @@ export async function searchTmdbMovie(params: SearchTmdbParams): Promise<TmdbMov
 
       try {
         const [detailRes, creditsRes] = await Promise.all([
-          axios.get<TmdbMovieDetailResponse>(
+          fetchJson<TmdbMovieDetailResponse>(
             `https://api.themoviedb.org/3/movie/${movieId}`,
             {
               timeout: 20000,
               params: { api_key: params.tmdbApiKey },
             }
           ),
-          axios.get<TmdbCreditsResponse>(
+          fetchJson<TmdbCreditsResponse>(
             `https://api.themoviedb.org/3/movie/${movieId}/credits`,
             {
               timeout: 20000,
@@ -452,7 +452,7 @@ export async function searchTmdbMovie(params: SearchTmdbParams): Promise<TmdbMov
     return buildFallbackOnly(params)
   }
 
-  const externalRes = await axios.get<TmdbExternalIdsResponse>(
+  const externalRes = await fetchJson<TmdbExternalIdsResponse>(
     `https://api.themoviedb.org/3/movie/${best.detail.id}/external_ids`,
     {
       timeout: 20000,

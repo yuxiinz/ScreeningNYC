@@ -1,6 +1,6 @@
 // lib/ingest/core/http.ts
 
-import axios from 'axios'
+import { fetchText } from '@/lib/http/server-fetch'
 
 const DEFAULT_HEADERS = {
   'User-Agent':
@@ -10,10 +10,9 @@ const DEFAULT_HEADERS = {
 }
 
 export async function fetchHtml(url: string): Promise<string> {
-  const res = await axios.get<string>(url, {
+  const res = await fetchText(url, {
     timeout: 20000,
     headers: DEFAULT_HEADERS,
-    responseType: 'text',
   })
 
   return res.data
