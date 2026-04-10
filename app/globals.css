@@ -22,6 +22,12 @@
   --app-border-strong: #333333;
   --app-border-input: #464646;
   --app-accent-positive: #00b51d;
+  --app-status-error: #ffb3b3;
+  --app-status-error-bg: #261313;
+  --app-status-error-border: #6b2c2c;
+  --app-status-success: #9fddb0;
+  --app-status-success-bg: #102114;
+  --app-status-success-border: #23452a;
   --app-accent-imdb: #f5c518;
   --app-accent-douban: #00b51d;
   --app-accent-letterboxd: #ff8000;
@@ -55,6 +61,12 @@
   --color-border-strong: var(--app-border-strong);
   --color-border-input: var(--app-border-input);
   --color-accent-positive: var(--app-accent-positive);
+  --color-status-error: var(--app-status-error);
+  --color-status-error-bg: var(--app-status-error-bg);
+  --color-status-error-border: var(--app-status-error-border);
+  --color-status-success: var(--app-status-success);
+  --color-status-success-bg: var(--app-status-success-bg);
+  --color-status-success-border: var(--app-status-success-border);
   --color-accent-imdb: var(--app-accent-imdb);
   --color-accent-douban: var(--app-accent-douban);
   --color-accent-letterboxd: var(--app-accent-letterboxd);

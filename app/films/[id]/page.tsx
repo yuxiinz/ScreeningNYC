@@ -19,7 +19,7 @@ import {
   cleanDirectorText,
   getReleaseYear,
 } from '@/lib/movie/display'
-import { syncMoviePeopleFromTmdbId } from '@/lib/movie/relations'
+import { syncMovieDirectorsFromTmdbId } from '@/lib/movie/relations'
 import { TmdbApiKeyMissingError } from '@/lib/tmdb/client'
 import { getMovieStatesForUser } from '@/lib/user-movies/service'
 import {
@@ -100,7 +100,7 @@ export default async function MovieDetailPage({
 
   if (movie.tmdbId && peopleLinks.length === 0) {
     try {
-      await syncMoviePeopleFromTmdbId(movie.id, movie.tmdbId)
+      await syncMovieDirectorsFromTmdbId(movie.id, movie.tmdbId)
       peopleLinks = await getMovieDirectorPeople(movieId)
     } catch (error) {
       if (!(error instanceof TmdbApiKeyMissingError)) {

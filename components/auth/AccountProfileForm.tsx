@@ -1,19 +1,22 @@
 'use client'
 
+import { useRouter } from 'next/navigation'
 import { FormEvent, useState } from 'react'
 
-type ResendVerificationFormProps = {
-  defaultEmail?: string
+type AccountProfileFormProps = {
+  initialName: string
 }
 
-type ResendErrorResponse = {
+type AccountUpdateErrorResponse = {
+  name?: string | null
   message?: string
 }
 
-export default function ResendVerificationForm({
-  defaultEmail = '',
-}: ResendVerificationFormProps) {
-  const [email, setEmail] = useState(defaultEmail)
+export default function AccountProfileForm({
+  initialName,
+}: AccountProfileFormProps) {
+  const router = useRouter()
+  const [name, setName] = useState(initialName)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -25,47 +28,52 @@ export default function ResendVerificationForm({
     setMessage('')
 
     try {
-      const response = await fetch('/api/auth/verify-email/resend', {
-        method: 'POST',
+      const response = await fetch('/api/me/account', {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({
+          name,
+        }),
       })
 
       if (!response.ok) {
-        const payload = (await response.json()) as ResendErrorResponse
-        setError(payload.message || 'Could not resend verification email.')
+        const payload = (await response.json()) as AccountUpdateErrorResponse
+        setError(payload.message || 'Could not update account details.')
         return
       }
 
-      setMessage('If this account still needs verification, we sent a fresh email.')
+      const payload = (await response.json()) as AccountUpdateErrorResponse
+      setName(payload.name || '')
+      setMessage('Account details updated.')
+      router.refresh()
     } catch {
-      setError('Could not resend verification email.')
+      setError('Could not update account details.')
     } finally {
       setPending(false)
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-3">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       <label className="text-[0.78rem] font-semibold tracking-[0.08em] text-text-dim">
-        EMAIL
+        NAME
       </label>
       <input
-        type="email"
-        value={email}
-        onChange={(event) => setEmail(event.target.value)}
-        autoComplete="email"
+        type="text"
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        autoComplete="name"
         className="rounded-panel border border-border-input bg-page-bg px-4 py-3 outline-none"
       />
 
       <button
         type="submit"
         disabled={pending}
-        className="rounded-panel border border-border-input px-4 py-3 text-[0.9rem] font-semibold transition-colors hover:border-text-primary disabled:cursor-not-allowed disabled:opacity-50"
+        className="mt-2 rounded-panel border border-text-primary bg-text-primary px-4 py-3 text-[0.9rem] font-bold text-page-bg transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {pending ? 'Resending...' : 'Resend verification email'}
+        {pending ? 'Saving...' : 'Save name'}
       </button>
 
       {(error || message) && (

@@ -2,19 +2,18 @@
 
 import { useState } from 'react'
 
-import RatingChain from '@/components/movie/RatingChain'
-import { getErrorMessageFromResponse } from '@/lib/api/client-response'
+import WatchedReviewFields from '@/components/movie/WatchedReviewFields'
 import { getReviewWordCount } from '@/lib/user-movies/review'
+import {
+  normalizeClientReviewText,
+  saveMovieWatchedEntry,
+} from '@/lib/user-movies/client-watched'
 
 type WatchedReviewEditorProps = {
   movieId: number
   initialRating: number | null
   initialReviewText?: string | null
   className?: string
-}
-
-function normalizeClientReviewText(reviewText: string) {
-  return reviewText.trim()
 }
 
 export default function WatchedReviewEditor({
@@ -50,26 +49,13 @@ export default function WatchedReviewEditor({
     setNotice('')
 
     try {
-      const response = await fetch(`/api/me/movies/${movieId}/watched`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          preserveWatchedAt: true,
-          rating,
-          reviewText: normalizedReviewText || null,
-        }),
+      await saveMovieWatchedEntry({
+        fallbackError: 'Could not save rating and review.',
+        movieId,
+        preserveWatchedAt: true,
+        rating,
+        reviewText: normalizedReviewText || null,
       })
-
-      if (!response.ok) {
-        throw new Error(
-          await getErrorMessageFromResponse(
-            response,
-            'Could not save rating and review.'
-          )
-        )
-      }
 
       setSavedRating(rating)
       setSavedReviewText(normalizedReviewText)
@@ -93,58 +79,25 @@ export default function WatchedReviewEditor({
         className || '',
       ].join(' ')}
     >
-      <div className="mb-5">
-        <p className="mb-3 text-[0.78rem] font-semibold tracking-[0.08em] text-text-dim">
-          RATING
-        </p>
-        <RatingChain
-          value={rating}
-          onChange={(nextRating) => {
-            setRating(nextRating)
-            setNotice('')
-          }}
-          disabled={pending}
-        />
-      </div>
-
-      <div className="mb-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <p className="m-0 text-[0.78rem] font-semibold tracking-[0.08em] text-text-dim">
-            SHORT REVIEW
-          </p>
-          <p
-            className={[
-              'm-0 text-[0.78rem]',
-              reviewTooLong ? 'text-[#ffb3b3]' : 'text-text-dim',
-            ].join(' ')}
-          >
-            {reviewWordCount}/200 words
-          </p>
-        </div>
-
-        <textarea
-          value={reviewText}
-          onChange={(event) => {
-            setReviewText(event.target.value)
-            setNotice('')
-          }}
-          rows={7}
-          placeholder="Optional. Keep it short."
-          disabled={pending}
-          className="w-full rounded-panel border border-border-input bg-card-bg px-4 py-3 text-[0.92rem] leading-[1.7] text-text-primary outline-none placeholder:text-text-dim disabled:cursor-not-allowed disabled:opacity-60"
-        />
-      </div>
-
-      {(error || notice) && (
-        <p
-          className={[
-            'mb-4 text-[0.82rem] leading-[1.6]',
-            error ? 'text-[#ffb3b3]' : 'text-accent-positive',
-          ].join(' ')}
-        >
-          {error || notice}
-        </p>
-      )}
+      <WatchedReviewFields
+        error={error}
+        notice={notice}
+        pending={pending}
+        rating={rating}
+        rows={7}
+        reviewText={reviewText}
+        reviewTooLong={reviewTooLong}
+        reviewWordCount={reviewWordCount}
+        textareaClassName="bg-card-bg leading-[1.7]"
+        onRatingChange={(nextRating) => {
+          setRating(nextRating)
+          setNotice('')
+        }}
+        onReviewTextChange={(nextReviewText) => {
+          setReviewText(nextReviewText)
+          setNotice('')
+        }}
+      />
 
       <div className="flex flex-wrap justify-end gap-3">
         <button

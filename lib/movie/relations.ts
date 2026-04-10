@@ -1,8 +1,8 @@
 import { Prisma } from '@prisma/client'
 
 import { prisma } from '@/lib/prisma'
-import { fetchTmdbMoviePeople } from '@/lib/people/tmdb'
-import type { MoviePersonSyncInput } from '@/lib/people/types'
+import { fetchTmdbMovieDirectors } from '@/lib/people/tmdb'
+import type { MovieDirectorSyncInput } from '@/lib/people/types'
 import { normalizeWhitespace } from '@/lib/ingest/core/text'
 
 function slugifyTagName(name: string) {
@@ -23,8 +23,8 @@ function parseCommaSeparatedValues(value?: string | null) {
     .filter(Boolean)
 }
 
-function dedupePeople(inputs: MoviePersonSyncInput[]) {
-  const deduped = new Map<string, MoviePersonSyncInput>()
+function dedupeDirectors(inputs: MovieDirectorSyncInput[]) {
+  const deduped = new Map<string, MovieDirectorSyncInput>()
 
   inputs.forEach((input) => {
     const name = normalizeWhitespace(input.name)
@@ -52,7 +52,7 @@ function dedupePeople(inputs: MoviePersonSyncInput[]) {
   return [...deduped.values()]
 }
 
-async function getOrCreatePersonId(input: MoviePersonSyncInput) {
+async function getOrCreatePersonId(input: MovieDirectorSyncInput) {
   const name = normalizeWhitespace(input.name)
 
   if (!name) {
@@ -180,31 +180,21 @@ async function getOrCreatePersonId(input: MoviePersonSyncInput) {
   return created.id
 }
 
-export async function syncMoviePeople(
+export async function syncMovieDirectors(
   movieId: number,
-  inputs: MoviePersonSyncInput[],
-  {
-    replaceKinds,
-  }: {
-    replaceKinds?: Array<MoviePersonSyncInput['kind']>
-  } = {}
+  inputs: MovieDirectorSyncInput[]
 ) {
-  const people = dedupePeople(inputs)
-  const kindsToReplace = replaceKinds || [...new Set(people.map((person) => person.kind))]
-
-  if (!kindsToReplace.length) {
-    return
-  }
+  const directors = dedupeDirectors(inputs)
 
   const rows: Array<{
     movieId: number
     personId: number
-    kind: MoviePersonSyncInput['kind']
+    kind: MovieDirectorSyncInput['kind']
     billingOrder: number | null
   }> = []
   const personIdCache = new Map<string, number>()
 
-  for (const input of people) {
+  for (const input of directors) {
     const personKey = input.tmdbId
       ? `tmdb:${input.tmdbId}`
       : `name:${normalizeWhitespace(input.name).toLowerCase()}`
@@ -234,9 +224,7 @@ export async function syncMoviePeople(
     prisma.moviePerson.deleteMany({
       where: {
         movieId,
-        kind: {
-          in: kindsToReplace,
-        },
+        kind: 'DIRECTOR',
       },
     }),
     ...(rows.length > 0
@@ -250,14 +238,12 @@ export async function syncMoviePeople(
   ])
 }
 
-export async function syncMoviePeopleFromTmdbId(movieId: number, tmdbId: number) {
-  const people = await fetchTmdbMoviePeople(tmdbId)
+export async function syncMovieDirectorsFromTmdbId(movieId: number, tmdbId: number) {
+  const directors = await fetchTmdbMovieDirectors(tmdbId)
 
   // The schema still allows CAST links, but automated TMDB sync is
   // intentionally director-only until the app exposes broader person flows.
-  await syncMoviePeople(movieId, people, {
-    replaceKinds: ['DIRECTOR'],
-  })
+  await syncMovieDirectors(movieId, directors)
 }
 
 export async function syncMovieTags(movieId: number, genresText?: string | null) {

@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-import { syncMoviePeopleFromTmdbId } from '@/lib/movie/relations'
+import { syncMovieDirectorsFromTmdbId } from '@/lib/movie/relations'
 import { prisma } from '@/lib/prisma'
 import {
   buildTmdbImageUrl,
@@ -183,7 +183,7 @@ export async function resolveDirectorFromTmdbId(tmdbId: number) {
 
     for (const movie of localMovies) {
       if (!movie.tmdbId) continue
-      await syncMoviePeopleFromTmdbId(movie.id, movie.tmdbId)
+      await syncMovieDirectorsFromTmdbId(movie.id, movie.tmdbId)
     }
   }
 

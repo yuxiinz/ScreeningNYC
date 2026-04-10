@@ -2,6 +2,11 @@ import { Prisma } from '@prisma/client'
 
 import { prisma } from '@/lib/prisma'
 import {
+  createCollectionStateMap,
+  getUniquePositiveIds,
+  patchCollectionState,
+} from '@/lib/user-collections/state'
+import {
   getReviewWordCount,
   normalizeReviewText,
 } from '@/lib/user-movies/review'
@@ -25,10 +30,6 @@ function toPlainRating(
   return value.toNumber()
 }
 
-function getUniqueMovieIds(movieIds: number[]) {
-  return [...new Set(movieIds.filter((movieId) => Number.isInteger(movieId) && movieId > 0))]
-}
-
 async function movieHasUpcomingShowtimes(movieId: number, now: Date = new Date()) {
   const showtime = await prisma.showtime.findFirst({
     where: {
@@ -50,15 +51,14 @@ export async function getMovieStatesForUser(
   userId: string | null,
   movieIds: number[]
 ) {
-  const uniqueMovieIds = getUniqueMovieIds(movieIds)
-  const states = new Map<number, MovieCollectionState>()
-
-  uniqueMovieIds.forEach((movieId) => {
-    states.set(movieId, {
-      inWant: false,
-      inWatched: false,
-    })
+  const createInitialState = (): MovieCollectionState => ({
+    inWant: false,
+    inWatched: false,
   })
+  const {
+    states,
+    uniqueIds: uniqueMovieIds,
+  } = createCollectionStateMap(movieIds, createInitialState)
 
   if (!userId || uniqueMovieIds.length === 0) {
     return states
@@ -90,26 +90,43 @@ export async function getMovieStatesForUser(
   ])
 
   watchlistItems.forEach(({ movieId }) => {
-    states.set(movieId, {
-      ...(states.get(movieId) || {
-        inWant: false,
-        inWatched: false,
-      }),
+    patchCollectionState(states, movieId, {
       inWant: true,
-    })
+    }, createInitialState)
   })
 
   watchedMovies.forEach(({ movieId }) => {
-    states.set(movieId, {
-      ...(states.get(movieId) || {
-        inWant: false,
-        inWatched: false,
-      }),
+    patchCollectionState(states, movieId, {
       inWatched: true,
-    })
+    }, createInitialState)
   })
 
   return states
+}
+
+export async function getWantedMovieIdsForUser(
+  userId: string | null,
+  movieIds: number[]
+) {
+  const uniqueMovieIds = getUniquePositiveIds(movieIds)
+
+  if (!userId || uniqueMovieIds.length === 0) {
+    return new Set<number>()
+  }
+
+  const watchlistItems = await prisma.watchlistItem.findMany({
+    where: {
+      userId,
+      movieId: {
+        in: uniqueMovieIds,
+      },
+    },
+    select: {
+      movieId: true,
+    },
+  })
+
+  return new Set(watchlistItems.map(({ movieId }) => movieId))
 }
 
 export async function addWant(userId: string, movieId: number) {

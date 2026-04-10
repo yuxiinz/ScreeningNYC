@@ -1,8 +1,8 @@
 import axios from 'axios'
 
 import {
-  type ExternalPersonMovie,
-  type MoviePersonSyncInput,
+  type ExternalDirectorMovie,
+  type MovieDirectorSyncInput,
 } from '@/lib/people/types'
 import {
   buildTmdbImageUrl,
@@ -45,10 +45,10 @@ function getReleaseYear(value?: string | null) {
   return Number.isFinite(year) ? year : null
 }
 
-export function mapTmdbMovieCreditsToPeople(
+export function mapTmdbMovieCreditsToDirectors(
   credits: TmdbMovieCreditsResponse,
   { directorLimit = 3 }: { directorLimit?: number } = {}
-): MoviePersonSyncInput[] {
+): MovieDirectorSyncInput[] {
   return (credits.crew || [])
     .filter((person) => person.job === 'Director' && person.id && person.name)
     .slice(0, directorLimit)
@@ -62,9 +62,9 @@ export function mapTmdbMovieCreditsToPeople(
     }))
 }
 
-export async function fetchTmdbMoviePeople(
+export async function fetchTmdbMovieDirectors(
   tmdbMovieId: number
-): Promise<MoviePersonSyncInput[]> {
+): Promise<MovieDirectorSyncInput[]> {
   const apiKey = getTmdbApiKey()
 
   const response = await axios.get<TmdbMovieCreditsResponse>(
@@ -77,13 +77,13 @@ export async function fetchTmdbMoviePeople(
     }
   )
 
-  return mapTmdbMovieCreditsToPeople(response.data)
+  return mapTmdbMovieCreditsToDirectors(response.data)
 }
 
 export async function fetchTmdbDirectorFilmography(
   tmdbPersonId: number,
   { take = 10 }: { take?: number } = {}
-): Promise<ExternalPersonMovie[]> {
+): Promise<ExternalDirectorMovie[]> {
   const apiKey = getTmdbApiKey()
 
   const response = await axios.get<TmdbPersonMovieCreditsResponse>(

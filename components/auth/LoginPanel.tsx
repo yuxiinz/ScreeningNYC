@@ -211,8 +211,8 @@ export default function LoginPanel({
           className={[
             'mt-6 rounded-panel border px-4 py-3 text-[0.9rem] leading-[1.5]',
             error
-              ? 'border-[#6b2c2c] bg-[#261313] text-[#ffb3b3]'
-              : 'border-[#23452a] bg-[#102114] text-[#9fddb0]',
+              ? 'border-status-error-border bg-status-error-bg text-status-error'
+              : 'border-status-success-border bg-status-success-bg text-status-success',
           ].join(' ')}
         >
           {error || message}

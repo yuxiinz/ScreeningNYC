@@ -7,9 +7,13 @@ import {
   buildListActionButtonClass,
   toggleListAction,
 } from '@/components/list-actions/shared'
-import RatingChain from '@/components/movie/RatingChain'
+import WatchedReviewFields from '@/components/movie/WatchedReviewFields'
 import { getErrorMessageFromResponse } from '@/lib/api/client-response'
 import { getReviewWordCount } from '@/lib/user-movies/review'
+import {
+  normalizeClientReviewText,
+  saveMovieWatchedEntry,
+} from '@/lib/user-movies/client-watched'
 
 type MovieListActionsProps = {
   movieId: number
@@ -120,25 +124,12 @@ export default function MovieListActions({
     setError('')
 
     try {
-      const response = await fetch(`/api/me/movies/${movieId}/watched`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          rating,
-          reviewText: reviewText.trim() || null,
-        }),
+      await saveMovieWatchedEntry({
+        fallbackError: 'Could not update watched list.',
+        movieId,
+        rating,
+        reviewText: normalizeClientReviewText(reviewText) || null,
       })
-
-      if (!response.ok) {
-        throw new Error(
-          await getErrorMessageFromResponse(
-            response,
-            'Could not update watched list.'
-          )
-        )
-      }
 
       setInWatched(true)
       setWatchedDialogOpen(false)
@@ -223,7 +214,7 @@ export default function MovieListActions({
       </div>
 
       {error && !watchedDialogOpen ? (
-        <p className="mt-2 text-[0.78rem] leading-[1.5] text-[#ffb3b3]">
+        <p className="mt-2 text-[0.78rem] leading-[1.5] text-status-error">
           {error}
         </p>
       ) : null}
@@ -246,41 +237,16 @@ export default function MovieListActions({
               ) : null}
             </div>
 
-            <div className="mb-6">
-              <p className="mb-3 text-[0.78rem] font-semibold tracking-[0.08em] text-text-dim">
-                RATING
-              </p>
-              <RatingChain value={rating} onChange={setRating} disabled={pendingAction !== null} />
-            </div>
-
-            <div className="mb-6">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <p className="m-0 text-[0.78rem] font-semibold tracking-[0.08em] text-text-dim">
-                  SHORT REVIEW
-                </p>
-                <p
-                  className={[
-                    'm-0 text-[0.78rem]',
-                    reviewTooLong ? 'text-[#ffb3b3]' : 'text-text-dim',
-                  ].join(' ')}
-                >
-                  {reviewWordCount}/200 words
-                </p>
-              </div>
-              <textarea
-                value={reviewText}
-                onChange={(event) => setReviewText(event.target.value)}
-                rows={5}
-                placeholder="Optional. Keep it short."
-                className="w-full rounded-panel border border-border-input bg-page-bg px-4 py-3 text-[0.92rem] leading-[1.6] text-text-primary outline-none placeholder:text-text-dim"
-              />
-            </div>
-
-            {error ? (
-              <p className="mb-6 text-[0.82rem] leading-[1.6] text-[#ffb3b3]">
-                {error}
-              </p>
-            ) : null}
+            <WatchedReviewFields
+              error={error}
+              pending={pendingAction !== null}
+              rating={rating}
+              reviewText={reviewText}
+              reviewTooLong={reviewTooLong}
+              reviewWordCount={reviewWordCount}
+              onRatingChange={setRating}
+              onReviewTextChange={setReviewText}
+            />
 
             <div className="flex flex-wrap justify-end gap-3">
               <button
@@ -327,7 +293,7 @@ export default function MovieListActions({
             </div>
 
             {error ? (
-              <p className="mb-6 text-[0.82rem] leading-[1.6] text-[#ffb3b3]">
+              <p className="mb-6 text-[0.82rem] leading-[1.6] text-status-error">
                 {error}
               </p>
             ) : null}

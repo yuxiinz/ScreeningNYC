@@ -70,7 +70,15 @@ export default async function MePage() {
                 Signed in as {user.email}
               </p>
             </div>
-            <LogoutButton />
+            <div className="flex items-center gap-3">
+              <Link
+                href="/me/account"
+                className="rounded-panel border border-border-input px-4 py-2 text-[0.82rem] font-semibold text-text-primary transition-colors hover:border-text-primary"
+              >
+                Edit
+              </Link>
+              <LogoutButton />
+            </div>
           </div>
 
           <div className="space-y-3 text-[0.9rem] leading-[1.6] text-text-body">

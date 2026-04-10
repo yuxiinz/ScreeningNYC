@@ -1,12 +1,12 @@
 import { prisma } from '@/lib/prisma'
 import { getUpcomingShowtimeWhere } from '@/lib/showtime/queries'
+import {
+  createCollectionStateMap,
+  patchCollectionState,
+} from '@/lib/user-collections/state'
 
 export type DirectorCollectionState = {
   inWant: boolean
-}
-
-function getUniquePersonIds(personIds: number[]) {
-  return [...new Set(personIds.filter((personId) => Number.isInteger(personId) && personId > 0))]
 }
 
 async function getDirectorUpcomingMovieIds(personId: number, now: Date = new Date()) {
@@ -37,14 +37,13 @@ export async function getDirectorStatesForUser(
   userId: string | null,
   personIds: number[]
 ) {
-  const uniquePersonIds = getUniquePersonIds(personIds)
-  const states = new Map<number, DirectorCollectionState>()
-
-  uniquePersonIds.forEach((personId) => {
-    states.set(personId, {
-      inWant: false,
-    })
+  const createInitialState = (): DirectorCollectionState => ({
+    inWant: false,
   })
+  const {
+    states,
+    uniqueIds: uniquePersonIds,
+  } = createCollectionStateMap(personIds, createInitialState)
 
   if (!userId || uniquePersonIds.length === 0) {
     return states
@@ -63,9 +62,9 @@ export async function getDirectorStatesForUser(
   })
 
   items.forEach(({ personId }) => {
-    states.set(personId, {
+    patchCollectionState(states, personId, {
       inWant: true,
-    })
+    }, createInitialState)
   })
 
   return states

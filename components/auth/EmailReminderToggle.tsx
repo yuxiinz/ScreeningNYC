@@ -74,7 +74,7 @@ export default function EmailReminderToggle({
       </label>
 
       {error && (
-        <p className="mt-3 text-[0.82rem] text-[#ffb3b3]">{error}</p>
+        <p className="mt-3 text-[0.82rem] text-status-error">{error}</p>
       )}
     </div>
   )

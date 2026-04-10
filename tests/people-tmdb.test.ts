@@ -1,10 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { mapTmdbMovieCreditsToPeople } from '../lib/people/tmdb'
+import { mapTmdbMovieCreditsToDirectors } from '../lib/people/tmdb'
 
-test('mapTmdbMovieCreditsToPeople keeps only director crew entries and ignores cast', () => {
-  const people = mapTmdbMovieCreditsToPeople({
+test('mapTmdbMovieCreditsToDirectors keeps only director crew entries and ignores cast', () => {
+  const directors = mapTmdbMovieCreditsToDirectors({
     crew: [
       {
         id: 101,
@@ -30,7 +30,7 @@ test('mapTmdbMovieCreditsToPeople keeps only director crew entries and ignores c
     ],
   })
 
-  assert.deepEqual(people, [
+  assert.deepEqual(directors, [
     {
       tmdbId: 101,
       name: 'Jane Director',
@@ -42,8 +42,8 @@ test('mapTmdbMovieCreditsToPeople keeps only director crew entries and ignores c
   ])
 })
 
-test('mapTmdbMovieCreditsToPeople respects the director limit and preserves billing order', () => {
-  const people = mapTmdbMovieCreditsToPeople(
+test('mapTmdbMovieCreditsToDirectors respects the director limit and preserves billing order', () => {
+  const directors = mapTmdbMovieCreditsToDirectors(
     {
       crew: [
         { id: 1, name: 'Director One', job: 'Director' },
@@ -55,7 +55,7 @@ test('mapTmdbMovieCreditsToPeople respects the director limit and preserves bill
   )
 
   assert.deepEqual(
-    people.map((person) => ({
+    directors.map((person) => ({
       tmdbId: person.tmdbId,
       name: person.name,
       kind: person.kind,

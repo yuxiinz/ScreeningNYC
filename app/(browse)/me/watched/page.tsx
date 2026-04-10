@@ -11,7 +11,7 @@ import {
   getReleaseYear,
 } from '@/lib/movie/display'
 import {
-  getMovieStatesForUser,
+  getWantedMovieIdsForUser,
   getWatchedListPageData,
 } from '@/lib/user-movies/service'
 
@@ -28,7 +28,7 @@ export default async function WatchedPage() {
   const userId = await requireUserIdForPage('/me/watched')
 
   const data = await getWatchedListPageData(userId)
-  const movieStates = await getMovieStatesForUser(
+  const wantedMovieIds = await getWantedMovieIdsForUser(
     userId,
     data.items.map((item) => item.movie.id)
   )
@@ -56,10 +56,7 @@ export default async function WatchedPage() {
           {data.items.map((item) => {
             const director = cleanDirectorText(item.movie.directorText, 'UNKNOWN')
             const year = getReleaseYear(item.movie.releaseDate)
-            const movieState = movieStates.get(item.movie.id) || {
-              inWant: false,
-              inWatched: true,
-            }
+            const inWant = wantedMovieIds.has(item.movie.id)
 
             return (
               <article
@@ -108,8 +105,8 @@ export default async function WatchedPage() {
 
                     <MovieListActions
                       movieId={item.movie.id}
-                      initialInWant={movieState.inWant}
-                      initialInWatched={movieState.inWatched}
+                      initialInWant={inWant}
+                      initialInWatched
                       className="mb-4"
                     />
 

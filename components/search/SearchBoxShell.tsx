@@ -49,7 +49,7 @@ export default function SearchBoxShell({
           ) : null}
 
           {!loading && error ? (
-            <div className="px-[14px] py-3 text-[0.9rem] text-[#ffb3b3]">
+            <div className="px-[14px] py-3 text-[0.9rem] text-status-error">
               {error}
             </div>
           ) : null}

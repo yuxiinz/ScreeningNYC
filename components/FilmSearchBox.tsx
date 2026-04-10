@@ -5,6 +5,7 @@
 import { useRouter } from 'next/navigation'
 
 import SearchBoxShell from '@/components/search/SearchBoxShell'
+import SearchResultButton from '@/components/search/SearchResultButton'
 import useEntitySearch from '@/components/search/useEntitySearch'
 import {
   getEmptyClientEntitySearchResults,
@@ -128,20 +129,16 @@ export default function FilmSearchBox({
     >
       {!loading &&
         results.localResults.map((movie, index) => (
-          <button
+          <SearchResultButton
             key={movie.id}
-            type="button"
             onClick={() => {
               clearAndClose()
               router.push(`/films/${movie.id}`)
             }}
-            className={[
-              'w-full cursor-pointer bg-transparent px-[14px] py-3 text-left text-text-primary transition-colors hover:bg-card-bg',
+            isLast={
               index === results.localResults.length - 1 &&
               results.externalResults.length === 0
-                ? 'border-none'
-                : 'border-b border-border-subtle',
-            ].join(' ')}
+            }
           >
             <div className="mb-1 text-[0.95rem] leading-[1.3]">
               {movie.title}
@@ -151,26 +148,20 @@ export default function FilmSearchBox({
             <div className="text-[0.8rem] leading-[1.2] text-text-dim">
               {getLocalMeta(movie)}
             </div>
-          </button>
+          </SearchResultButton>
         ))}
 
       {!loading &&
         results.externalResults.map((movie, index) => (
-          <button
+          <SearchResultButton
             key={movie.tmdbId}
-            type="button"
             onClick={() => {
               if (pendingResolveKey === null) {
                 void handleExternalSelect(movie)
               }
             }}
             disabled={pendingResolveKey !== null}
-            className={[
-              'w-full cursor-pointer bg-transparent px-[14px] py-3 text-left text-text-primary transition-colors hover:bg-card-bg disabled:cursor-not-allowed disabled:opacity-60',
-              index === results.externalResults.length - 1
-                ? 'border-none'
-                : 'border-b border-border-subtle',
-            ].join(' ')}
+            isLast={index === results.externalResults.length - 1}
           >
             <div className="mb-1 flex items-center justify-between gap-3 text-[0.95rem] leading-[1.3]">
               <span>
@@ -187,7 +178,7 @@ export default function FilmSearchBox({
                 ? 'Creating film page...'
                 : 'Create film page and open details'}
             </div>
-          </button>
+          </SearchResultButton>
         ))}
     </SearchBoxShell>
   )

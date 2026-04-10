@@ -116,7 +116,7 @@ export default function RegisterForm({
       </form>
 
       {error && (
-        <div className="mt-6 rounded-panel border border-[#6b2c2c] bg-[#261313] px-4 py-3 text-[0.9rem] leading-[1.5] text-[#ffb3b3]">
+        <div className="mt-6 rounded-panel border border-status-error-border bg-status-error-bg px-4 py-3 text-[0.9rem] leading-[1.5] text-status-error">
           {error}
         </div>
       )}

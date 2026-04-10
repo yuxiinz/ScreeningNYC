@@ -8,7 +8,7 @@ import type { TmdbMovie } from './tmdb_service'
 import { canonicalizeTitle } from './tmdb_service'
 import { findLocalMovieByImportMatch } from '@/lib/movie/match'
 import {
-  syncMoviePeople,
+  syncMovieDirectors,
   syncMovieTags,
 } from '@/lib/movie/relations'
 
@@ -639,9 +639,7 @@ export async function upsertLocalMovie(fallback: FallbackMovieData) {
     }
 
     await syncMovieTags(movie.id, movie.genresText)
-    await syncMoviePeople(movie.id, [], {
-      replaceKinds: ['DIRECTOR'],
-    })
+    await syncMovieDirectors(movie.id, [])
 
     return movie
   }
@@ -659,9 +657,7 @@ export async function upsertLocalMovie(fallback: FallbackMovieData) {
   })
 
   await syncMovieTags(movie.id, movie.genresText)
-  await syncMoviePeople(movie.id, [], {
-    replaceKinds: ['DIRECTOR'],
-  })
+  await syncMovieDirectors(movie.id, [])
 
   return movie
 }
@@ -798,9 +794,7 @@ export async function upsertMovie(tmdb: TmdbMovie, fallback?: FallbackMovieData)
   })
 
   await syncMovieTags(movie.id, movie.genresText || fallback?.genresText)
-  await syncMoviePeople(movie.id, tmdb.peopleCredits || [], {
-    replaceKinds: ['DIRECTOR'],
-  })
+  await syncMovieDirectors(movie.id, tmdb.directorCredits || [])
 
   return movie
 }

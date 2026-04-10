@@ -14,6 +14,21 @@ type ResendEmailResponse = {
   }
 }
 
+function maskEmailAddress(email: string) {
+  const [localPart = '', domain = ''] = email.split('@')
+
+  if (!localPart || !domain) {
+    return '[invalid-email]'
+  }
+
+  const visibleLocalPart =
+    localPart.length <= 2
+      ? `${localPart[0] || '*'}*`
+      : `${localPart.slice(0, 2)}***`
+
+  return `${visibleLocalPart}@${domain}`
+}
+
 export async function sendEmail(params: SendEmailInput) {
   if (!isMagicLinkConfigured()) {
     throw new Error('Email delivery is not configured.')
@@ -37,10 +52,29 @@ export async function sendEmail(params: SendEmailInput) {
   const payload = (await response.json()) as ResendEmailResponse
 
   if (!response.ok) {
-    throw new Error(payload.error?.message || 'Failed to send email.')
+    const message = payload.error?.message || 'Failed to send email.'
+
+    console.error('[auth][email][send-failed]', {
+      to: maskEmailAddress(params.to),
+      subject: params.subject,
+      status: response.status,
+      message,
+    })
+
+    throw new Error(message)
   }
 
-  return payload.id || null
+  const messageId = payload.id || null
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[auth][email][sent]', {
+      to: maskEmailAddress(params.to),
+      subject: params.subject,
+      messageId,
+    })
+  }
+
+  return messageId
 }
 
 export async function sendPasswordVerificationEmail(params: {

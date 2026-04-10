@@ -30,14 +30,18 @@ export default async function WantListPage({
 
   const params = await searchParams
   const activeTab = params.tab === 'directors' ? 'directors' : 'films'
-  const [filmData, directorData] = await Promise.all([
-    getWantListPageData(userId),
-    getWantDirectorListPageData(userId),
-  ])
-  const movieStates = await getMovieStatesForUser(
-    userId,
-    filmData.items.map((item) => item.movie.id)
-  )
+  const filmData =
+    activeTab === 'films' ? await getWantListPageData(userId) : null
+  const directorData =
+    activeTab === 'directors'
+      ? await getWantDirectorListPageData(userId)
+      : null
+  const movieStates = filmData
+    ? await getMovieStatesForUser(
+        userId,
+        filmData.items.map((item) => item.movie.id)
+      )
+    : null
 
   return (
     <main className="mx-auto max-w-[var(--container-main)]">
@@ -78,10 +82,13 @@ export default async function WantListPage({
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <p className="m-0 text-[0.98rem] leading-[1.6] text-text-secondary lg:max-w-[720px]">
             {activeTab === 'films'
-              ? getHeadline(filmData.totalCount, filmData.onScreenNowCount)
+              ? getHeadline(
+                  filmData?.totalCount || 0,
+                  filmData?.onScreenNowCount || 0
+                )
               : getDirectorHeadline(
-                  directorData.totalCount,
-                  directorData.onScreenNowCount
+                  directorData?.totalCount || 0,
+                  directorData?.onScreenNowCount || 0
                 )}
           </p>
           {activeTab === 'films' ? (
@@ -92,11 +99,11 @@ export default async function WantListPage({
 
       {activeTab === 'films' ? (
         <WantFilmListSection
-          items={filmData.items}
-          movieStates={movieStates}
+          items={filmData?.items || []}
+          movieStates={movieStates || new Map()}
         />
       ) : (
-        <WantDirectorListSection items={directorData.items} />
+        <WantDirectorListSection items={directorData?.items || []} />
       )}
     </main>
   )

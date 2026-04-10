@@ -1,7 +1,7 @@
 import 'dotenv/config'
 
 import {
-  syncMoviePeopleFromTmdbId,
+  syncMovieDirectorsFromTmdbId,
   syncMovieTags,
 } from '@/lib/movie/relations'
 import { prisma } from '@/lib/prisma'
@@ -77,7 +77,7 @@ async function main() {
       await syncMovieTags(movie.id, movie.genresText)
 
       if (movie.tmdbId) {
-        await syncMoviePeopleFromTmdbId(movie.id, movie.tmdbId)
+        await syncMovieDirectorsFromTmdbId(movie.id, movie.tmdbId)
       }
 
       syncedCount += 1

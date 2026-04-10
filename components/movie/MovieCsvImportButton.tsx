@@ -139,7 +139,7 @@ export default function MovieCsvImportButton({
       </p>
 
       {error ? (
-        <p className="mt-2 text-[0.78rem] leading-[1.5] text-[#ffb3b3]">{error}</p>
+        <p className="mt-2 text-[0.78rem] leading-[1.5] text-status-error">{error}</p>
       ) : null}
 
       {summary ? (
@@ -161,7 +161,7 @@ export default function MovieCsvImportButton({
                 {failedItems.map((item) => (
                   <p
                     key={`${item.rowNumber}-${item.title}`}
-                    className="m-0 text-[0.82rem] leading-[1.6] text-[#ffb3b3]"
+                    className="m-0 text-[0.82rem] leading-[1.6] text-status-error"
                   >
                     Row {item.rowNumber}: {item.title}. {item.message || 'Import failed.'}
                   </p>

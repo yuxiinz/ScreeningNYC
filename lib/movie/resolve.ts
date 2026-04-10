@@ -12,7 +12,7 @@ import {
   findLocalMovieByImportMatch,
 } from '@/lib/movie/match'
 import { shouldAttemptCanonicalTmdbLookup } from '@/lib/movie/canonical-lookup'
-import { mapTmdbMovieCreditsToPeople } from '@/lib/people/tmdb'
+import { mapTmdbMovieCreditsToDirectors } from '@/lib/people/tmdb'
 import {
   buildTmdbImageUrl,
   getTmdbApiKey,
@@ -223,7 +223,7 @@ async function fetchTmdbMovieById(tmdbId: number): Promise<TmdbMovie> {
       productionCountriesText: productionCountries || undefined,
       directorText: directors || undefined,
       castText: cast || undefined,
-      peopleCredits: mapTmdbMovieCreditsToPeople(credits),
+      directorCredits: mapTmdbMovieCreditsToDirectors(credits),
     }
   } catch (error) {
     if (axios.isAxiosError(error) && error.response?.status === 404) {

@@ -7,8 +7,8 @@ import {
   stripLeadingBullets,
   isLikelyProgramTitle,
 } from '../core/text'
-import { mapTmdbMovieCreditsToPeople } from '@/lib/people/tmdb'
-import type { MoviePersonSyncInput } from '@/lib/people/types'
+import { mapTmdbMovieCreditsToDirectors } from '@/lib/people/tmdb'
+import type { MovieDirectorSyncInput } from '@/lib/people/types'
 import { buildTmdbImageUrl } from '@/lib/tmdb/client'
 
 export type TmdbMovie = {
@@ -26,7 +26,7 @@ export type TmdbMovie = {
   productionCountriesText?: string
   directorText?: string
   castText?: string
-  peopleCredits?: MoviePersonSyncInput[]
+  directorCredits?: MovieDirectorSyncInput[]
   matchedQueryTitle?: string
 }
 
@@ -505,7 +505,7 @@ export async function searchTmdbMovie(params: SearchTmdbParams): Promise<TmdbMov
     productionCountriesText: productionCountries || undefined,
     directorText: directors || params.directorText,
     castText: cast || undefined,
-    peopleCredits: mapTmdbMovieCreditsToPeople(credits),
+    directorCredits: mapTmdbMovieCreditsToDirectors(credits),
     matchedQueryTitle: best.matchedQuery,
   }
 }

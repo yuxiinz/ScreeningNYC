@@ -73,7 +73,7 @@ export default function DirectorListActions({
       </button>
 
       {error ? (
-        <p className="mt-2 text-[0.78rem] leading-[1.5] text-[#ffb3b3]">
+        <p className="mt-2 text-[0.78rem] leading-[1.5] text-status-error">
           {error}
         </p>
       ) : null}

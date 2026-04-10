@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 
 import SearchBoxShell from '@/components/search/SearchBoxShell'
+import SearchResultButton from '@/components/search/SearchResultButton'
 import useEntitySearch from '@/components/search/useEntitySearch'
 import {
   getEmptyClientEntitySearchResults,
@@ -106,20 +107,16 @@ export default function DirectorSearchBox({
     >
       {!loading &&
         results.localResults.map((person, index) => (
-          <button
+          <SearchResultButton
             key={person.id}
-            type="button"
             onClick={() => {
               clearAndClose()
               router.push(`/people/${person.id}`)
             }}
-            className={[
-              'w-full cursor-pointer bg-transparent px-[14px] py-3 text-left text-text-primary transition-colors hover:bg-card-bg',
+            isLast={
               index === results.localResults.length - 1 &&
               results.externalResults.length === 0
-                ? 'border-none'
-                : 'border-0 border-b border-solid border-border-subtle',
-            ].join(' ')}
+            }
           >
             <div className="text-[0.92rem] font-medium leading-[1.3]">
               {person.name}
@@ -127,7 +124,7 @@ export default function DirectorSearchBox({
             <div className="mt-1 text-[0.78rem] text-text-muted">
               {getFilmCountLabel(person.filmCount)}
             </div>
-          </button>
+          </SearchResultButton>
         ))}
 
       {!loading &&
@@ -136,21 +133,16 @@ export default function DirectorSearchBox({
           const isLast = index === results.externalResults.length - 1
 
           return (
-            <button
+            <SearchResultButton
               key={`tmdb-${person.tmdbId}`}
-              type="button"
               disabled={pendingResolveKey !== null}
               onClick={() => {
                 if (pendingResolveKey === null) {
                   void handleExternalSelect(person)
                 }
               }}
-              className={[
-                'w-full cursor-pointer bg-transparent px-[14px] py-3 text-left text-text-primary transition-colors hover:bg-card-bg disabled:cursor-wait disabled:opacity-70',
-                isLast
-                  ? 'border-none'
-                  : 'border-0 border-b border-solid border-border-subtle',
-              ].join(' ')}
+              disabledClassName="disabled:cursor-wait disabled:opacity-70"
+              isLast={isLast}
             >
               <div className="text-[0.92rem] font-medium leading-[1.3]">
                 {person.name}
@@ -158,7 +150,7 @@ export default function DirectorSearchBox({
               <div className="mt-1 text-[0.78rem] text-text-muted">
                 {isPending ? 'Adding director...' : 'TMDB director'}
               </div>
-            </button>
+            </SearchResultButton>
           )
         })}
     </SearchBoxShell>
