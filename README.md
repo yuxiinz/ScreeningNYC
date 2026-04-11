@@ -178,21 +178,6 @@ Adapters are in `lib/ingest/adapters/index.ts`
 
 ---
 
-## Project Structure
-
-\`\`\`text
-screeningnyc/
-├── app/
-├── components/
-├── lib/
-├── prisma/
-├── scripts/
-└── tests/
-\`\`\`
-
-Organized by business domain rather than purely technical layers.
-
----
 
 ## Tech Stack
 
@@ -231,7 +216,7 @@ Configured in `auth.ts`
 
 ### Environment Variables
 
-\`\`\`env
+```env
 DATABASE_URL="..."
 TMDB_API_KEY="..."
 AUTH_SECRET="..."
@@ -242,37 +227,37 @@ EMAIL_FROM="auth@example.com"
 RESEND_API_KEY="..."
 GOOGLE_CLIENT_ID="..."
 GOOGLE_CLIENT_SECRET="..."
-\`\`\`
+```
 
 ### Setup
 
-\`\`\`bash
+```bash
 npm install
 npx prisma migrate dev
 npm run dev
-\`\`\`
+```
 
 ---
 
 ## Common Commands
 
-\`\`\`bash
+```bash
 npm run dev
 npm run typecheck
 npm test
 npm run lint
 npm run build
-\`\`\`
+```
 
 ---
 
 ## Data Ingestion
 
-\`\`\`bash
+```bash
 npm run ingest:theater
 npm run cleanup:showtimes
 npm run reminders:watchlist
-\`\`\`
+```
 
 ---
 
