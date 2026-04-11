@@ -1,75 +1,79 @@
 # Screening NYC
 
-Screening NYC 是一个围绕纽约影院排片信息构建的 Next.js 应用。  
-它当前的业务主线不是“电影数据库”，而是三件事：
+Screening NYC is a Next.js application built around movie showtimes in New York City.
 
-1. 查询 NYC 影院当前和近期的 on-screening 排片情况
-2. 登录后把电影或导演加入 want list，并订阅提醒
-3. 登录后发布电影票买卖信息，但平台只做信息共享，不做信息筛查，也不在站内成交
+Its core is not a traditional movie database, but focuses on three main functions:
 
-线上地址：<https://www.screeningnyc.com/>
+1. Discover current and upcoming showtimes across NYC cinemas  
+2. After login, add movies or directors to a want list and subscribe to notifications  
+3. After login, post movie ticket buy and sell information, with the platform acting only as an information board (no transactions handled on-site)
 
-## 业务逻辑
+Live site: https://www.screeningnyc.com/
 
-### 1. 查询 on-screening 排片情况
+---
 
-这是项目的公共主入口，不登录也能用。
+## Core Features
 
-用户可以做的事情：
+### 1. Browse On-Screening Showtimes
 
-- 在首页 `/` 查看当前有排片的电影
-- 在 `/date` 按日期查看某一天的排片
-- 在 `/map` 按影院地图查看
-- 在 `/films/[id]` 看单部电影的排片详情
-- 用搜索框搜索电影；登录后还能把 TMDB 外部结果落地成站内页面
+This is the main public entry point and does not require login.
 
-这一块对应的代码主要在：
+Users can:
 
-- 页面入口
+- View currently screening films on the homepage `/`
+- Browse showtimes by date at `/date`
+- Explore theaters on a map at `/map`
+- View detailed showtimes for a film at `/films/[id]`
+- Search for films; logged-in users can also resolve external TMDB results into internal pages
+
+Key code areas:
+
+- Pages
   - `app/(browse)/page.tsx`
   - `app/(browse)/date/page.tsx`
   - `app/(browse)/map/page.tsx`
   - `app/films/[id]/page.tsx`
-- UI 组件
+- UI components
   - `components/FilmSearchBox.tsx`
   - `components/TheaterFilter.tsx`
   - `components/showtime/ShowtimeRow.tsx`
   - `components/map/*`
-- 数据读取与缓存
+- Data fetching and caching
   - `lib/cache/public-data.ts`
   - `lib/movie/search-service.ts`
   - `lib/api/search-route.ts`
   - `lib/api/client-search.ts`
-- 数据来源与落库
+- Data ingestion and persistence
   - `lib/ingest/adapters/*`
   - `lib/ingest/services/persist_service.ts`
   - `lib/ingest/services/tmdb_service.ts`
   - `scripts/ingest_theater.ts`
 
-这部分的核心数据模型是：
+Core data models:
 
-- `Movie`: 电影主记录
-- `Theater`: 影院
-- `Showtime`: 某场具体排片
-- `Format`: 格式信息，例如 `35mm`、`70mm`、`DCP`
+- `Movie`: film metadata  
+- `Theater`: cinema  
+- `Showtime`: a specific screening  
+- `Format`: screening format such as 35mm, 70mm, DCP  
 
-### 2. 登录后标记 want，订阅影片
+---
 
-这一块是用户状态层。  
-当前不只是“想看电影”，还包括“关注导演”。
+### 2. Want List and Subscriptions (Logged-in Users)
 
-用户登录后可以：
+This is the user state layer, covering both movies and directors.
 
-- 把电影加入 want list
-- 把导演加入 want list
-- 在 `/me/want-list` 查看自己的电影和导演 want list
-- 开启或关闭提醒邮件
-- 在电影开始上映时收到 noon reminder
-- 在周五中午收到一次汇总 summary
+After logging in, users can:
 
-相关代码主要在：
+- Add movies to a want list  
+- Add directors to a want list  
+- View lists at `/me/want-list`  
+- Enable or disable email notifications  
+- Receive a notification when a film starts screening  
+- Receive a weekly summary on Friday at noon  
 
-- 页面入口
+Key code areas:
+
+- Pages
   - `app/(browse)/me/page.tsx`
   - `app/(browse)/me/want-list/page.tsx`
 - API
@@ -79,49 +83,51 @@ Screening NYC 是一个围绕纽约影院排片信息构建的 Next.js 应用。
   - `app/api/me/people/search/route.ts`
   - `app/api/me/movies/resolve/route.ts`
   - `app/api/me/people/resolve/route.ts`
-- 业务服务
+- Services
   - `lib/user-movies/service.ts`
   - `lib/user-directors/service.ts`
   - `lib/watchlist-reminders/service.ts`
   - `lib/watchlist-reminders/content.ts`
-- 相关组件
+- Components
   - `components/movie/MovieListActions.tsx`
   - `components/person/DirectorListActions.tsx`
   - `components/me/want-list/*`
   - `components/auth/EmailReminderToggle.tsx`
 
-提醒逻辑说明：
+Notification logic:
 
-- 平日中午主要发“刚开始上映”的 transition reminder
-- 周五中午主要发 summary reminder
-- 邮件只是一种提醒手段，不替代站内 want list
+- Weekdays: notify when films start screening  
+- Fridays: send a summary email  
+- Email is a reminder layer, not a replacement for the in-app want list  
 
-### 3. 登录后电影票交易
+---
 
-这一块是 marketplace。
+### 3. Ticket Marketplace
 
-用户登录后可以：
+This is an information-only marketplace.
 
-- 在 `/market` 按电影查看当前活跃的 BUY / SELL 信息
-- 在 `/market/new` 按 4 步创建帖子
-  - 先选 BUY 或 SELL
-  - 再选电影
-  - 再选具体 showtime
-  - 最后填写数量、价格、座位信息和联系方式
-- 在 `/market/films/[id]` 按具体 showtime 查看该电影的买卖信息
-- 在 `/me/market` 管理自己的帖子
+After logging in, users can:
 
-平台边界非常明确：
+- Browse active BUY and SELL posts at `/market`  
+- Create a post at `/market/new` in four steps:
+  1. Choose BUY or SELL  
+  2. Select a film  
+  3. Select a showtime  
+  4. Enter quantity, price, seat info, and contact details  
+- View posts per film and showtime at `/market/films/[id]`  
+- Manage their posts at `/me/market`  
 
-- 平台只展示用户填写的信息
-- 平台不做票务审核、身份背书、真伪筛查
-- 平台不处理付款、托管、退款
-- 平台不在站内成交
-- 用户只是在站内交换联系方式，后续交易在线下或站外自行完成
+Platform boundaries:
 
-相关代码主要在：
+- Only displays user-submitted information  
+- Does not verify tickets or identities  
+- Does not handle payments or escrow  
+- Does not facilitate transactions on-site  
+- Users exchange contact info and complete transactions externally  
 
-- 页面入口
+Key code areas:
+
+- Pages
   - `app/(browse)/market/page.tsx`
   - `app/(browse)/market/new/page.tsx`
   - `app/(browse)/market/films/[id]/page.tsx`
@@ -131,126 +137,102 @@ Screening NYC 是一个围绕纽约影院排片信息构建的 Next.js 应用。
   - `app/api/me/marketplace/posts/batch/route.ts`
   - `app/api/me/marketplace/posts/[postId]/route.ts`
   - `app/api/me/marketplace/posts/[postId]/contact/route.ts`
-- 业务服务
+- Services
   - `lib/marketplace/service.ts`
   - `lib/marketplace/request-body.ts`
   - `lib/marketplace/http.ts`
   - `lib/marketplace/errors.ts`
-- 相关组件
+- Components
   - `components/marketplace/*`
 
-当前 marketplace 设计上是“按电影 -> 按场次 -> 看 BUY/SELL”，不是泛化二手平台。
+Design note: marketplace is structured as film -> showtime -> BUY or SELL, not a general second-hand platform.
 
-## 当前覆盖影院
+---
 
-项目当前抓取并标准化这些影院的排片：
+## Supported Theaters
 
-- Metrograph
-- Film Forum
-- Film at Lincoln Center
-- IFC Center
-- Quad Cinema
-- Cinema Village
-- Spectacle
-- Roxy Cinema
-- MoMA
-- Museum of the Moving Image
-- Anthology Film Archives
-- BAM
-- Angelika New York
-- Village East by Angelika
-- Cinema 123 by Angelika
-- Paris Theater
-- Nitehawk Williamsburg
-- Nitehawk Prospect Park
-- Japan Society
+The system currently ingests and normalizes showtimes from:
 
-影院元数据在 `lib/ingest/config/theater_meta.ts`，抓取入口在 `lib/ingest/adapters/index.ts`。
+- Metrograph  
+- Film Forum  
+- Film at Lincoln Center  
+- IFC Center  
+- Quad Cinema  
+- Cinema Village  
+- Spectacle  
+- Roxy Cinema  
+- MoMA  
+- Museum of the Moving Image  
+- Anthology Film Archives  
+- BAM  
+- Angelika New York  
+- Village East by Angelika  
+- Cinema 123 by Angelika  
+- Paris Theater  
+- Nitehawk Williamsburg  
+- Nitehawk Prospect Park  
+- Japan Society  
 
-## 目录结构
+Metadata is defined in `lib/ingest/config/theater_meta.ts`  
+Adapters are in `lib/ingest/adapters/index.ts`
 
-下面这个结构不是按技术层随便堆，而是按当前业务拆的：
+---
 
-```text
+## Project Structure
+
+\`\`\`text
 screeningnyc/
 ├── app/
-│   ├── (browse)/
-│   │   ├── page.tsx                 # 首页，当前排片聚合
-│   │   ├── date/page.tsx            # 按日期查排片
-│   │   ├── map/page.tsx             # 地图查影院
-│   │   ├── people/                  # 导演列表与详情
-│   │   ├── market/                  # marketplace 页面
-│   │   └── me/                      # 登录后的个人区域
-│   ├── films/[id]/page.tsx          # 电影详情页
-│   └── api/
-│       ├── movies/search            # 公共电影搜索
-│       ├── people/search            # 公共导演搜索
-│       └── me/                      # 登录后的 want / resolve / marketplace API
 ├── components/
-│   ├── search/                      # 通用搜索框骨架
-│   ├── movie/                       # 电影卡片、海报、外链、列表动作
-│   ├── marketplace/                 # 买卖信息 UI
-│   ├── me/want-list/                # want list 页面组件
-│   └── map/                         # 地图组件
 ├── lib/
-│   ├── ingest/                      # 排片抓取、清洗、落库
-│   ├── cache/                       # 首页 / 日期 / 地图的缓存读取
-│   ├── movie/                       # 电影搜索、匹配、展示、TMDB resolve
-│   ├── people/                      # 导演搜索、TMDB resolve
-│   ├── user-movies/                 # 电影 want / watched / import
-│   ├── user-directors/              # 导演 want
-│   ├── watchlist-reminders/         # want reminder 邮件
-│   ├── marketplace/                 # 票务信息共享
-│   ├── api/                         # route helper / client helper
-│   ├── auth/                        # 登录、注册、邮件验证
-│   └── prisma.ts
 ├── prisma/
-│   ├── schema.prisma
-│   └── migrations/
 ├── scripts/
-│   ├── ingest_theater.ts
-│   ├── cleanup_expired_showtimes.ts
-│   └── send_watchlist_reminders.ts
 └── tests/
-```
+\`\`\`
 
-## 技术栈
+Organized by business domain rather than purely technical layers.
 
-- Next.js 16.2 App Router
-- React 19
-- TypeScript
-- Tailwind CSS v4
-- Prisma
-- PostgreSQL
-- Luxon
-- NextAuth v5 beta
-- Cheerio + `fetch`/JSON 抓取
-- Leaflet / React Leaflet
-- Resend
+---
 
-## 登录方式
+## Tech Stack
 
-当前登录支持：
+- Next.js 16.2 App Router  
+- React 19  
+- TypeScript  
+- Tailwind CSS v4  
+- Prisma  
+- PostgreSQL  
+- Luxon  
+- NextAuth v5 beta  
+- Cheerio + fetch / JSON scraping  
+- Leaflet / React Leaflet  
+- Resend  
 
-- 邮箱 + 密码
-- Magic link 邮件登录
-- Google 登录
+---
 
-认证入口和 provider 配置在 `auth.ts`。
+## Authentication
 
-## 本地开发
+Supported login methods:
 
-### 1. 环境要求
+- Email and password  
+- Magic link via email  
+- Google login  
 
-- Node.js 20+
-- PostgreSQL
+Configured in `auth.ts`
 
-### 2. 环境变量
+---
 
-新建 `.env`：
+## Local Development
 
-```env
-DATABASE_URL="postgresql://..."
+### Requirements
+
+- Node.js 20+  
+- PostgreSQL  
+
+### Environment Variables
+
+\`\`\`env
+DATABASE_URL="..."
 TMDB_API_KEY="..."
 AUTH_SECRET="..."
 APP_BASE_URL="http://localhost:3000"
@@ -260,117 +242,53 @@ EMAIL_FROM="auth@example.com"
 RESEND_API_KEY="..."
 GOOGLE_CLIENT_ID="..."
 GOOGLE_CLIENT_SECRET="..."
-```
+\`\`\`
 
-说明：
+### Setup
 
-- `DATABASE_URL`：必需
-- `TMDB_API_KEY`：可选，但强烈建议配；不配时 TMDB enrich / resolve 能力会受限
-- `AUTH_SECRET`：生产环境必需；开发环境代码里有 fallback
-- `EMAIL_FROM` + `RESEND_API_KEY`：magic link 和提醒邮件需要
-- `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET`：Google 登录需要
-- `CRON_SECRET`：定时 revalidate 需要
-- `APP_BASE_URL`：本地登录回调和站内链接使用
-- `REMINDER_BASE_URL`：提醒邮件跳回正式站点时使用
-
-### 3. 初始化并启动
-
-```bash
+\`\`\`bash
 npm install
 npx prisma migrate dev
 npm run dev
-```
+\`\`\`
 
-默认打开：<http://localhost:3000>
+---
 
-## 常用命令
+## Common Commands
 
-开发：
-
-```bash
+\`\`\`bash
 npm run dev
-```
-
-类型检查：
-
-```bash
 npm run typecheck
-```
-
-测试：
-
-```bash
 npm test
-```
-
-Lint：
-
-```bash
 npm run lint
-```
-
-生产构建：
-
-```bash
 npm run build
-```
+\`\`\`
 
-## 数据抓取与运维命令
+---
 
-手动抓取全部影院排片：
+## Data Ingestion
 
-```bash
+\`\`\`bash
 npm run ingest:theater
-```
-
-只抓部分影院：
-
-```bash
-npm run ingest:theater -- metrograph filmforum flc
-```
-
-清理过期 showtimes：
-
-```bash
 npm run cleanup:showtimes
-```
+npm run reminders:watchlist
+\`\`\`
 
-补全缺失的 `endTime`：
+---
 
-```bash
-npm run backfill:showtime-end-times
-```
+## Automation
 
-手动触发 want reminder：
+GitHub Actions handle:
 
-```bash
-npm run reminders:watchlist -- --force
-```
+- CI checks  
+- Daily ingestion  
+- Cleanup of expired showtimes  
+- Watchlist reminders  
 
-强制跑周五 summary 分支：
+---
 
-```bash
-npm run reminders:watchlist -- --force --mode=summary
-```
+## Notes
 
-## 自动化
-
-仓库当前有这些 GitHub Actions：
-
-- `.github/workflows/ci.yml`
-- `.github/workflows/daily_ingest.yml`
-- `.github/workflows/cleanup_showtimes.yml`
-- `.github/workflows/watchlist_reminders.yml`
-
-它们分别负责：
-
-- CI 构建与检查
-- 定时抓取排片并 revalidate
-- 定时清理过期排片
-- 中午发送 watchlist reminder
-
-## 补充说明
-
-- `app/(browse)` 是 Next App Router 的 route group，只影响目录结构，不影响 URL
-- 地图页显式调用了 `connection()`，避免影院数据被锁进构建期快照
-- marketplace 当前是“信息共享 + 联系方式交换”，不是票务担保平台
+- `(browse)` is a route group and does not affect URLs  
+- Map page uses dynamic connection to avoid static snapshot issues  
+- Marketplace is strictly information sharing, not a transaction platform  
