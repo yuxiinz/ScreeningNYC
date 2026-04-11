@@ -1,6 +1,8 @@
 import { revalidatePath, revalidateTag } from 'next/cache'
 import { NextResponse, type NextRequest } from 'next/server'
 
+import { buildInvalidJsonResponse, jsonError } from '@/lib/api/route'
+
 function getBearerToken(request: NextRequest) {
   const authorization = request.headers.get('authorization')
 
@@ -26,23 +28,11 @@ export async function POST(request: NextRequest) {
   const secret = process.env.CRON_SECRET
 
   if (!secret) {
-    return NextResponse.json(
-      {
-        code: 'MISSING_SECRET',
-        message: 'CRON_SECRET is not configured.',
-      },
-      { status: 500 }
-    )
+    return jsonError('MISSING_SECRET', 'CRON_SECRET is not configured.', 500)
   }
 
   if (getBearerToken(request) !== secret) {
-    return NextResponse.json(
-      {
-        code: 'UNAUTHORIZED',
-        message: 'Invalid revalidation token.',
-      },
-      { status: 401 }
-    )
+    return jsonError('UNAUTHORIZED', 'Invalid revalidation token.', 401)
   }
 
   let body: unknown
@@ -50,26 +40,14 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json()
   } catch {
-    return NextResponse.json(
-      {
-        code: 'INVALID_JSON',
-        message: 'Request body must be valid JSON.',
-      },
-      { status: 400 }
-    )
+    return buildInvalidJsonResponse()
   }
 
   const tags = getUniqueStrings((body as { tags?: unknown })?.tags)
   const paths = getUniqueStrings((body as { paths?: unknown })?.paths)
 
   if (tags.length === 0 && paths.length === 0) {
-    return NextResponse.json(
-      {
-        code: 'INVALID_INPUT',
-        message: 'Provide at least one cache tag or path.',
-      },
-      { status: 400 }
-    )
+    return jsonError('INVALID_INPUT', 'Provide at least one cache tag or path.', 400)
   }
 
   tags.forEach((tag) => {

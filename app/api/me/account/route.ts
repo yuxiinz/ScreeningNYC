@@ -1,34 +1,28 @@
 import { NextResponse } from 'next/server'
 
-import { auth } from '@/auth'
+import {
+  buildInvalidJsonResponse,
+  buildUnauthorizedResponse,
+  jsonError,
+} from '@/lib/api/route'
 import {
   hashPassword,
   validatePassword,
   verifyPassword,
 } from '@/lib/auth/password'
+import { getCurrentUserId } from '@/lib/auth/require-user-id'
 import { normalizeOptionalName } from '@/lib/auth/users'
 import { prisma } from '@/lib/prisma'
-
-async function getRequiredUserId() {
-  const session = await auth()
-  return session?.user?.id || null
-}
 
 function hasOwnProperty(value: object, key: string) {
   return Object.prototype.hasOwnProperty.call(value, key)
 }
 
 export async function PUT(request: Request) {
-  const userId = await getRequiredUserId()
+  const userId = await getCurrentUserId()
 
   if (!userId) {
-    return NextResponse.json(
-      {
-        code: 'UNAUTHORIZED',
-        message: 'Sign in required.',
-      },
-      { status: 401 }
-    )
+    return buildUnauthorizedResponse()
   }
 
   let body: unknown
@@ -36,45 +30,25 @@ export async function PUT(request: Request) {
   try {
     body = await request.json()
   } catch {
-    return NextResponse.json(
-      {
-        code: 'INVALID_JSON',
-        message: 'Request body must be valid JSON.',
-      },
-      { status: 400 }
-    )
+    return buildInvalidJsonResponse()
   }
 
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
-    return NextResponse.json(
-      {
-        code: 'INVALID_BODY',
-        message: 'Request body must be a JSON object.',
-      },
-      { status: 400 }
-    )
+    return jsonError('INVALID_BODY', 'Request body must be a JSON object.', 400)
   }
 
   if (hasOwnProperty(body, 'email')) {
-    return NextResponse.json(
-      {
-        code: 'EMAIL_IMMUTABLE',
-        message: 'Email cannot be changed.',
-      },
-      { status: 400 }
-    )
+    return jsonError('EMAIL_IMMUTABLE', 'Email cannot be changed.', 400)
   }
 
   const hasNameUpdate = hasOwnProperty(body, 'name')
   const hasPasswordUpdate = hasOwnProperty(body, 'newPassword')
 
   if (!hasNameUpdate && !hasPasswordUpdate) {
-    return NextResponse.json(
-      {
-        code: 'NO_CHANGES',
-        message: 'Provide a new name or password to update your account.',
-      },
-      { status: 400 }
+    return jsonError(
+      'NO_CHANGES',
+      'Provide a new name or password to update your account.',
+      400
     )
   }
 
@@ -83,36 +57,22 @@ export async function PUT(request: Request) {
   const rawNewPassword = (body as { newPassword?: unknown }).newPassword
 
   if (hasNameUpdate && typeof rawName !== 'string') {
-    return NextResponse.json(
-      {
-        code: 'INVALID_NAME',
-        message: 'Name must be a string.',
-      },
-      { status: 400 }
-    )
+    return jsonError('INVALID_NAME', 'Name must be a string.', 400)
   }
 
   if (
     hasOwnProperty(body, 'currentPassword') &&
     typeof rawCurrentPassword !== 'string'
   ) {
-    return NextResponse.json(
-      {
-        code: 'INVALID_CURRENT_PASSWORD',
-        message: 'Current password must be a string.',
-      },
-      { status: 400 }
+    return jsonError(
+      'INVALID_CURRENT_PASSWORD',
+      'Current password must be a string.',
+      400
     )
   }
 
   if (hasPasswordUpdate && typeof rawNewPassword !== 'string') {
-    return NextResponse.json(
-      {
-        code: 'INVALID_NEW_PASSWORD',
-        message: 'New password must be a string.',
-      },
-      { status: 400 }
-    )
+    return jsonError('INVALID_NEW_PASSWORD', 'New password must be a string.', 400)
   }
 
   const nextName = hasNameUpdate ? (rawName as string) : undefined
@@ -131,13 +91,7 @@ export async function PUT(request: Request) {
   })
 
   if (!user) {
-    return NextResponse.json(
-      {
-        code: 'USER_NOT_FOUND',
-        message: 'User account not found.',
-      },
-      { status: 404 }
-    )
+    return jsonError('USER_NOT_FOUND', 'User account not found.', 404)
   }
 
   const updateData: {
@@ -157,23 +111,15 @@ export async function PUT(request: Request) {
     const passwordError = validatePassword(newPassword)
 
     if (passwordError) {
-      return NextResponse.json(
-        {
-          code: 'INVALID_PASSWORD',
-          message: passwordError,
-        },
-        { status: 400 }
-      )
+      return jsonError('INVALID_PASSWORD', passwordError, 400)
     }
 
     if (user.passwordHash) {
       if (!currentPassword) {
-        return NextResponse.json(
-          {
-            code: 'CURRENT_PASSWORD_REQUIRED',
-            message: 'Enter your current password to set a new one.',
-          },
-          { status: 400 }
+        return jsonError(
+          'CURRENT_PASSWORD_REQUIRED',
+          'Enter your current password to set a new one.',
+          400
         )
       }
 
@@ -183,12 +129,10 @@ export async function PUT(request: Request) {
       )
 
       if (!currentPasswordMatches) {
-        return NextResponse.json(
-          {
-            code: 'CURRENT_PASSWORD_INCORRECT',
-            message: 'Current password is incorrect.',
-          },
-          { status: 400 }
+        return jsonError(
+          'CURRENT_PASSWORD_INCORRECT',
+          'Current password is incorrect.',
+          400
         )
       }
 
@@ -198,12 +142,10 @@ export async function PUT(request: Request) {
       )
 
       if (nextPasswordMatchesCurrent) {
-        return NextResponse.json(
-          {
-            code: 'PASSWORD_UNCHANGED',
-            message: 'Choose a different new password.',
-          },
-          { status: 400 }
+        return jsonError(
+          'PASSWORD_UNCHANGED',
+          'Choose a different new password.',
+          400
         )
       }
     }

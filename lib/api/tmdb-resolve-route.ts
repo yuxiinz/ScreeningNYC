@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
 
+import {
+  buildInvalidJsonResponse,
+  buildUnauthorizedResponse,
+  jsonError,
+} from '@/lib/api/route'
 import { AuthRequiredError, requireUserId } from '@/lib/auth/require-user-id'
 import { TmdbApiKeyMissingError } from '@/lib/tmdb/client'
 
@@ -20,21 +25,11 @@ type TmdbResolveRouteConfig<TResult> = {
   resolveEntity: (tmdbId: number) => Promise<TResult>
 }
 
-function jsonError(code: string, message: string, status: number) {
-  return NextResponse.json(
-    {
-      code,
-      message,
-    },
-    { status }
-  )
-}
-
 async function parseJsonBody(request: Request) {
   try {
     return await request.json()
   } catch {
-    return jsonError('INVALID_JSON', 'Request body must be valid JSON.', 400)
+    return buildInvalidJsonResponse()
   }
 }
 
@@ -74,7 +69,7 @@ export async function handleTmdbResolveRoute<TResult>({
     return NextResponse.json(buildSuccessBody(result))
   } catch (error) {
     if (error instanceof AuthRequiredError) {
-      return jsonError('UNAUTHORIZED', error.message, 401)
+      return buildUnauthorizedResponse(error.message)
     }
 
     if (error instanceof TmdbApiKeyMissingError) {

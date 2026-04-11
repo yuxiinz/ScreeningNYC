@@ -1,42 +1,17 @@
 import { NextResponse } from 'next/server'
 
+import {
+  buildInvalidJsonResponse,
+  buildUnauthorizedResponse,
+  getPositiveIntegerParam,
+  jsonError,
+} from '@/lib/api/route'
 import { AuthRequiredError, requireUserId } from '@/lib/auth/require-user-id'
 import {
   markWatched,
   removeWatched,
 } from '@/lib/user-movies/service'
 import { getReviewWordCount } from '@/lib/user-movies/review'
-
-async function getMovieId(params: Promise<{ movieId: string }>) {
-  const { movieId } = await params
-  const parsedMovieId = Number.parseInt(movieId, 10)
-
-  if (!Number.isInteger(parsedMovieId) || parsedMovieId <= 0) {
-    return null
-  }
-
-  return parsedMovieId
-}
-
-function buildInvalidMovieIdResponse() {
-  return NextResponse.json(
-    {
-      code: 'INVALID_MOVIE_ID',
-      message: 'movieId must be a positive integer.',
-    },
-    { status: 400 }
-  )
-}
-
-function buildUnauthorizedResponse(error: AuthRequiredError) {
-  return NextResponse.json(
-    {
-      code: 'UNAUTHORIZED',
-      message: error.message,
-    },
-    { status: 401 }
-  )
-}
 
 function parseRatingInput(input: unknown): number | null | 'invalid' {
   if (typeof input === 'undefined') {
@@ -98,13 +73,7 @@ export async function PUT(
   try {
     body = await request.json()
   } catch {
-    return NextResponse.json(
-      {
-        code: 'INVALID_JSON',
-        message: 'Request body must be valid JSON.',
-      },
-      { status: 400 }
-    )
+    return buildInvalidJsonResponse()
   }
 
   const confirmRemoveWant = (body as { confirmRemoveWant?: unknown })
@@ -119,12 +88,10 @@ export async function PUT(
     typeof confirmRemoveWant !== 'undefined' &&
     typeof confirmRemoveWant !== 'boolean'
   ) {
-    return NextResponse.json(
-      {
-        code: 'INVALID_CONFIRMATION',
-        message: 'confirmRemoveWant must be a boolean.',
-      },
-      { status: 400 }
+    return jsonError(
+      'INVALID_CONFIRMATION',
+      'confirmRemoveWant must be a boolean.',
+      400
     )
   }
 
@@ -132,36 +99,30 @@ export async function PUT(
     typeof preserveWatchedAt !== 'undefined' &&
     typeof preserveWatchedAt !== 'boolean'
   ) {
-    return NextResponse.json(
-      {
-        code: 'INVALID_PRESERVE_WATCHED_AT',
-        message: 'preserveWatchedAt must be a boolean.',
-      },
-      { status: 400 }
+    return jsonError(
+      'INVALID_PRESERVE_WATCHED_AT',
+      'preserveWatchedAt must be a boolean.',
+      400
     )
   }
 
   const watchedAt = parseWatchedAtInput(watchedAtInput)
 
   if (watchedAt === 'invalid') {
-    return NextResponse.json(
-      {
-        code: 'INVALID_WATCHED_AT',
-        message: 'watchedAt must be an ISO datetime string or YYYY-MM-DD.',
-      },
-      { status: 400 }
+    return jsonError(
+      'INVALID_WATCHED_AT',
+      'watchedAt must be an ISO datetime string or YYYY-MM-DD.',
+      400
     )
   }
 
   const rating = parseRatingInput(ratingInput)
 
   if (rating === 'invalid') {
-    return NextResponse.json(
-      {
-        code: 'INVALID_RATING',
-        message: 'rating must be null or a number from 0 to 5 in 0.5 increments.',
-      },
-      { status: 400 }
+    return jsonError(
+      'INVALID_RATING',
+      'rating must be null or a number from 0 to 5 in 0.5 increments.',
+      400
     )
   }
 
@@ -170,35 +131,23 @@ export async function PUT(
     reviewTextInput !== null &&
     typeof reviewTextInput !== 'string'
   ) {
-    return NextResponse.json(
-      {
-        code: 'INVALID_REVIEW',
-        message: 'reviewText must be a string or null.',
-      },
-      { status: 400 }
-    )
+    return jsonError('INVALID_REVIEW', 'reviewText must be a string or null.', 400)
   }
 
   const reviewText = typeof reviewTextInput === 'string' ? reviewTextInput : null
 
   if (getReviewWordCount(reviewText) > 200) {
-    return NextResponse.json(
-      {
-        code: 'REVIEW_TOO_LONG',
-        message: 'reviewText must be 200 words or fewer.',
-      },
-      { status: 400 }
-    )
+    return jsonError('REVIEW_TOO_LONG', 'reviewText must be 200 words or fewer.', 400)
   }
 
   try {
     const [userId, movieId] = await Promise.all([
       requireUserId(),
-      getMovieId(params),
+      getPositiveIntegerParam(params, 'movieId'),
     ])
 
     if (!movieId) {
-      return buildInvalidMovieIdResponse()
+      return jsonError('INVALID_MOVIE_ID', 'movieId must be a positive integer.', 400)
     }
 
     const result = await markWatched(userId, movieId, {
@@ -215,18 +164,11 @@ export async function PUT(
     })
   } catch (error) {
     if (error instanceof AuthRequiredError) {
-      return buildUnauthorizedResponse(error)
+      return buildUnauthorizedResponse(error.message)
     }
 
     console.error('[api][me][movies][watched][PUT]', error)
-
-    return NextResponse.json(
-      {
-        code: 'INTERNAL_ERROR',
-        message: 'Could not update watched list right now.',
-      },
-      { status: 500 }
-    )
+    return jsonError('INTERNAL_ERROR', 'Could not update watched list right now.', 500)
   }
 }
 
@@ -237,11 +179,11 @@ export async function DELETE(
   try {
     const [userId, movieId] = await Promise.all([
       requireUserId(),
-      getMovieId(params),
+      getPositiveIntegerParam(params, 'movieId'),
     ])
 
     if (!movieId) {
-      return buildInvalidMovieIdResponse()
+      return jsonError('INVALID_MOVIE_ID', 'movieId must be a positive integer.', 400)
     }
 
     const result = await removeWatched(userId, movieId)
@@ -252,17 +194,10 @@ export async function DELETE(
     })
   } catch (error) {
     if (error instanceof AuthRequiredError) {
-      return buildUnauthorizedResponse(error)
+      return buildUnauthorizedResponse(error.message)
     }
 
     console.error('[api][me][movies][watched][DELETE]', error)
-
-    return NextResponse.json(
-      {
-        code: 'INTERNAL_ERROR',
-        message: 'Could not update watched list right now.',
-      },
-      { status: 500 }
-    )
+    return jsonError('INTERNAL_ERROR', 'Could not update watched list right now.', 500)
   }
 }

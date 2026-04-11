@@ -47,6 +47,17 @@ const MARKETPLACE_SHOWTIME_SELECT = {
   },
 } as const
 
+const MARKETPLACE_MY_POST_SHOWTIME_SELECT = {
+  ...MARKETPLACE_SHOWTIME_SELECT,
+  movie: {
+    select: {
+      id: true,
+      title: true,
+      posterUrl: true,
+    },
+  },
+} as const
+
 function getMarketplacePostSelect() {
   return {
     id: true,
@@ -66,13 +77,7 @@ function getMarketplacePostSelect() {
 }
 
 export type MarketplaceHomeMovieCard = {
-  movie: {
-    id: number
-    title: string
-    posterUrl: string | null
-    directorText: string | null
-    releaseDate: Date | null
-  }
+  movie: MarketplaceMovieSummary
   activeBuyCount: number
   activeSellCount: number
   activeShowtimeCount: number
@@ -94,29 +99,52 @@ export type MarketplacePostPublicCard = {
   canContact: boolean
 }
 
-export type MarketplaceMoviePageData = {
-  movie: {
-    id: number
-    title: string
-    posterUrl: string | null
-    directorText: string | null
-    releaseDate: Date | null
-    runtimeMinutes: number | null
+type MarketplaceMovieSummary = {
+  id: number
+  title: string
+  posterUrl: string | null
+  directorText: string | null
+  releaseDate: Date | null
+  runtimeMinutes: number | null
+}
+
+type MarketplaceMoviePreview = Pick<
+  MarketplaceMovieSummary,
+  'id' | 'title' | 'posterUrl' | 'directorText'
+>
+
+type MarketplaceShowtimeSummary = {
+  id: number
+  startTime: Date
+  runtimeMinutes: number | null
+  ticketUrl: string | null
+  shownTitle: string | null
+  theater: {
+    name: string
   }
+  format: {
+    name: string
+  } | null
+}
+
+type MarketplaceExistingPost = {
+  id: number
+  type: MarketplacePostTypeValue
+  status: 'ACTIVE' | 'COMPLETED' | 'CANCELED'
+  quantity: number
+  priceCents: number | null
+  seatInfo: string | null
+  contactSnapshot: string
+}
+
+type MarketplaceMyPostShowtime = MarketplaceShowtimeSummary & {
+  movie: Pick<MarketplaceMovieSummary, 'id' | 'title' | 'posterUrl'>
+}
+
+export type MarketplaceMoviePageData = {
+  movie: MarketplaceMovieSummary
   sections: Array<{
-    showtime: {
-      id: number
-      startTime: Date
-      runtimeMinutes: number | null
-      ticketUrl: string | null
-      shownTitle: string | null
-      theater: {
-        name: string
-      }
-      format: {
-        name: string
-      } | null
-    }
+    showtime: MarketplaceShowtimeSummary
     activeBuyCount: number
     activeSellCount: number
     buys: MarketplacePostPublicCard[]
@@ -130,35 +158,10 @@ export type MarketplaceNewPageData = {
     requiresDisplayName: boolean
   }
   selectedType: MarketplacePostTypeValue | null
-  selectedMovie: {
-    id: number
-    title: string
-    posterUrl: string | null
-    directorText: string | null
-  } | null
-  availableShowtimes: Array<{
-    id: number
-    startTime: Date
-    runtimeMinutes: number | null
-    ticketUrl: string | null
-    shownTitle: string | null
-    theater: {
-      name: string
-    }
-    format: {
-      name: string
-    } | null
-  }>
+  selectedMovie: MarketplaceMoviePreview | null
+  availableShowtimes: MarketplaceShowtimeSummary[]
   selectedShowtimeIds: number[]
-  existingPost: {
-    id: number
-    type: MarketplacePostTypeValue
-    status: 'ACTIVE' | 'COMPLETED' | 'CANCELED'
-    quantity: number
-    priceCents: number | null
-    seatInfo: string | null
-    contactSnapshot: string
-  } | null
+  existingPost: MarketplaceExistingPost | null
 }
 
 export type MyMarketplacePostRow = {
@@ -170,44 +173,24 @@ export type MyMarketplacePostRow = {
   seatInfo: string | null
   updatedAt: Date
   closedAt: Date | null
-  showtime: {
-    id: number
-    startTime: Date
-    runtimeMinutes: number | null
-    ticketUrl: string | null
-    shownTitle: string | null
-    theater: {
-      name: string
-    }
-    format: {
-      name: string
-    } | null
-    movie: {
-      id: number
-      title: string
-      posterUrl: string | null
-    }
-  }
+  showtime: MarketplaceMyPostShowtime
 }
 
-export type UpsertMarketplacePostInput = {
+type MarketplacePostDraftInput = {
   type: MarketplacePostTypeValue
+  quantity: number
+  priceCents?: number | null
+  seatInfo?: string | null
+  contactSnapshot: string
+  displayName?: string | null
+}
+
+export type UpsertMarketplacePostInput = MarketplacePostDraftInput & {
   showtimeId: number
-  quantity: number
-  priceCents?: number | null
-  seatInfo?: string | null
-  contactSnapshot: string
-  displayName?: string | null
 }
 
-export type UpsertMarketplacePostsInput = {
-  type: MarketplacePostTypeValue
+export type UpsertMarketplacePostsInput = MarketplacePostDraftInput & {
   showtimeIds: number[]
-  quantity: number
-  priceCents?: number | null
-  seatInfo?: string | null
-  contactSnapshot: string
-  displayName?: string | null
 }
 
 function getMarketplaceDisplayName(name?: string | null) {
@@ -251,6 +234,22 @@ function buildMarketplacePostPublicCard(
 function getMarketplaceShowtimeLabel(startTime: Date) {
   const dateLabel = formatDateKeyInAppTimezone(getDateKeyInAppTimezone(startTime))
   return `${dateLabel} at ${formatTimeInAppTimezone(startTime)}`
+}
+
+function getMarketplacePostWriteData(
+  input: Pick<
+    MarketplacePostDraftInput,
+    'type' | 'quantity' | 'priceCents'
+  >,
+  normalizedSeatInfo: string | null | undefined,
+  normalizedContactSnapshot: string
+) {
+  return {
+    quantity: input.quantity,
+    priceCents: input.type === 'SELL' ? input.priceCents ?? 0 : null,
+    seatInfo: input.type === 'SELL' ? normalizedSeatInfo : null,
+    contactSnapshot: normalizedContactSnapshot,
+  }
 }
 
 async function getMarketplaceUser(userId: string) {
@@ -776,30 +775,7 @@ export async function getMyMarketplacePostsPageData(userId: string) {
       updatedAt: true,
       closedAt: true,
       showtime: {
-        select: {
-          id: true,
-          startTime: true,
-          runtimeMinutes: true,
-          ticketUrl: true,
-          shownTitle: true,
-          theater: {
-            select: {
-              name: true,
-            },
-          },
-          format: {
-            select: {
-              name: true,
-            },
-          },
-          movie: {
-            select: {
-              id: true,
-              title: true,
-              posterUrl: true,
-            },
-          },
-        },
+        select: MARKETPLACE_MY_POST_SHOWTIME_SELECT,
       },
     },
   })
@@ -829,6 +805,11 @@ export async function upsertMarketplacePosts(
     input.contactSnapshot
   )
   const normalizedSeatInfo = normalizeMarketplaceSeatInfo(input.seatInfo)
+  const postWriteData = getMarketplacePostWriteData(
+    input,
+    normalizedSeatInfo,
+    normalizedContactSnapshot
+  )
   const movieId = showtimes[0]?.movieId
 
   if (!movieId) {
@@ -885,10 +866,7 @@ export async function upsertMarketplacePosts(
           },
           update: {
             status: 'ACTIVE',
-            quantity: input.quantity,
-            priceCents: input.type === 'SELL' ? input.priceCents ?? 0 : null,
-            seatInfo: input.type === 'SELL' ? normalizedSeatInfo : null,
-            contactSnapshot: normalizedContactSnapshot,
+            ...postWriteData,
             closedAt: null,
           },
           create: {
@@ -896,10 +874,7 @@ export async function upsertMarketplacePosts(
             showtimeId,
             type: input.type,
             status: 'ACTIVE',
-            quantity: input.quantity,
-            priceCents: input.type === 'SELL' ? input.priceCents ?? 0 : null,
-            seatInfo: input.type === 'SELL' ? normalizedSeatInfo : null,
-            contactSnapshot: normalizedContactSnapshot,
+            ...postWriteData,
           },
           select: {
             id: true,

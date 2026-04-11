@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 
+import { jsonError } from '@/lib/api/route'
 import { AuthRequiredError, requireUserId } from '@/lib/auth/require-user-id'
 import {
   buildMarketplaceServiceErrorResponse,
@@ -12,16 +13,6 @@ import {
   completeMarketplacePost,
 } from '@/lib/marketplace/service'
 import { MarketplaceValidationError } from '@/lib/marketplace/errors'
-
-function buildInvalidPostIdResponse() {
-  return NextResponse.json(
-    {
-      code: 'INVALID_POST_ID',
-      message: 'postId must be a positive integer.',
-    },
-    { status: 400 }
-  )
-}
 
 function parsePatchBody(body: unknown) {
   const payload = body as {
@@ -49,7 +40,7 @@ export async function PATCH(
     ])
 
     if (!postId) {
-      return buildInvalidPostIdResponse()
+      return jsonError('INVALID_POST_ID', 'postId must be a positive integer.', 400)
     }
 
     parsePatchBody(body)
@@ -83,7 +74,7 @@ export async function DELETE(
     ])
 
     if (!postId) {
-      return buildInvalidPostIdResponse()
+      return jsonError('INVALID_POST_ID', 'postId must be a positive integer.', 400)
     }
 
     const result = await cancelMarketplacePost(userId, postId)

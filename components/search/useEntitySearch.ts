@@ -1,41 +1,34 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-
-type SearchResultsState<TLocal, TExternal> = {
-  localResults: TLocal[]
-  externalResults: TExternal[]
-}
+import {
+  getEmptyClientEntitySearchResults,
+  type ClientEntitySearchResults,
+} from '@/lib/api/client-search'
 
 type UseEntitySearchOptions<TLocal, TExternal> = {
   debounceMs?: number
-  getEmptyResults: () => SearchResultsState<TLocal, TExternal>
   getExternalKey?: (item: TExternal) => number | string
   isAuthenticated?: boolean
   minQueryLength?: number
-  resolveErrorMessage?: string
   resolveExternal?: (item: TExternal) => Promise<void>
   search: (
     query: string,
     isAuthenticated: boolean
-  ) => Promise<SearchResultsState<TLocal, TExternal>>
-  searchErrorMessage: string
+  ) => Promise<ClientEntitySearchResults<TLocal, TExternal>>
 }
 
 export default function useEntitySearch<TLocal, TExternal>({
   debounceMs = 300,
-  getEmptyResults,
   getExternalKey,
   isAuthenticated = false,
   minQueryLength = 2,
-  resolveErrorMessage = 'Could not complete this action right now.',
   resolveExternal,
   search,
-  searchErrorMessage,
 }: UseEntitySearchOptions<TLocal, TExternal>) {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<SearchResultsState<TLocal, TExternal>>(
-    getEmptyResults
+  const [results, setResults] = useState<ClientEntitySearchResults<TLocal, TExternal>>(
+    () => getEmptyClientEntitySearchResults<TLocal, TExternal>()
   )
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
@@ -75,7 +68,7 @@ export default function useEntitySearch<TLocal, TExternal>({
     const trimmed = query.trim()
 
     if (trimmed.length < minQueryLength) {
-      setResults(getEmptyResults())
+      setResults(getEmptyClientEntitySearchResults<TLocal, TExternal>())
       setLoading(false)
       setOpen(false)
       setError('')
@@ -103,8 +96,12 @@ export default function useEntitySearch<TLocal, TExternal>({
         }
 
         console.error('Search request failed:', nextError)
-        setResults(getEmptyResults())
-        setError(searchErrorMessage)
+        setResults(getEmptyClientEntitySearchResults<TLocal, TExternal>())
+        setError(
+          nextError instanceof Error
+            ? nextError.message
+            : 'Could not search right now.'
+        )
         setOpen(true)
       } finally {
         if (active) {
@@ -119,12 +116,10 @@ export default function useEntitySearch<TLocal, TExternal>({
     }
   }, [
     debounceMs,
-    getEmptyResults,
     isAuthenticated,
     minQueryLength,
     query,
     search,
-    searchErrorMessage,
   ])
 
   function clearAndClose() {
@@ -155,7 +150,9 @@ export default function useEntitySearch<TLocal, TExternal>({
     } catch (nextError) {
       console.error('Resolve request failed:', nextError)
       setError(
-        nextError instanceof Error ? nextError.message : resolveErrorMessage
+        nextError instanceof Error
+          ? nextError.message
+          : 'Could not complete this action right now.'
       )
       setOpen(true)
     } finally {

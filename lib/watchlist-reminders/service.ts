@@ -53,6 +53,7 @@ type ReminderGroup<TItem> = {
 
 type ReminderUserGroup = ReminderGroup<ReminderMovie>
 type ReminderDirectorUserGroup = ReminderGroup<ReminderDirectorItem>
+type ReminderMode = 'summary' | 'transition'
 
 export type WatchlistReminderRunResult = {
   dryRun: boolean
@@ -69,6 +70,120 @@ export type WatchlistReminderRunResult = {
   directorSummaryCandidates: number
   directorSummaryEmailsSent: number
   skippedReason?: string
+}
+
+const REMINDER_USER_SELECT = {
+  email: true,
+  name: true,
+} as const
+
+function getUpcomingReminderMovieWhere(now: Date) {
+  return {
+    showtimes: {
+      some: getUpcomingShowtimeWhere(now),
+    },
+  }
+}
+
+function getReminderShowtimesSelect(now: Date) {
+  return {
+    where: getUpcomingShowtimeWhere(now),
+    orderBy: {
+      startTime: 'asc' as const,
+    },
+    take: 2,
+    select: {
+      id: true,
+      startTime: true,
+      theater: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  }
+}
+
+function getReminderMovieSelect(now: Date) {
+  return {
+    id: true,
+    title: true,
+    showtimes: getReminderShowtimesSelect(now),
+  }
+}
+
+function getDirectorReminderMovieLinksWhere(now: Date) {
+  return {
+    kind: 'DIRECTOR' as const,
+    movie: getUpcomingReminderMovieWhere(now),
+  }
+}
+
+function getDirectorReminderPersonSelect(now: Date) {
+  return {
+    id: true,
+    name: true,
+    movieLinks: {
+      where: getDirectorReminderMovieLinksWhere(now),
+      select: {
+        movie: {
+          select: getReminderMovieSelect(now),
+        },
+      },
+    },
+  }
+}
+
+function toReminderMovie(item: {
+  id: number
+  movie: ReminderMovie['movie']
+}): ReminderMovie {
+  return {
+    watchlistItemId: item.id,
+    movie: item.movie,
+  }
+}
+
+function toReminderDirectorMovies(
+  movies: Array<{
+    id: number
+    title: string
+    showtimes: ReminderDirectorItem['movies'][number]['showtimes']
+  }>,
+  deliveredMovieIds = new Set<number>()
+) {
+  return movies
+    .filter(
+      (movie) => movie.showtimes.length > 0 && !deliveredMovieIds.has(movie.id)
+    )
+    .map((movie) => ({
+      movieId: movie.id,
+      title: movie.title,
+      showtimes: movie.showtimes,
+    }))
+}
+
+function toReminderDirectorItem(
+  itemId: number,
+  person: ReminderDirectorItem['person'],
+  movies: ReminderDirectorItem['movies']
+): ReminderDirectorItem {
+  return {
+    directorWatchlistItemId: itemId,
+    person,
+    movies,
+  }
+}
+
+function countReminderGroups<TItem>(groups: ReminderGroup<TItem>[]) {
+  return groups.reduce((count, group) => count + group.items.length, 0)
+}
+
+function countDirectorReminderGroups(groups: ReminderDirectorUserGroup[]) {
+  return groups.reduce(
+    (count, group) => count + countDirectorReminderMovies(group.items),
+    0
+  )
 }
 
 function getExecutionMode(options: ReminderRunOptions, now: Date) {
@@ -168,7 +283,7 @@ async function sendReminderEmails<TItem>({
   persistDeliveries: (
     group: ReminderGroup<TItem>,
     resendMessageId: string | null | undefined
-  ) => Promise<void>
+  ) => Promise<unknown>
 }) {
   let emailsSent = 0
   let deliveredItems = 0
@@ -203,125 +318,108 @@ async function sendReminderEmails<TItem>({
   }
 }
 
-async function sendMovieReminderEmails(
-  mode: 'summary' | 'transition',
-  groups: ReminderUserGroup[],
-  options: ReminderRunOptions,
-  now: Date
-) {
-  if (mode === 'summary') {
-    const summaryDateKey = getSummaryDateKey(now)
-
-    return sendReminderEmails({
-      groups,
-      options,
-      buildEmail: (group) =>
-        buildMovieReminderEmail({
-          items: group.items,
-          mode: 'summary',
-          name: group.name,
-        }),
-      countDeliveredItems: (group) => group.items.length,
-      formatDryRunLog: (group) =>
-        `[watchlist-reminders][dry-run][summary] ${group.email} <- ${group.items.length} items`,
-      persistDeliveries: async (group, resendMessageId) => {
-        await prisma.watchlistSummaryDelivery.create({
-          data: {
-            userId: group.userId,
-            summaryDateKey,
-            resendMessageId,
-            sentToEmail: group.email,
-          },
-        })
-      },
-    })
+type ReminderSenderConfig<TItem> = {
+  buildEmail: (group: ReminderGroup<TItem>, mode: ReminderMode) => {
+    subject: string
+    html: string
+    text: string
   }
-
-  return sendReminderEmails({
-    groups,
-    options,
-    buildEmail: (group) =>
-      buildMovieReminderEmail({
-        items: group.items,
-        mode: 'transition',
-        name: group.name,
-      }),
-    countDeliveredItems: (group) => group.items.length,
-    formatDryRunLog: (group) =>
-      `[watchlist-reminders][dry-run][transition] ${group.email} <- ${group.items.length} items`,
-    persistDeliveries: async (group, resendMessageId) => {
-      await prisma.watchlistNotificationDelivery.createMany({
-        data: group.items.map((item) => ({
-          watchlistItemId: item.watchlistItemId,
-          showtimeId: item.movie.showtimes[0].id,
-          resendMessageId,
-          sentToEmail: group.email,
-        })),
-        skipDuplicates: true,
-      })
-    },
-  })
+  countDeliveredItems: (group: ReminderGroup<TItem>) => number
+  formatDryRunLog: (group: ReminderGroup<TItem>, mode: ReminderMode) => string
+  persistSummaryDelivery: (
+    group: ReminderGroup<TItem>,
+    resendMessageId: string | null | undefined,
+    summaryDateKey: string
+  ) => Promise<unknown>
+  persistTransitionDelivery: (
+    group: ReminderGroup<TItem>,
+    resendMessageId: string | null | undefined
+  ) => Promise<unknown>
 }
 
-async function sendDirectorReminderEmails(
-  mode: 'summary' | 'transition',
-  groups: ReminderDirectorUserGroup[],
-  options: ReminderRunOptions,
-  now: Date
-) {
-  if (mode === 'summary') {
-    const summaryDateKey = getSummaryDateKey(now)
-
-    return sendReminderEmails({
-      groups,
-      options,
-      buildEmail: (group) =>
-        buildDirectorReminderEmail({
-          items: group.items,
-          mode: 'summary',
-          name: group.name,
-        }),
-      countDeliveredItems: (group) => countDirectorReminderMovies(group.items),
-      formatDryRunLog: (group) =>
-        `[watchlist-reminders][dry-run][director-summary] ${group.email} <- ${group.items.length} directors`,
-      persistDeliveries: async (group, resendMessageId) => {
-        await prisma.directorWatchlistSummaryDelivery.create({
-          data: {
-            userId: group.userId,
-            summaryDateKey,
-            resendMessageId,
-            sentToEmail: group.email,
-          },
-        })
+const movieReminderSender: ReminderSenderConfig<ReminderMovie> = {
+  buildEmail: (group, mode) =>
+    buildMovieReminderEmail({
+      items: group.items,
+      mode,
+      name: group.name,
+    }),
+  countDeliveredItems: (group) => group.items.length,
+  formatDryRunLog: (group, mode) =>
+    `[watchlist-reminders][dry-run][${mode}] ${group.email} <- ${group.items.length} items`,
+  persistSummaryDelivery: (group, resendMessageId, summaryDateKey) =>
+    prisma.watchlistSummaryDelivery.create({
+      data: {
+        userId: group.userId,
+        summaryDateKey,
+        resendMessageId,
+        sentToEmail: group.email,
       },
-    })
-  }
+    }),
+  persistTransitionDelivery: (group, resendMessageId) =>
+    prisma.watchlistNotificationDelivery.createMany({
+      data: group.items.map((item) => ({
+        watchlistItemId: item.watchlistItemId,
+        showtimeId: item.movie.showtimes[0].id,
+        resendMessageId,
+        sentToEmail: group.email,
+      })),
+      skipDuplicates: true,
+    }),
+}
+
+const directorReminderSender: ReminderSenderConfig<ReminderDirectorItem> = {
+  buildEmail: (group, mode) =>
+    buildDirectorReminderEmail({
+      items: group.items,
+      mode,
+      name: group.name,
+    }),
+  countDeliveredItems: (group) => countDirectorReminderMovies(group.items),
+  formatDryRunLog: (group, mode) =>
+    `[watchlist-reminders][dry-run][director-${mode}] ${group.email} <- ${group.items.length} directors`,
+  persistSummaryDelivery: (group, resendMessageId, summaryDateKey) =>
+    prisma.directorWatchlistSummaryDelivery.create({
+      data: {
+        userId: group.userId,
+        summaryDateKey,
+        resendMessageId,
+        sentToEmail: group.email,
+      },
+    }),
+  persistTransitionDelivery: (group, resendMessageId) =>
+    prisma.directorWatchlistNotificationDelivery.createMany({
+      data: group.items.flatMap((item) =>
+        item.movies.map((movie) => ({
+          directorWatchlistItemId: item.directorWatchlistItemId,
+          movieId: movie.movieId,
+          resendMessageId,
+          sentToEmail: group.email,
+        }))
+      ),
+      skipDuplicates: true,
+    }),
+}
+
+async function sendConfiguredReminderEmails<TItem>(
+  mode: ReminderMode,
+  groups: ReminderGroup<TItem>[],
+  options: ReminderRunOptions,
+  now: Date,
+  config: ReminderSenderConfig<TItem>
+) {
+  const summaryDateKey = mode === 'summary' ? getSummaryDateKey(now) : null
 
   return sendReminderEmails({
     groups,
     options,
-    buildEmail: (group) =>
-      buildDirectorReminderEmail({
-        items: group.items,
-        mode: 'transition',
-        name: group.name,
-      }),
-    countDeliveredItems: (group) => countDirectorReminderMovies(group.items),
-    formatDryRunLog: (group) =>
-      `[watchlist-reminders][dry-run][director-transition] ${group.email} <- ${group.items.length} directors`,
-    persistDeliveries: async (group, resendMessageId) => {
-      await prisma.directorWatchlistNotificationDelivery.createMany({
-        data: group.items.flatMap((item) =>
-          item.movies.map((movie) => ({
-            directorWatchlistItemId: item.directorWatchlistItemId,
-            movieId: movie.movieId,
-            resendMessageId,
-            sentToEmail: group.email,
-          }))
-        ),
-        skipDuplicates: true,
-      })
-    },
+    buildEmail: (group) => config.buildEmail(group, mode),
+    countDeliveredItems: config.countDeliveredItems,
+    formatDryRunLog: (group) => config.formatDryRunLog(group, mode),
+    persistDeliveries: (group, resendMessageId) =>
+      mode === 'summary' && summaryDateKey
+        ? config.persistSummaryDelivery(group, resendMessageId, summaryDateKey)
+        : config.persistTransitionDelivery(group, resendMessageId),
   })
 }
 
@@ -339,10 +437,10 @@ async function initializeAddedWhileOnScreenFlags(
         select: {
           showtimes: {
             where: getUpcomingShowtimeWhere(now),
+            take: 1,
             select: {
               id: true,
             },
-            take: 1,
           },
         },
       },
@@ -394,49 +492,25 @@ async function initializeAddedWhileOnScreenFlags(
 }
 
 async function loadTransitionReminderGroups(now: Date): Promise<ReminderUserGroup[]> {
+  const movieWhere = getUpcomingReminderMovieWhere(now)
+  const movieSelect = getReminderMovieSelect(now)
   const items = await prisma.watchlistItem.findMany({
     where: {
       addedWhileOnScreen: false,
       notificationDeliveries: {
         none: {},
       },
-      movie: {
-        showtimes: {
-          some: getUpcomingShowtimeWhere(now),
-        },
-      },
+      movie: movieWhere,
       user: getEmailEnabledUserFilter(),
     },
     select: {
       id: true,
       userId: true,
       user: {
-        select: {
-          email: true,
-          name: true,
-        },
+        select: REMINDER_USER_SELECT,
       },
       movie: {
-        select: {
-          id: true,
-          title: true,
-          showtimes: {
-            where: getUpcomingShowtimeWhere(now),
-            orderBy: {
-              startTime: 'asc',
-            },
-            take: 2,
-            select: {
-              id: true,
-              startTime: true,
-              theater: {
-                select: {
-                  name: true,
-                },
-              },
-            },
-          },
-        },
+        select: movieSelect,
       },
     },
   })
@@ -455,10 +529,7 @@ async function loadTransitionReminderGroups(now: Date): Promise<ReminderUserGrou
       item.user.name
     )
 
-    group.items.push({
-      watchlistItemId: item.id,
-      movie: item.movie,
-    })
+    group.items.push(toReminderMovie(item))
   })
 
   return sortGroupsByEmail([...groups.values()])
@@ -466,6 +537,8 @@ async function loadTransitionReminderGroups(now: Date): Promise<ReminderUserGrou
 
 async function loadFridaySummaryGroups(now: Date): Promise<ReminderUserGroup[]> {
   const summaryDateKey = getSummaryDateKey(now)
+  const movieWhere = getUpcomingReminderMovieWhere(now)
+  const movieSelect = getReminderMovieSelect(now)
   const users = await prisma.user.findMany({
     where: {
       ...getEmailEnabledUserFilter(),
@@ -476,11 +549,7 @@ async function loadFridaySummaryGroups(now: Date): Promise<ReminderUserGroup[]> 
       },
       watchlistItems: {
         some: {
-          movie: {
-            showtimes: {
-              some: getUpcomingShowtimeWhere(now),
-            },
-          },
+          movie: movieWhere,
         },
       },
     },
@@ -490,35 +559,12 @@ async function loadFridaySummaryGroups(now: Date): Promise<ReminderUserGroup[]> 
       name: true,
       watchlistItems: {
         where: {
-          movie: {
-            showtimes: {
-              some: getUpcomingShowtimeWhere(now),
-            },
-          },
+          movie: movieWhere,
         },
         select: {
           id: true,
           movie: {
-            select: {
-              id: true,
-              title: true,
-              showtimes: {
-                where: getUpcomingShowtimeWhere(now),
-                orderBy: {
-                  startTime: 'asc',
-                },
-                take: 2,
-                select: {
-                  id: true,
-                  startTime: true,
-                  theater: {
-                    select: {
-                      name: true,
-                    },
-                  },
-                },
-              },
-            },
+            select: movieSelect,
           },
         },
       },
@@ -532,10 +578,7 @@ async function loadFridaySummaryGroups(now: Date): Promise<ReminderUserGroup[]> 
       name: user.name,
       items: user.watchlistItems
         .filter((item) => item.movie.showtimes.length > 0)
-        .map((item) => ({
-          watchlistItemId: item.id,
-          movie: item.movie,
-        })),
+        .map(toReminderMovie),
     }))
     .filter((group) => group.items.length > 0)
     .sort((a, b) => a.email.localeCompare(b.email))
@@ -544,18 +587,13 @@ async function loadFridaySummaryGroups(now: Date): Promise<ReminderUserGroup[]> 
 async function loadDirectorTransitionReminderGroups(
   now: Date
 ): Promise<ReminderDirectorUserGroup[]> {
+  const movieLinksWhere = getDirectorReminderMovieLinksWhere(now)
+  const personSelect = getDirectorReminderPersonSelect(now)
   const items = await prisma.directorWatchlistItem.findMany({
     where: {
       person: {
         movieLinks: {
-          some: {
-            kind: 'DIRECTOR',
-            movie: {
-              showtimes: {
-                some: getUpcomingShowtimeWhere(now),
-              },
-            },
-          },
+          some: movieLinksWhere,
         },
       },
       user: getEmailEnabledUserFilter(),
@@ -564,10 +602,7 @@ async function loadDirectorTransitionReminderGroups(
       id: true,
       userId: true,
       user: {
-        select: {
-          email: true,
-          name: true,
-        },
+        select: REMINDER_USER_SELECT,
       },
       notificationDeliveries: {
         select: {
@@ -575,44 +610,7 @@ async function loadDirectorTransitionReminderGroups(
         },
       },
       person: {
-        select: {
-          id: true,
-          name: true,
-          movieLinks: {
-            where: {
-              kind: 'DIRECTOR',
-              movie: {
-                showtimes: {
-                  some: getUpcomingShowtimeWhere(now),
-                },
-              },
-            },
-            select: {
-              movie: {
-                select: {
-                  id: true,
-                  title: true,
-                  showtimes: {
-                    where: getUpcomingShowtimeWhere(now),
-                    orderBy: {
-                      startTime: 'asc',
-                    },
-                    take: 2,
-                    select: {
-                      id: true,
-                      startTime: true,
-                      theater: {
-                        select: {
-                          name: true,
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
+        select: personSelect,
       },
     },
   })
@@ -627,17 +625,10 @@ async function loadDirectorTransitionReminderGroups(
     const deliveredMovieIds = new Set(
       item.notificationDeliveries.map((delivery) => delivery.movieId)
     )
-    const pendingMovies = item.person.movieLinks
-      .map((link) => link.movie)
-      .filter(
-        (movie) =>
-          movie.showtimes.length > 0 && !deliveredMovieIds.has(movie.id)
-      )
-      .map((movie) => ({
-        movieId: movie.id,
-        title: movie.title,
-        showtimes: movie.showtimes,
-      }))
+    const pendingMovies = toReminderDirectorMovies(
+      item.person.movieLinks.map((link) => link.movie),
+      deliveredMovieIds
+    )
 
     if (pendingMovies.length === 0) {
       return
@@ -650,14 +641,16 @@ async function loadDirectorTransitionReminderGroups(
       item.user.name
     )
 
-    group.items.push({
-      directorWatchlistItemId: item.id,
-      person: {
-        id: item.person.id,
-        name: item.person.name,
-      },
-      movies: pendingMovies,
-    })
+    group.items.push(
+      toReminderDirectorItem(
+        item.id,
+        {
+          id: item.person.id,
+          name: item.person.name,
+        },
+        pendingMovies
+      )
+    )
   })
 
   return sortGroupsByEmail([...groups.values()])
@@ -667,6 +660,8 @@ async function loadDirectorFridaySummaryGroups(
   now: Date
 ): Promise<ReminderDirectorUserGroup[]> {
   const summaryDateKey = getSummaryDateKey(now)
+  const movieLinksWhere = getDirectorReminderMovieLinksWhere(now)
+  const personSelect = getDirectorReminderPersonSelect(now)
   const users = await prisma.user.findMany({
     where: {
       ...getEmailEnabledUserFilter(),
@@ -679,14 +674,7 @@ async function loadDirectorFridaySummaryGroups(
         some: {
           person: {
             movieLinks: {
-              some: {
-                kind: 'DIRECTOR',
-                movie: {
-                  showtimes: {
-                    some: getUpcomingShowtimeWhere(now),
-                  },
-                },
-              },
+              some: movieLinksWhere,
             },
           },
         },
@@ -700,44 +688,7 @@ async function loadDirectorFridaySummaryGroups(
         select: {
           id: true,
           person: {
-            select: {
-              id: true,
-              name: true,
-              movieLinks: {
-                where: {
-                  kind: 'DIRECTOR',
-                  movie: {
-                    showtimes: {
-                      some: getUpcomingShowtimeWhere(now),
-                    },
-                  },
-                },
-                select: {
-                  movie: {
-                    select: {
-                      id: true,
-                      title: true,
-                      showtimes: {
-                        where: getUpcomingShowtimeWhere(now),
-                        orderBy: {
-                          startTime: 'asc',
-                        },
-                        take: 2,
-                        select: {
-                          id: true,
-                          startTime: true,
-                          theater: {
-                            select: {
-                              name: true,
-                            },
-                          },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
+            select: personSelect,
           },
         },
       },
@@ -750,21 +701,16 @@ async function loadDirectorFridaySummaryGroups(
       email: user.email,
       name: user.name,
       items: user.directorWatchlistItems
-        .map((item) => ({
-          directorWatchlistItemId: item.id,
-          person: {
-            id: item.person.id,
-            name: item.person.name,
-          },
-          movies: item.person.movieLinks
-            .map((link) => link.movie)
-            .filter((movie) => movie.showtimes.length > 0)
-            .map((movie) => ({
-              movieId: movie.id,
-              title: movie.title,
-              showtimes: movie.showtimes,
-            })),
-        }))
+        .map((item) =>
+          toReminderDirectorItem(
+            item.id,
+            {
+              id: item.person.id,
+              name: item.person.name,
+            },
+            toReminderDirectorMovies(item.person.movieLinks.map((link) => link.movie))
+          )
+        )
         .filter((item) => item.movies.length > 0),
     }))
     .filter((group) => group.items.length > 0)
@@ -808,8 +754,14 @@ export async function runWatchlistReminderJob(
       loadDirectorFridaySummaryGroups(now),
     ])
     const [summaryResult, directorSummaryResult] = await Promise.all([
-      sendMovieReminderEmails('summary', groups, options, now),
-      sendDirectorReminderEmails('summary', directorGroups, options, now),
+      sendConfiguredReminderEmails('summary', groups, options, now, movieReminderSender),
+      sendConfiguredReminderEmails(
+        'summary',
+        directorGroups,
+        options,
+        now,
+        directorReminderSender
+      ),
     ])
 
     return {
@@ -822,12 +774,9 @@ export async function runWatchlistReminderJob(
       directorTransitionCandidates: 0,
       directorTransitionEmailsSent: 0,
       directorTransitionItemsDelivered: 0,
-      summaryCandidates: groups.reduce((count, group) => count + group.items.length, 0),
+      summaryCandidates: countReminderGroups(groups),
       summaryEmailsSent: summaryResult.emailsSent,
-      directorSummaryCandidates: directorGroups.reduce(
-        (count, group) => count + group.items.length,
-        0
-      ),
+      directorSummaryCandidates: countReminderGroups(directorGroups),
       directorSummaryEmailsSent: directorSummaryResult.emailsSent,
     }
   }
@@ -837,22 +786,30 @@ export async function runWatchlistReminderJob(
     loadDirectorTransitionReminderGroups(now),
   ])
   const [transitionResult, directorTransitionResult] = await Promise.all([
-    sendMovieReminderEmails('transition', groups, options, now),
-    sendDirectorReminderEmails('transition', directorGroups, options, now),
+    sendConfiguredReminderEmails(
+      'transition',
+      groups,
+      options,
+      now,
+      movieReminderSender
+    ),
+    sendConfiguredReminderEmails(
+      'transition',
+      directorGroups,
+      options,
+      now,
+      directorReminderSender
+    ),
   ])
 
   return {
     dryRun: Boolean(options.dryRun),
     executedMode: 'transition',
     initializedWatchlistItems,
-    transitionCandidates: groups.reduce((count, group) => count + group.items.length, 0),
+    transitionCandidates: countReminderGroups(groups),
     transitionEmailsSent: transitionResult.emailsSent,
     transitionItemsDelivered: transitionResult.deliveredItems,
-    directorTransitionCandidates: directorGroups.reduce(
-      (count, group) =>
-        count + group.items.reduce((groupCount, item) => groupCount + item.movies.length, 0),
-      0
-    ),
+    directorTransitionCandidates: countDirectorReminderGroups(directorGroups),
     directorTransitionEmailsSent: directorTransitionResult.emailsSent,
     directorTransitionItemsDelivered: directorTransitionResult.deliveredItems,
     summaryCandidates: 0,

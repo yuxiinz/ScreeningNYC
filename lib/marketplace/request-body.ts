@@ -1,11 +1,8 @@
-import {
-  MarketplaceValidationError,
-} from '@/lib/marketplace/errors'
+import { MarketplaceValidationError } from '@/lib/marketplace/errors'
 import { normalizeMarketplacePostType } from '@/lib/marketplace/shared'
 
-export type ParsedMarketplacePostUpsertBody = {
+type ParsedMarketplacePostCommonBody = {
   type: 'BUY' | 'SELL'
-  showtimeId: number
   quantity: number
   priceCents?: number | null
   seatInfo?: string | null
@@ -13,14 +10,12 @@ export type ParsedMarketplacePostUpsertBody = {
   displayName?: string | null
 }
 
-export type ParsedMarketplacePostsBatchBody = {
-  type: 'BUY' | 'SELL'
+export type ParsedMarketplacePostUpsertBody = ParsedMarketplacePostCommonBody & {
+  showtimeId: number
+}
+
+export type ParsedMarketplacePostsBatchBody = ParsedMarketplacePostCommonBody & {
   showtimeIds: number[]
-  quantity: number
-  priceCents?: number | null
-  seatInfo?: string | null
-  contactSnapshot: string
-  displayName?: string | null
 }
 
 type UpsertBodyPayload = {
@@ -36,7 +31,7 @@ type UpsertBodyPayload = {
 
 function parseUpsertCommonFields(
   payload: UpsertBodyPayload
-): Omit<ParsedMarketplacePostsBatchBody, 'showtimeIds'> {
+): ParsedMarketplacePostCommonBody {
   const type = normalizeMarketplacePostType(
     typeof payload.type === 'string' ? payload.type : null
   )
@@ -93,25 +88,31 @@ function parsePositiveIntegerList(value: unknown, fieldName: string) {
   return parsedValues
 }
 
-export function parseMarketplacePostUpsertBody(
-  body: unknown
-): ParsedMarketplacePostUpsertBody {
+function parseMarketplacePostBody<TShowtimeFields>(
+  body: unknown,
+  parseShowtimeFields: (payload: UpsertBodyPayload) => TShowtimeFields
+): ParsedMarketplacePostCommonBody & TShowtimeFields {
   const payload = body as UpsertBodyPayload
 
   return {
     ...parseUpsertCommonFields(payload),
+    ...parseShowtimeFields(payload),
+  }
+}
+
+export function parseMarketplacePostUpsertBody(
+  body: unknown
+): ParsedMarketplacePostUpsertBody {
+  return parseMarketplacePostBody(body, (payload) => ({
     showtimeId:
       typeof payload.showtimeId === 'number' ? payload.showtimeId : Number.NaN,
-  }
+  }))
 }
 
 export function parseMarketplacePostsBatchBody(
   body: unknown
 ): ParsedMarketplacePostsBatchBody {
-  const payload = body as UpsertBodyPayload
-
-  return {
-    ...parseUpsertCommonFields(payload),
+  return parseMarketplacePostBody(body, (payload) => ({
     showtimeIds: parsePositiveIntegerList(payload.showtimeIds, 'showtimeIds'),
-  }
+  }))
 }

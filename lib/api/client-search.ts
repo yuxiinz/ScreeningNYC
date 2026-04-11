@@ -3,22 +3,28 @@ export type ClientEntitySearchResults<TLocal, TExternal> = {
   externalResults: TExternal[]
 }
 
-type SearchRouteOptions<TLocal, TPublicLocal> = {
+type ClientEntitySearchConfig<TLocal, TPublicLocal> = {
   authenticatedEndpoint: string
   errorMessage: string
   invalidPayloadLabel: string
-  isAuthenticated: boolean
   publicEndpoint: string
-  query: string
   transformPublicResults: (results: TPublicLocal[]) => TLocal[]
 }
 
-type ResolveEntityRouteOptions<TBody, TIdKey extends string> = {
-  body: TBody
+type TmdbClientEntityResolveConfig<TIdKey extends string> = {
   endpoint: string
   errorMessage: string
   idKey: TIdKey
   invalidPayloadErrorMessage: string
+}
+
+type TmdbClientEntityRoutesConfig<
+  TLocal,
+  TPublicLocal,
+  TIdKey extends string,
+> = {
+  resolve: TmdbClientEntityResolveConfig<TIdKey>
+  search: ClientEntitySearchConfig<TLocal, TPublicLocal>
 }
 
 export function getEmptyClientEntitySearchResults<TLocal, TExternal>(): ClientEntitySearchResults<
@@ -49,78 +55,88 @@ function isClientEntitySearchResults<TLocal, TExternal>(
   )
 }
 
-export async function searchClientEntityRoute<TLocal, TExternal, TPublicLocal>({
-  authenticatedEndpoint,
-  errorMessage,
-  invalidPayloadLabel,
-  isAuthenticated,
-  publicEndpoint,
-  query,
-  transformPublicResults,
-}: SearchRouteOptions<TLocal, TPublicLocal>): Promise<
-  ClientEntitySearchResults<TLocal, TExternal>
-> {
-  const endpoint = isAuthenticated
-    ? authenticatedEndpoint
-    : publicEndpoint
-  const response = await fetch(`${endpoint}?q=${encodeURIComponent(query)}`)
+export function createClientEntitySearch<TLocal, TExternal, TPublicLocal>(
+  config: ClientEntitySearchConfig<TLocal, TPublicLocal>
+) {
+  return async (
+    query: string,
+    isAuthenticated: boolean
+  ): Promise<ClientEntitySearchResults<TLocal, TExternal>> => {
+    const endpoint = isAuthenticated
+      ? config.authenticatedEndpoint
+      : config.publicEndpoint
+    const response = await fetch(`${endpoint}?q=${encodeURIComponent(query)}`)
 
-  if (!response.ok) {
-    const text = await response.text()
-    console.error(`${invalidPayloadLabel} returned non OK response:`, text)
-    throw new Error(errorMessage)
-  }
-
-  const data = await response.json()
-
-  if (isAuthenticated) {
-    if (isClientEntitySearchResults<TLocal, TExternal>(data)) {
-      return data
+    if (!response.ok) {
+      const text = await response.text()
+      console.error(`${config.invalidPayloadLabel} returned non OK response:`, text)
+      throw new Error(config.errorMessage)
     }
 
-    console.error(`${invalidPayloadLabel} returned invalid payload:`, data)
+    const data = await response.json()
+
+    if (isAuthenticated) {
+      if (isClientEntitySearchResults<TLocal, TExternal>(data)) {
+        return data
+      }
+
+      console.error(`${config.invalidPayloadLabel} returned invalid payload:`, data)
+
+      return getEmptyClientEntitySearchResults()
+    }
+
+    if (Array.isArray(data)) {
+      return {
+        localResults: config.transformPublicResults(data as TPublicLocal[]),
+        externalResults: [],
+      }
+    }
+
+    console.error(`${config.invalidPayloadLabel} did not return an array:`, data)
 
     return getEmptyClientEntitySearchResults()
   }
-
-  if (Array.isArray(data)) {
-    return {
-      localResults: transformPublicResults(data as TPublicLocal[]),
-      externalResults: [],
-    }
-  }
-
-  console.error(`${invalidPayloadLabel} did not return an array:`, data)
-
-  return getEmptyClientEntitySearchResults()
 }
 
-export async function resolveClientEntityRoute<TBody, TIdKey extends string>({
-  body,
-  endpoint,
-  errorMessage,
-  idKey,
-  invalidPayloadErrorMessage,
-}: ResolveEntityRouteOptions<TBody, TIdKey>): Promise<number> {
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  })
+function createTmdbClientEntityResolver<TIdKey extends string>(
+  config: TmdbClientEntityResolveConfig<TIdKey>
+) {
+  return async (tmdbId: number) => {
+    const response = await fetch(config.endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ tmdbId }),
+    })
 
-  if (!response.ok) {
-    throw new Error(errorMessage)
+    if (!response.ok) {
+      throw new Error(config.errorMessage)
+    }
+
+    const data = (await response.json()) as Record<string, unknown>
+    const resolvedId = data[config.idKey]
+
+    if (typeof resolvedId !== 'number' || !Number.isInteger(resolvedId)) {
+      console.error('Resolve API returned invalid payload:', data)
+      throw new Error(config.invalidPayloadErrorMessage)
+    }
+
+    return resolvedId
   }
+}
 
-  const data = (await response.json()) as Record<string, unknown>
-  const resolvedId = data[idKey]
-
-  if (typeof resolvedId !== 'number' || !Number.isInteger(resolvedId)) {
-    console.error('Resolve API returned invalid payload:', data)
-    throw new Error(invalidPayloadErrorMessage)
+export function createTmdbClientEntityRoutes<
+  TLocal,
+  TExternal,
+  TPublicLocal,
+  TIdKey extends string,
+>({
+  resolve,
+  search,
+}: TmdbClientEntityRoutesConfig<TLocal, TPublicLocal, TIdKey>) {
+  return {
+    resolve: createTmdbClientEntityResolver(resolve),
+    search: createClientEntitySearch<TLocal, TExternal, TPublicLocal>(search),
   }
-
-  return resolvedId
 }

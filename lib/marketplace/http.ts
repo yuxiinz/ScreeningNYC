@@ -1,6 +1,9 @@
-import { NextResponse } from 'next/server'
-
 import { AuthRequiredError } from '@/lib/auth/require-user-id'
+import {
+  buildUnauthorizedResponse,
+  getPositiveIntegerParam,
+  jsonError,
+} from '@/lib/api/route'
 import {
   MarketplaceNotFoundError,
   MarketplaceValidationError,
@@ -11,18 +14,14 @@ export function jsonMarketplaceError(
   message: string,
   status: number
 ) {
-  return NextResponse.json(
-    {
-      code,
-      message,
-    },
-    { status }
-  )
+  return jsonError(code, message, status)
 }
 
 export function buildMarketplaceUnauthorizedResponse(error: AuthRequiredError) {
-  return jsonMarketplaceError('UNAUTHORIZED', error.message, 401)
+  return buildUnauthorizedResponse(error.message)
 }
+
+export { getPositiveIntegerParam }
 
 export function buildMarketplaceServiceErrorResponse(
   error: unknown,
@@ -45,20 +44,6 @@ export function buildMarketplaceServiceErrorResponse(
   console.error(logLabel, error)
 
   return jsonMarketplaceError('INTERNAL_ERROR', fallbackMessage, 500)
-}
-
-export async function getPositiveIntegerParam(
-  params: Promise<Record<string, string>>,
-  key: string
-) {
-  const values = await params
-  const parsedValue = Number.parseInt(values[key] || '', 10)
-
-  if (!Number.isInteger(parsedValue) || parsedValue <= 0) {
-    return null
-  }
-
-  return parsedValue
 }
 
 export async function readJsonBody(request: Request) {

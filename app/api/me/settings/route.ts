@@ -1,24 +1,18 @@
 import { NextResponse } from 'next/server'
 
-import { auth } from '@/auth'
+import {
+  buildInvalidJsonResponse,
+  buildUnauthorizedResponse,
+  jsonError,
+} from '@/lib/api/route'
+import { getCurrentUserId } from '@/lib/auth/require-user-id'
 import { prisma } from '@/lib/prisma'
 
-async function getRequiredUserId() {
-  const session = await auth()
-  return session?.user?.id || null
-}
-
 export async function GET() {
-  const userId = await getRequiredUserId()
+  const userId = await getCurrentUserId()
 
   if (!userId) {
-    return NextResponse.json(
-      {
-        code: 'UNAUTHORIZED',
-        message: 'Sign in required.',
-      },
-      { status: 401 }
-    )
+    return buildUnauthorizedResponse()
   }
 
   const settings = await prisma.userSettings.upsert({
@@ -34,16 +28,10 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
-  const userId = await getRequiredUserId()
+  const userId = await getCurrentUserId()
 
   if (!userId) {
-    return NextResponse.json(
-      {
-        code: 'UNAUTHORIZED',
-        message: 'Sign in required.',
-      },
-      { status: 401 }
-    )
+    return buildUnauthorizedResponse()
   }
 
   let body: unknown
@@ -51,25 +39,17 @@ export async function PUT(request: Request) {
   try {
     body = await request.json()
   } catch {
-    return NextResponse.json(
-      {
-        code: 'INVALID_JSON',
-        message: 'Request body must be valid JSON.',
-      },
-      { status: 400 }
-    )
+    return buildInvalidJsonResponse()
   }
 
   const watchlistEmailEnabled = (body as { watchlistEmailEnabled?: unknown })
     ?.watchlistEmailEnabled
 
   if (typeof watchlistEmailEnabled !== 'boolean') {
-    return NextResponse.json(
-      {
-        code: 'INVALID_SETTINGS',
-        message: 'watchlistEmailEnabled must be a boolean.',
-      },
-      { status: 400 }
+    return jsonError(
+      'INVALID_SETTINGS',
+      'watchlistEmailEnabled must be a boolean.',
+      400
     )
   }
 

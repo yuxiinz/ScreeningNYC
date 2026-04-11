@@ -2,6 +2,7 @@
 
 import { NextResponse } from 'next/server'
 
+import { buildInvalidJsonResponse, jsonError } from '@/lib/api/route'
 import { registerUser } from '@/lib/auth/register'
 
 export async function POST(request: Request) {
@@ -10,13 +11,7 @@ export async function POST(request: Request) {
   try {
     body = await request.json()
   } catch {
-    return NextResponse.json(
-      {
-        code: 'INVALID_JSON',
-        message: 'Request body must be valid JSON.',
-      },
-      { status: 400 }
-    )
+    return buildInvalidJsonResponse()
   }
 
   const email =
@@ -56,11 +51,5 @@ export async function POST(request: Request) {
           ? 503
           : 400
 
-  return NextResponse.json(
-    {
-      code: result.code,
-      message: result.message,
-    },
-    { status }
-  )
+  return jsonError(result.code, result.message, status)
 }

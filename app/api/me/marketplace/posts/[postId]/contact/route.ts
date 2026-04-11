@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 
+import { jsonError } from '@/lib/api/route'
 import { AuthRequiredError, requireUserId } from '@/lib/auth/require-user-id'
 import {
   buildMarketplaceServiceErrorResponse,
@@ -7,16 +8,6 @@ import {
   getPositiveIntegerParam,
 } from '@/lib/marketplace/http'
 import { getMarketplacePostContact } from '@/lib/marketplace/service'
-
-function buildInvalidPostIdResponse() {
-  return NextResponse.json(
-    {
-      code: 'INVALID_POST_ID',
-      message: 'postId must be a positive integer.',
-    },
-    { status: 400 }
-  )
-}
 
 export async function GET(
   _request: Request,
@@ -29,7 +20,7 @@ export async function GET(
     ])
 
     if (!postId) {
-      return buildInvalidPostIdResponse()
+      return jsonError('INVALID_POST_ID', 'postId must be a positive integer.', 400)
     }
 
     const result = await getMarketplacePostContact(userId, postId)
