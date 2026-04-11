@@ -1,9 +1,15 @@
 import * as cheerio from 'cheerio'
 import type { ScrapedShowtime, TheaterAdapterConfig } from './types'
+import { dedupeByKeys } from '../core/collection'
 import { fetchHtml } from '../core/http'
 import { parseFormat, parseRuntimeMinutes, parseYear } from '../core/meta'
 import { parseScreeningTitle } from '../core/screening_title'
-import { cleanText, decodeHtmlEntities } from '../core/text'
+import {
+  cleanText,
+  decodeHtmlEntities,
+  getUniqueStrings,
+  normalizeComparableText as normalizeComparableTextValue,
+} from '../core/text'
 import { buildAbsoluteUrl, pickFirstAbsoluteUrl } from '../core/url'
 import { fetchJson } from '@/lib/http/server-fetch'
 
@@ -69,27 +75,11 @@ function textOf(value?: string | null): string {
   return cleanText(decodeHtmlEntities(value))
 }
 
-function normalizeComparableText(value?: string | null): string {
-  return textOf(value).toLowerCase()
-}
+const normalizeComparableText = (value?: string | null) =>
+  normalizeComparableTextValue(textOf(value))
 
-function uniqueStrings(values: Array<string | undefined>): string[] | undefined {
-  const seen = new Set<string>()
-  const result: string[] = []
-
-  for (const value of values) {
-    const cleaned = textOf(value)
-    if (!cleaned) continue
-
-    const normalized = normalizeComparableText(cleaned)
-    if (seen.has(normalized)) continue
-
-    seen.add(normalized)
-    result.push(cleaned)
-  }
-
-  return result.length ? result : undefined
-}
+const uniqueStrings = (values: Array<string | undefined>) =>
+  getUniqueStrings(values, textOf, normalizeComparableText)
 
 function htmlToTextWithBreaks(value?: string | null): string {
   return decodeHtmlEntities(value)
@@ -447,23 +437,10 @@ async function scrapeJapanSocietyEvent(
 }
 
 function dedupeShowtimes(rows: ScrapedShowtime[]): ScrapedShowtime[] {
-  const seen = new Set<string>()
-  const deduped: ScrapedShowtime[] = []
-
-  for (const row of rows) {
-    const key =
-      row.sourceShowtimeId ||
-      `${normalizeComparableText(row.sourceUrl)}|${normalizeComparableText(row.shownTitle || row.movieTitle)}|${row.startTimeRaw}`
-
-    if (seen.has(key)) {
-      continue
-    }
-
-    seen.add(key)
-    deduped.push(row)
-  }
-
-  return deduped
+  return dedupeByKeys(rows, (row) => [
+    row.sourceShowtimeId ||
+      `${normalizeComparableText(row.sourceUrl)}|${normalizeComparableText(row.shownTitle || row.movieTitle)}|${row.startTimeRaw}`,
+  ])
 }
 
 export async function scrapeJapanSocietyShowtimes(

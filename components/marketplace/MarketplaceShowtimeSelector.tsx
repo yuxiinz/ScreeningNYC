@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation'
 
 import ShowtimeRow, { type ShowtimeRowItem } from '@/components/showtime/ShowtimeRow'
 import type { MarketplacePostTypeValue } from '@/lib/marketplace/shared'
+import {
+  formatDateKeyInAppTimezone,
+  getDateKeyInAppTimezone,
+} from '@/lib/timezone'
 
 type MarketplaceShowtimeSelectorProps = {
   initialSelectedShowtimeIds: number[]
@@ -53,6 +57,26 @@ export default function MarketplaceShowtimeSelector({
         .filter((showtimeId) => selectedIdSet.has(showtimeId)),
     [selectedIdSet, showtimes]
   )
+  const groupedShowtimes = useMemo(() => {
+    const groupsByDate = new Map<string, ShowtimeRowItem[]>()
+
+    for (const showtime of showtimes) {
+      const dateKey = getDateKeyInAppTimezone(showtime.startTime)
+      const group = groupsByDate.get(dateKey)
+
+      if (group) {
+        group.push(showtime)
+        continue
+      }
+
+      groupsByDate.set(dateKey, [showtime])
+    }
+
+    return Array.from(groupsByDate.entries()).map(([dateKey, groupedRows]) => ({
+      dateKey,
+      showtimes: groupedRows,
+    }))
+  }, [showtimes])
 
   function shouldIgnoreToggle(target: EventTarget | null) {
     return (
@@ -82,53 +106,57 @@ export default function MarketplaceShowtimeSelector({
 
   return (
     <div className="space-y-4">
-      {showtimes.map((showtime) => {
-        const isSelected = selectedIdSet.has(showtime.id)
+      {groupedShowtimes.map((group) => (
+        <section key={group.dateKey} className="space-y-3">
+          <h3 className="text-[1.1rem] tracking-[1px] text-accent-positive">
+            {formatDateKeyInAppTimezone(group.dateKey)}
+          </h3>
 
-        return (
-          <div
-            key={showtime.id}
-            role="button"
-            tabIndex={0}
-            aria-pressed={isSelected}
-            onClick={(event) => {
-              if (shouldIgnoreToggle(event.target)) {
-                return
-              }
+          <div className="space-y-3">
+            {group.showtimes.map((showtime) => {
+              const isSelected = selectedIdSet.has(showtime.id)
 
-              toggleShowtime(showtime.id)
-            }}
-            onKeyDown={(event) => {
-              if (event.key !== 'Enter' && event.key !== ' ') {
-                return
-              }
+              return (
+                <div
+                  key={showtime.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isSelected}
+                  onClick={(event) => {
+                    if (shouldIgnoreToggle(event.target)) {
+                      return
+                    }
 
-              event.preventDefault()
-              toggleShowtime(showtime.id)
-            }}
-            className={[
-              'rounded-panel border p-3 transition-colors outline-none',
-              isSelected
-                ? 'border-text-primary bg-page-bg'
-                : 'border-border-default bg-card-bg hover:border-border-input',
-            ].join(' ')}
-          >
-            <ShowtimeRow movieTitle={movieTitle} showtime={showtime} />
+                    toggleShowtime(showtime.id)
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') {
+                      return
+                    }
 
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-4 px-2 pb-1">
-              <span className="text-[0.82rem] tracking-[0.08em] text-text-secondary">
-                {isSelected ? 'SELECTED' : 'CLICK CARD TO SELECT'}
-              </span>
+                    event.preventDefault()
+                    toggleShowtime(showtime.id)
+                  }}
+                  className={[
+                    'rounded-panel border p-3 transition-colors outline-none',
+                    isSelected
+                      ? 'border-text-primary bg-page-bg'
+                      : 'border-border-default bg-card-bg hover:border-border-input',
+                  ].join(' ')}
+                >
+                  <ShowtimeRow movieTitle={movieTitle} showtime={showtime} />
 
-              <span className="text-[0.78rem] tracking-[0.08em] text-text-dim">
-                {isSelected
-                  ? 'Included in this marketplace post.'
-                  : 'Click anywhere on this showtime card to include it.'}
-              </span>
-            </div>
+                  <div className="mt-3 px-2 pb-1">
+                    <span className="text-[0.82rem] tracking-[0.08em] text-text-secondary">
+                      {isSelected ? 'SELECTED' : 'CLICK CARD TO SELECT'}
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
           </div>
-        )
-      })}
+        </section>
+      ))}
 
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-panel border border-border-default bg-page-bg px-4 py-4">
         <div>

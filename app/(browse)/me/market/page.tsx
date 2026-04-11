@@ -99,6 +99,7 @@ export default async function MyMarketplacePage() {
 
                   <ShowtimeRow
                     movieTitle={post.showtime.movie.title}
+                    showDate
                     showtime={post.showtime}
                   />
 
@@ -155,6 +156,7 @@ export default async function MyMarketplacePage() {
 
                   <ShowtimeRow
                     movieTitle={post.showtime.movie.title}
+                    showDate
                     showtime={post.showtime}
                   />
                 </article>

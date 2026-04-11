@@ -1,107 +1,109 @@
 import { NextResponse } from 'next/server'
 
-import { AuthRequiredError, requireUserId } from '@/lib/auth/require-user-id'
+import {
+  getEmptyClientEntitySearchResults,
+  type ClientEntitySearchResults,
+} from '@/lib/api/client-search'
+import {
+  buildUnauthorizedResponse,
+  jsonError,
+} from '@/lib/api/route'
+import { AuthRequiredError } from '@/lib/auth/require-user-id'
 import { TmdbApiKeyMissingError } from '@/lib/tmdb/client'
 
-type SearchRouteConfig<TResponse> = {
-  emptyResponse: TResponse
-  internalErrorMessage: string
-  logLabel: string
-  minQueryLength?: number
-  request: Request
-  run: (query: string) => Promise<TResponse>
-}
-
-type AuthenticatedSearchRouteConfig<TResponse> = {
-  emptyResponse: TResponse
-  internalErrorMessage: string
-  logLabel: string
-  minQueryLength?: number
-  request: Request
-  run: (query: string, userId: string) => Promise<TResponse>
-}
-
-type ExternalSearchConfig<TLocal, TExternal> = {
+type SearchRouteExternalConfig<TLocal, TExternal> = {
   getExternalTmdbId: (item: TExternal) => number
   getLocalTmdbId: (item: TLocal) => number | null | undefined
+  searchExternal: (query: string) => Promise<TExternal[]>
+}
+
+type SearchRouteConfig<TLocalSearch, TLocalResult = TLocalSearch, TExternal = never> = {
+  external?: SearchRouteExternalConfig<TLocalSearch, TExternal>
+  getUserId?: () => Promise<string>
+  internalErrorMessage: string
+  logLabel: string
+  mapLocalResults?: (
+    localResults: TLocalSearch[],
+    userId: string
+  ) => Promise<TLocalResult[]> | TLocalResult[]
+  minQueryLength?: number
+  searchLocal: (query: string) => Promise<TLocalSearch[]>
+}
+
+type ExternalSearchRequest<TLocal, TExternal> = {
+  external: SearchRouteExternalConfig<TLocal, TExternal>
   localResults: TLocal[]
   query: string
-  searchExternal: (query: string) => Promise<TExternal[]>
 }
 
 function getSearchQuery(request: Request) {
   return new URL(request.url).searchParams.get('q')?.trim() || ''
 }
 
-function jsonError(code: string, message: string, status: number) {
-  return NextResponse.json(
-    {
-      code,
-      message,
-    },
-    { status }
-  )
-}
-
-export async function handlePublicSearchRoute<TResponse>({
-  emptyResponse,
+export function createSearchRoute<
+  TLocalSearch,
+  TLocalResult = TLocalSearch,
+  TExternal = never,
+>({
+  external,
+  getUserId,
   internalErrorMessage,
   logLabel,
+  mapLocalResults,
   minQueryLength = 2,
-  request,
-  run,
-}: SearchRouteConfig<TResponse>) {
-  const query = getSearchQuery(request)
+  searchLocal,
+}: SearchRouteConfig<TLocalSearch, TLocalResult, TExternal>) {
+  return async (request: Request) => {
+    const query = getSearchQuery(request)
 
-  if (query.length < minQueryLength) {
-    return NextResponse.json(emptyResponse)
-  }
-
-  try {
-    return NextResponse.json(await run(query))
-  } catch (error) {
-    console.error(logLabel, error)
-
-    return jsonError('INTERNAL_ERROR', internalErrorMessage, 500)
-  }
-}
-
-export async function handleAuthenticatedSearchRoute<TResponse>({
-  emptyResponse,
-  internalErrorMessage,
-  logLabel,
-  minQueryLength = 2,
-  request,
-  run,
-}: AuthenticatedSearchRouteConfig<TResponse>) {
-  const query = getSearchQuery(request)
-
-  if (query.length < minQueryLength) {
-    return NextResponse.json(emptyResponse)
-  }
-
-  try {
-    const userId = await requireUserId()
-
-    return NextResponse.json(await run(query, userId))
-  } catch (error) {
-    if (error instanceof AuthRequiredError) {
-      return jsonError('UNAUTHORIZED', error.message, 401)
+    if (query.length < minQueryLength) {
+      return NextResponse.json(
+        external
+          ? getEmptyClientEntitySearchResults<TLocalResult, TExternal>()
+          : ([] as TLocalResult[])
+      )
     }
 
-    console.error(logLabel, error)
+    try {
+      const userId = getUserId ? await getUserId() : ''
+      const localSearchResults = await searchLocal(query)
+      const localResults = mapLocalResults
+        ? await mapLocalResults(localSearchResults, userId)
+        : (localSearchResults as unknown as TLocalResult[])
 
-    return jsonError('INTERNAL_ERROR', internalErrorMessage, 500)
+      if (!external) {
+        return NextResponse.json(localResults)
+      }
+
+      const externalResults = await searchExternalResults({
+        external,
+        query,
+        localResults: localSearchResults,
+      })
+
+      return NextResponse.json({
+        localResults,
+        externalResults,
+      } satisfies ClientEntitySearchResults<TLocalResult, TExternal>)
+    } catch (error) {
+      if (getUserId && error instanceof AuthRequiredError) {
+        return buildUnauthorizedResponse(error.message)
+      }
+
+      console.error(logLabel, error)
+
+      return jsonError('INTERNAL_ERROR', internalErrorMessage, 500)
+    }
   }
 }
 
 export async function searchExternalResults<TLocal, TExternal>({
-  getExternalTmdbId,
-  getLocalTmdbId,
+  external,
   localResults,
   query,
-  searchExternal,
-}: ExternalSearchConfig<TLocal, TExternal>): Promise<TExternal[]> {
+}: ExternalSearchRequest<TLocal, TExternal>): Promise<TExternal[]> {
+  const { getExternalTmdbId, getLocalTmdbId, searchExternal } = external
+
   const localTmdbIds = new Set(
     localResults
       .map(getLocalTmdbId)

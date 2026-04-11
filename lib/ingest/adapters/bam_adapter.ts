@@ -1,11 +1,18 @@
 import * as cheerio from 'cheerio'
 import type { AnyNode } from 'domhandler'
 import type { ScrapedShowtime, TheaterAdapterConfig } from './types'
+import { dedupeByKeys } from '../core/collection'
 import { fetchHtml } from '../core/http'
 import { fetchJson } from '@/lib/http/server-fetch'
 import { parseFormat, parseRuntimeMinutes, parseYear } from '../core/meta'
 import { buildAbsoluteUrl } from '../core/url'
-import { cleanText, decodeHtmlEntities } from '../core/text'
+import {
+  cleanText,
+  decodeHtmlEntities,
+  getUniqueStrings,
+  normalizeLooseComparableText,
+  stripOuterQuotes,
+} from '../core/text'
 import { FREE_TICKET_SENTINEL } from '../../showtime/ticket'
 
 const BAM_BASE_URL = 'https://www.bam.org'
@@ -54,24 +61,6 @@ type BamDetailMeta = BamTitleParse & {
   isFreeAdmission: boolean
 }
 
-function uniqueStrings(values: Array<string | undefined>): string[] | undefined {
-  const seen = new Set<string>()
-  const result: string[] = []
-
-  for (const value of values) {
-    const cleaned = cleanText(value)
-    if (!cleaned) continue
-
-    const normalized = cleaned.toLowerCase()
-    if (seen.has(normalized)) continue
-
-    seen.add(normalized)
-    result.push(cleaned)
-  }
-
-  return result.length ? result : undefined
-}
-
 function cleanHtmlText(value?: string | null): string | undefined {
   const decoded = decodeHtmlEntities(value)
     .replace(/<br\s*\/?>/gi, '\n')
@@ -82,23 +71,8 @@ function cleanHtmlText(value?: string | null): string | undefined {
   return cleaned || undefined
 }
 
-function stripOuterQuotes(value?: string | null): string {
-  return cleanText(value)
-    .replace(/^["“”'‘’]+/, '')
-    .replace(/["“”'‘’]+$/, '')
-    .trim()
-}
-
-function normalizeComparableText(value?: string | null): string {
-  return stripOuterQuotes(decodeHtmlEntities(value))
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/&/g, ' and ')
-    .replace(/[’']/g, '')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-}
+const normalizeComparableText = (value?: string | null) =>
+  normalizeLooseComparableText(stripOuterQuotes(decodeHtmlEntities(value)))
 
 function extractSourceShowtimeId(ticketUrl?: string): string | undefined {
   const cleaned = cleanText(ticketUrl)
@@ -283,7 +257,7 @@ function deriveBamTitle(input: {
   return {
     movieTitle,
     shownTitle,
-    tmdbTitleCandidates: uniqueStrings(
+    tmdbTitleCandidates: getUniqueStrings(
       preferMovieTitleForDisplay ? [shownTitle] : []
     ),
     preferMovieTitleForDisplay: preferMovieTitleForDisplay || undefined,
@@ -536,24 +510,15 @@ function parsePerformanceApiShowtimes(
 }
 
 function dedupeShowtimes(rows: ScrapedShowtime[]): ScrapedShowtime[] {
-  const seen = new Set<string>()
-  const deduped: ScrapedShowtime[] = []
-
-  for (const row of rows) {
-    const key = [
+  return dedupeByKeys(rows, (row) => [
+    [
       row.movieTitle,
       row.shownTitle || '',
       row.startTimeRaw,
       row.ticketUrl || '',
       row.sourceShowtimeId || '',
-    ].join('|')
-
-    if (seen.has(key)) continue
-    seen.add(key)
-    deduped.push(row)
-  }
-
-  return deduped
+    ].join('|'),
+  ])
 }
 
 async function scrapeBamDetailPage(entry: BamListEntry): Promise<ScrapedShowtime[]> {

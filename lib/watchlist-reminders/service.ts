@@ -54,6 +54,12 @@ type ReminderGroup<TItem> = {
 type ReminderUserGroup = ReminderGroup<ReminderMovie>
 type ReminderDirectorUserGroup = ReminderGroup<ReminderDirectorItem>
 type ReminderMode = 'summary' | 'transition'
+type ReminderGroupSeed<TItem> = {
+  userId: string
+  email?: string | null
+  name: string | null
+  items: TItem[]
+}
 
 export type WatchlistReminderRunResult = {
   dryRun: boolean
@@ -175,23 +181,20 @@ function toReminderDirectorItem(
   }
 }
 
-function countReminderGroups<TItem>(groups: ReminderGroup<TItem>[]) {
-  return groups.reduce((count, group) => count + group.items.length, 0)
-}
-
-function countDirectorReminderGroups(groups: ReminderDirectorUserGroup[]) {
-  return groups.reduce(
-    (count, group) => count + countDirectorReminderMovies(group.items),
-    0
-  )
+function countReminderGroups<TItem>(
+  groups: ReminderGroup<TItem>[],
+  countItems: (items: TItem[]) => number = (items) => items.length
+) {
+  return groups.reduce((count, group) => count + countItems(group.items), 0)
 }
 
 function getExecutionMode(options: ReminderRunOptions, now: Date) {
-  if (options.mode === 'summary' || options.mode === 'transition') {
-    return options.mode
-  }
+  if (options.mode === 'summary' || options.mode === 'transition') return options.mode
 
-  return isFridayNoonWindow(now) || (options.force && getLocalNow(now).weekday === 5)
+  const localNow = DateTime.fromJSDate(now).setZone(APP_TIMEZONE)
+  return (
+    (localNow.weekday === 5 && localNow.hour === 12) || (options.force && localNow.weekday === 5)
+  )
     ? 'summary'
     : 'transition'
 }
@@ -218,23 +221,6 @@ function getEmailEnabledUserFilter() {
   }
 }
 
-function getLocalNow(now: Date) {
-  return DateTime.fromJSDate(now).setZone(APP_TIMEZONE)
-}
-
-function getSummaryDateKey(now: Date) {
-  return getDateKeyInAppTimezone(now)
-}
-
-function isFridayNoonWindow(now: Date) {
-  const localNow = getLocalNow(now)
-  return localNow.weekday === 5 && localNow.hour === 12
-}
-
-function isNoonWindow(now: Date) {
-  return getLocalNow(now).hour === 12
-}
-
 function sortGroupsByEmail<TGroup extends { email: string }>(groups: TGroup[]) {
   return [...groups].sort((a, b) => a.email.localeCompare(b.email))
 }
@@ -246,10 +232,7 @@ function getOrCreateReminderGroup<TItem>(
   name: string | null
 ) {
   const existing = groups.get(userId)
-
-  if (existing) {
-    return existing
-  }
+  if (existing) return existing
 
   const group: ReminderGroup<TItem> = {
     userId,
@@ -261,6 +244,32 @@ function getOrCreateReminderGroup<TItem>(
   groups.set(userId, group)
 
   return group
+}
+
+function buildReminderGroups<TSource, TItem>(
+  sources: TSource[],
+  getSeed: (source: TSource) => ReminderGroupSeed<TItem>
+) {
+  const groups = new Map<string, ReminderGroup<TItem>>()
+
+  sources.forEach((source) => {
+    const seed = getSeed(source)
+
+    if (!seed.email || seed.items.length === 0) {
+      return
+    }
+
+    const group = getOrCreateReminderGroup(
+      groups,
+      seed.userId,
+      seed.email,
+      seed.name
+    )
+
+    group.items.push(...seed.items)
+  })
+
+  return sortGroupsByEmail([...groups.values()])
 }
 
 async function sendReminderEmails<TItem>({
@@ -408,7 +417,7 @@ async function sendConfiguredReminderEmails<TItem>(
   now: Date,
   config: ReminderSenderConfig<TItem>
 ) {
-  const summaryDateKey = mode === 'summary' ? getSummaryDateKey(now) : null
+  const summaryDateKey = mode === 'summary' ? getDateKeyInAppTimezone(now) : null
 
   return sendReminderEmails({
     groups,
@@ -494,6 +503,7 @@ async function initializeAddedWhileOnScreenFlags(
 async function loadTransitionReminderGroups(now: Date): Promise<ReminderUserGroup[]> {
   const movieWhere = getUpcomingReminderMovieWhere(now)
   const movieSelect = getReminderMovieSelect(now)
+
   const items = await prisma.watchlistItem.findMany({
     where: {
       addedWhileOnScreen: false,
@@ -515,28 +525,16 @@ async function loadTransitionReminderGroups(now: Date): Promise<ReminderUserGrou
     },
   })
 
-  const groups = new Map<string, ReminderUserGroup>()
-
-  items.forEach((item) => {
-    if (!item.user.email || item.movie.showtimes.length === 0) {
-      return
-    }
-
-    const group = getOrCreateReminderGroup(
-      groups,
-      item.userId,
-      item.user.email,
-      item.user.name
-    )
-
-    group.items.push(toReminderMovie(item))
-  })
-
-  return sortGroupsByEmail([...groups.values()])
+  return buildReminderGroups(items, (item) => ({
+    userId: item.userId,
+    email: item.user.email,
+    name: item.user.name,
+    items: item.movie.showtimes.length > 0 ? [toReminderMovie(item)] : [],
+  }))
 }
 
 async function loadFridaySummaryGroups(now: Date): Promise<ReminderUserGroup[]> {
-  const summaryDateKey = getSummaryDateKey(now)
+  const summaryDateKey = getDateKeyInAppTimezone(now)
   const movieWhere = getUpcomingReminderMovieWhere(now)
   const movieSelect = getReminderMovieSelect(now)
   const users = await prisma.user.findMany({
@@ -571,17 +569,14 @@ async function loadFridaySummaryGroups(now: Date): Promise<ReminderUserGroup[]> 
     },
   })
 
-  return users
-    .map((user) => ({
-      userId: user.id,
-      email: user.email,
-      name: user.name,
-      items: user.watchlistItems
-        .filter((item) => item.movie.showtimes.length > 0)
-        .map(toReminderMovie),
-    }))
-    .filter((group) => group.items.length > 0)
-    .sort((a, b) => a.email.localeCompare(b.email))
+  return buildReminderGroups(users, (user) => ({
+    userId: user.id,
+    email: user.email,
+    name: user.name,
+    items: user.watchlistItems.flatMap((item) =>
+      item.movie.showtimes.length > 0 ? [toReminderMovie(item)] : []
+    ),
+  }))
 }
 
 async function loadDirectorTransitionReminderGroups(
@@ -589,6 +584,7 @@ async function loadDirectorTransitionReminderGroups(
 ): Promise<ReminderDirectorUserGroup[]> {
   const movieLinksWhere = getDirectorReminderMovieLinksWhere(now)
   const personSelect = getDirectorReminderPersonSelect(now)
+
   const items = await prisma.directorWatchlistItem.findMany({
     where: {
       person: {
@@ -615,13 +611,7 @@ async function loadDirectorTransitionReminderGroups(
     },
   })
 
-  const groups = new Map<string, ReminderDirectorUserGroup>()
-
-  items.forEach((item) => {
-    if (!item.user.email) {
-      return
-    }
-
+  return buildReminderGroups(items, (item) => {
     const deliveredMovieIds = new Set(
       item.notificationDeliveries.map((delivery) => delivery.movieId)
     )
@@ -630,36 +620,30 @@ async function loadDirectorTransitionReminderGroups(
       deliveredMovieIds
     )
 
-    if (pendingMovies.length === 0) {
-      return
+    return {
+      userId: item.userId,
+      email: item.user.email,
+      name: item.user.name,
+      items: pendingMovies.length
+        ? [
+            toReminderDirectorItem(
+              item.id,
+              {
+                id: item.person.id,
+                name: item.person.name,
+              },
+              pendingMovies
+            ),
+          ]
+        : [],
     }
-
-    const group = getOrCreateReminderGroup(
-      groups,
-      item.userId,
-      item.user.email,
-      item.user.name
-    )
-
-    group.items.push(
-      toReminderDirectorItem(
-        item.id,
-        {
-          id: item.person.id,
-          name: item.person.name,
-        },
-        pendingMovies
-      )
-    )
   })
-
-  return sortGroupsByEmail([...groups.values()])
 }
 
 async function loadDirectorFridaySummaryGroups(
   now: Date
 ): Promise<ReminderDirectorUserGroup[]> {
-  const summaryDateKey = getSummaryDateKey(now)
+  const summaryDateKey = getDateKeyInAppTimezone(now)
   const movieLinksWhere = getDirectorReminderMovieLinksWhere(now)
   const personSelect = getDirectorReminderPersonSelect(now)
   const users = await prisma.user.findMany({
@@ -695,26 +679,29 @@ async function loadDirectorFridaySummaryGroups(
     },
   })
 
-  return users
-    .map((user) => ({
-      userId: user.id,
-      email: user.email,
-      name: user.name,
-      items: user.directorWatchlistItems
-        .map((item) =>
-          toReminderDirectorItem(
-            item.id,
-            {
-              id: item.person.id,
-              name: item.person.name,
-            },
-            toReminderDirectorMovies(item.person.movieLinks.map((link) => link.movie))
-          )
-        )
-        .filter((item) => item.movies.length > 0),
-    }))
-    .filter((group) => group.items.length > 0)
-    .sort((a, b) => a.email.localeCompare(b.email))
+  return buildReminderGroups(users, (user) => ({
+    userId: user.id,
+    email: user.email,
+    name: user.name,
+    items: user.directorWatchlistItems.flatMap((item) => {
+      const movies = toReminderDirectorMovies(
+        item.person.movieLinks.map((link) => link.movie)
+      )
+
+      return movies.length
+        ? [
+            toReminderDirectorItem(
+              item.id,
+              {
+                id: item.person.id,
+                name: item.person.name,
+              },
+              movies
+            ),
+          ]
+        : []
+    }),
+  }))
 }
 
 export async function runWatchlistReminderJob(
@@ -726,7 +713,10 @@ export async function runWatchlistReminderJob(
     throw new Error('Email delivery is not configured for watchlist reminders.')
   }
 
-  if (!options.force && !isNoonWindow(now)) {
+  if (
+    !options.force &&
+    DateTime.fromJSDate(now).setZone(APP_TIMEZONE).hour !== 12
+  ) {
     return {
       dryRun: Boolean(options.dryRun),
       executedMode: 'skipped',
@@ -809,7 +799,10 @@ export async function runWatchlistReminderJob(
     transitionCandidates: countReminderGroups(groups),
     transitionEmailsSent: transitionResult.emailsSent,
     transitionItemsDelivered: transitionResult.deliveredItems,
-    directorTransitionCandidates: countDirectorReminderGroups(directorGroups),
+    directorTransitionCandidates: countReminderGroups(
+      directorGroups,
+      countDirectorReminderMovies
+    ),
     directorTransitionEmailsSent: directorTransitionResult.emailsSent,
     directorTransitionItemsDelivered: directorTransitionResult.deliveredItems,
     summaryCandidates: 0,

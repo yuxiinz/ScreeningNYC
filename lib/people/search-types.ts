@@ -10,8 +10,3 @@ export type MeDirectorSearchExternalResult = {
   tmdbId: number
   name: string
 }
-
-export type MeDirectorSearchResponse = {
-  localResults: DirectorSearchResult[]
-  externalResults: MeDirectorSearchExternalResult[]
-}

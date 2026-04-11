@@ -8,6 +8,13 @@ export function cleanText(input?: string | null): string {
   return normalizeWhitespace((input || '').replace(/\u00a0/g, ' '))
 }
 
+export function stripOuterQuotes(input?: string | null): string {
+  return cleanText(input)
+    .replace(/^["“”'‘’]+/, '')
+    .replace(/["“”'‘’]+$/, '')
+    .trim()
+}
+
 export function decodeHtmlEntities(text?: string | null): string {
   const input = text || ''
 
@@ -29,6 +36,43 @@ export function decodeHtmlEntities(text?: string | null): string {
     .replace(/&lsquo;/g, '‘')
     .replace(/&rdquo;/g, '”')
     .replace(/&ldquo;/g, '“')
+}
+
+export function normalizeComparableText(input?: string | null): string {
+  return cleanText(input).toLowerCase()
+}
+
+export function normalizeLooseComparableText(input?: string | null): string {
+  return cleanText(input)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/&/g, ' and ')
+    .replace(/[’']/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+export function getUniqueStrings(
+  values: Array<string | undefined>,
+  cleanValue: (value?: string | null) => string = cleanText,
+  normalizeValue: (value: string) => string = normalizeComparableText
+): string[] | undefined {
+  const seen = new Set<string>()
+  const result: string[] = []
+
+  for (const value of values) {
+    const cleaned = cleanValue(value)
+    if (!cleaned) continue
+
+    const normalized = normalizeValue(cleaned)
+    if (seen.has(normalized)) continue
+
+    seen.add(normalized)
+    result.push(cleaned)
+  }
+
+  return result.length ? result : undefined
 }
 
 export function stripLeadingBullets(text?: string | null): string {

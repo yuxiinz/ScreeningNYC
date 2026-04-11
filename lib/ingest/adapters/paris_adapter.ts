@@ -2,6 +2,7 @@ import * as cheerio from 'cheerio'
 import { DateTime } from 'luxon'
 import type { ScrapedShowtime, TheaterAdapterConfig } from './types'
 import { fetchJson } from '@/lib/http/server-fetch'
+import { dedupeByKeys } from '../core/collection'
 import { fetchHtml } from '../core/http'
 import { cleanText, decodeHtmlEntities, normalizeWhitespace } from '../core/text'
 import { buildAbsoluteUrl } from '../core/url'
@@ -602,28 +603,12 @@ function isLikelyActiveEventDate(dateIso: string): boolean {
 }
 
 function dedupeShowtimes(rows: ScrapedShowtime[]): ScrapedShowtime[] {
-  const seenSourceIds = new Set<string>()
-  const seenSemantic = new Set<string>()
-  const deduped: ScrapedShowtime[] = []
-
-  for (const row of rows) {
-    const sourceId = cleanText(row.sourceShowtimeId)
-    if (sourceId) {
-      if (seenSourceIds.has(sourceId)) continue
-      seenSourceIds.add(sourceId)
-    }
-
-    const semanticKey = [
-      cleanText(row.startTimeRaw),
-      cleanText(row.ticketUrl),
-    ].join('|')
-
-    if (seenSemantic.has(semanticKey)) continue
-    seenSemantic.add(semanticKey)
-    deduped.push(row)
-  }
-
-  return deduped
+  return dedupeByKeys(rows, (row) => [
+    cleanText(row.sourceShowtimeId)
+      ? `source:${cleanText(row.sourceShowtimeId)}`
+      : undefined,
+    `semantic:${cleanText(row.startTimeRaw)}|${cleanText(row.ticketUrl)}`,
+  ])
 }
 
 async function scrapeVistaShowtimes(

@@ -2,7 +2,12 @@ import type { ScrapedShowtime, TheaterAdapterConfig } from './types'
 import { fetchJson } from '@/lib/http/server-fetch'
 import { parseRuntimeMinutes } from '../core/meta'
 import { parseScreeningTitle } from '../core/screening_title'
-import { cleanText, decodeHtmlEntities } from '../core/text'
+import {
+  cleanText,
+  decodeHtmlEntities,
+  getUniqueStrings,
+  normalizeComparableText as normalizeComparableTextValue,
+} from '../core/text'
 import { buildAbsoluteUrl } from '../core/url'
 import { FREE_TICKET_SENTINEL } from '../../showtime/ticket'
 
@@ -135,27 +140,11 @@ function htmlToText(value?: string | null): string | undefined {
   return cleaned || undefined
 }
 
-function normalizeComparableText(value?: string | null): string {
-  return textOf(value).toLowerCase()
-}
+const normalizeComparableText = (value?: string | null) =>
+  normalizeComparableTextValue(textOf(value))
 
-function uniqueStrings(values: Array<string | undefined>): string[] | undefined {
-  const seen = new Set<string>()
-  const result: string[] = []
-
-  for (const value of values) {
-    const cleaned = textOf(value)
-    if (!cleaned) continue
-
-    const normalized = normalizeComparableText(cleaned)
-    if (seen.has(normalized)) continue
-
-    seen.add(normalized)
-    result.push(cleaned)
-  }
-
-  return result.length ? result : undefined
-}
+const uniqueStrings = (values: Array<string | undefined>) =>
+  getUniqueStrings(values, textOf, normalizeComparableText)
 
 function parseFlcRuntimeMinutes(value?: string | null): number | undefined {
   const cleaned = textOf(value)

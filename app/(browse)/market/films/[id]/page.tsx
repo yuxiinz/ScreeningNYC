@@ -90,6 +90,7 @@ export default async function MarketplaceMoviePage({
             >
               <ShowtimeRow
                 movieTitle={data.movie.title}
+                showDate
                 showtime={section.showtime}
                 fallbackRuntimeMinutes={data.movie.runtimeMinutes}
               />

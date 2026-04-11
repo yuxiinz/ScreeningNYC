@@ -19,8 +19,3 @@ export type MeMovieSearchExternalResult = {
   year?: number | null
   posterUrl?: string | null
 }
-
-export type MeMovieSearchResponse = {
-  localResults: MeMovieSearchLocalResult[]
-  externalResults: MeMovieSearchExternalResult[]
-}

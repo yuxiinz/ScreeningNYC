@@ -9,6 +9,7 @@ import { APP_TIMEZONE } from '../../timezone'
 import {
   cleanText,
   decodeHtmlEntities,
+  normalizeLooseComparableText as normalizeComparableText,
   normalizeWhitespace,
 } from '../core/text'
 import { buildAbsoluteUrl } from '../core/url'
@@ -347,17 +348,6 @@ function cleanAnthologyTitle(input?: string | null): string {
     .trim()
 
   return title
-}
-
-function normalizeComparableText(value?: string | null): string {
-  return cleanText(value)
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/&/g, ' and ')
-    .replace(/[’']/g, '')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
 }
 
 function isWeakTmdbCandidate(candidate: string, primaryTitle: string): boolean {

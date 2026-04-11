@@ -1,10 +1,16 @@
 import { getShowtimeDisplayTitle } from '@/lib/showtime/display'
 import { isFreeTicketValue } from '@/lib/showtime/ticket'
-import { formatTimeInAppTimezone } from '@/lib/timezone'
+import {
+  formatDateKeyInAppTimezone,
+  formatTimeInAppTimezone,
+  getDateKeyInAppTimezone,
+} from '@/lib/timezone'
 
 const ROW_CLASS =
   'flex flex-wrap items-start justify-between gap-4 rounded-panel border border-border-default bg-card-bg px-5 py-[15px]'
 const META_CLASS = 'flex flex-wrap items-baseline gap-5'
+const DATE_CLASS =
+  'mb-1 text-[0.74rem] font-semibold tracking-[0.08em] text-text-dim'
 const TITLE_CLASS = 'mb-1 text-[0.82rem] leading-[1.4] text-text-soft'
 const TIME_CLASS = 'font-mono text-[1.2rem] font-bold'
 const DETAIL_CLASS = 'text-[0.85rem] text-text-dim'
@@ -32,6 +38,7 @@ type ShowtimeRowProps = {
   fallbackFormatName?: string | null
   fallbackRuntimeMinutes?: number | null
   movieTitle: string
+  showDate?: boolean
   showtime: ShowtimeRowItem
   theaterClassName?: string
   ticketLinkClassName?: string
@@ -41,17 +48,22 @@ export default function ShowtimeRow({
   fallbackFormatName,
   fallbackRuntimeMinutes,
   movieTitle,
+  showDate = false,
   showtime,
   theaterClassName = DEFAULT_THEATER_CLASS,
   ticketLinkClassName = DEFAULT_TICKET_LINK_CLASS,
 }: ShowtimeRowProps) {
   const displayTitle = getShowtimeDisplayTitle(showtime.shownTitle, movieTitle)
+  const dateLabel = showDate
+    ? formatDateKeyInAppTimezone(getDateKeyInAppTimezone(showtime.startTime))
+    : ''
   const runtimeMinutes = showtime.runtimeMinutes || fallbackRuntimeMinutes
   const formatName = showtime.format?.name || fallbackFormatName
 
   return (
     <div className={ROW_CLASS}>
       <div className="min-w-0 flex-1">
+        {dateLabel ? <p className={DATE_CLASS}>{dateLabel}</p> : null}
         {displayTitle ? <p className={TITLE_CLASS}>{displayTitle}</p> : null}
 
         <div className={META_CLASS}>

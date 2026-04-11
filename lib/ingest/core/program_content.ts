@@ -1,8 +1,4 @@
-import { cleanText } from './text'
-
-function normalizeComparableText(input?: string | null): string {
-  return cleanText(input).toLowerCase()
-}
+import { normalizeComparableText } from './text'
 
 const TITLE_PROGRAM_PATTERNS = [
   /\btribute\b/i,

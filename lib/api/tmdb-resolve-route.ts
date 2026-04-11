@@ -21,7 +21,6 @@ type TmdbResolveRouteConfig<TResult> = {
   customErrors?: ResolveRouteErrorConfig[]
   internalErrorMessage: string
   logLabel: string
-  request: Request
   resolveEntity: (tmdbId: number) => Promise<TResult>
 }
 
@@ -41,49 +40,50 @@ function parsePositiveInteger(value: unknown) {
   return value
 }
 
-export async function handleTmdbResolveRoute<TResult>({
+export function createTmdbResolveRoute<TResult>({
   buildSuccessBody,
   customErrors = [],
   internalErrorMessage,
   logLabel,
-  request,
   resolveEntity,
 }: TmdbResolveRouteConfig<TResult>) {
-  const body = await parseJsonBody(request)
+  return async (request: Request) => {
+    const body = await parseJsonBody(request)
 
-  if (body instanceof NextResponse) {
-    return body
-  }
-
-  const tmdbId = parsePositiveInteger((body as { tmdbId?: unknown })?.tmdbId)
-
-  if (tmdbId instanceof NextResponse) {
-    return tmdbId
-  }
-
-  try {
-    await requireUserId()
-
-    const result = await resolveEntity(tmdbId)
-
-    return NextResponse.json(buildSuccessBody(result))
-  } catch (error) {
-    if (error instanceof AuthRequiredError) {
-      return buildUnauthorizedResponse(error.message)
+    if (body instanceof NextResponse) {
+      return body
     }
 
-    if (error instanceof TmdbApiKeyMissingError) {
-      return jsonError('TMDB_NOT_CONFIGURED', error.message, 503)
+    const tmdbId = parsePositiveInteger((body as { tmdbId?: unknown })?.tmdbId)
+
+    if (tmdbId instanceof NextResponse) {
+      return tmdbId
     }
 
-    for (const config of customErrors) {
-      if (error instanceof config.errorType) {
-        return jsonError(config.code, error.message, config.status)
+    try {
+      await requireUserId()
+
+      const result = await resolveEntity(tmdbId)
+
+      return NextResponse.json(buildSuccessBody(result))
+    } catch (error) {
+      if (error instanceof AuthRequiredError) {
+        return buildUnauthorizedResponse(error.message)
       }
+
+      if (error instanceof TmdbApiKeyMissingError) {
+        return jsonError('TMDB_NOT_CONFIGURED', error.message, 503)
+      }
+
+      for (const config of customErrors) {
+        if (error instanceof config.errorType) {
+          return jsonError(config.code, error.message, config.status)
+        }
+      }
+
+      console.error(logLabel, error)
+
+      return jsonError('INTERNAL_ERROR', internalErrorMessage, 500)
     }
-
-    console.error(logLabel, error)
-
-    return jsonError('INTERNAL_ERROR', internalErrorMessage, 500)
   }
 }
