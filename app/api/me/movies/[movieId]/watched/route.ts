@@ -7,18 +7,23 @@ import {
   jsonError,
 } from '@/lib/api/route'
 import { AuthRequiredError, requireUserId } from '@/lib/auth/require-user-id'
-import {
-  markWatched,
-  removeWatched,
-} from '@/lib/user-movies/service'
+import { markWatched, removeWatched } from '@/lib/user-movies/service'
 import { getReviewWordCount } from '@/lib/user-movies/review'
 
-function parseRatingInput(input: unknown): number | null | 'invalid' {
-  if (typeof input === 'undefined') {
-    return null
-  }
+const WATCHED_ROUTE_LOG_LABEL = '[api][me][movies][watched]'
+const WATCHED_ROUTE_ERROR_MESSAGE = 'Could not update watched list right now.'
 
-  if (input === null) {
+type WatchedRouteContext = {
+  params: Promise<{ movieId: string }>
+}
+
+function parseOptionalBoolean(input: unknown) {
+  if (typeof input === 'undefined') return undefined
+  return typeof input === 'boolean' ? input : 'invalid'
+}
+
+function parseRatingInput(input: unknown): number | null | 'invalid' {
+  if (typeof input === 'undefined' || input === null) {
     return null
   }
 
@@ -26,11 +31,7 @@ function parseRatingInput(input: unknown): number | null | 'invalid' {
     return 'invalid'
   }
 
-  if (!Number.isInteger(input * 2)) {
-    return 'invalid'
-  }
-
-  return input
+  return Number.isInteger(input * 2) ? input : 'invalid'
 }
 
 function parseWatchedAtInput(input: unknown): Date | null | 'invalid' {
@@ -43,10 +44,7 @@ function parseWatchedAtInput(input: unknown): Date | null | 'invalid' {
   }
 
   const trimmed = input.trim()
-
-  if (!trimmed) {
-    return null
-  }
+  if (!trimmed) return null
 
   const dateOnlyMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/)
 
@@ -56,18 +54,32 @@ function parseWatchedAtInput(input: unknown): Date | null | 'invalid' {
   }
 
   const parsed = new Date(trimmed)
-
-  if (Number.isNaN(parsed.getTime())) {
-    return 'invalid'
-  }
-
-  return parsed
+  return Number.isNaN(parsed.getTime()) ? 'invalid' : parsed
 }
 
-export async function PUT(
-  request: Request,
-  { params }: { params: Promise<{ movieId: string }> }
-) {
+async function resolveWatchedRouteTarget(params: WatchedRouteContext['params']) {
+  const [userId, movieId] = await Promise.all([
+    requireUserId(),
+    getPositiveIntegerParam(params, 'movieId'),
+  ])
+
+  if (!movieId) {
+    return jsonError('INVALID_MOVIE_ID', 'movieId must be a positive integer.', 400)
+  }
+
+  return { userId, movieId }
+}
+
+function buildWatchedRouteErrorResponse(method: 'PUT' | 'DELETE', error: unknown) {
+  if (error instanceof AuthRequiredError) {
+    return buildUnauthorizedResponse(error.message)
+  }
+
+  console.error(`${WATCHED_ROUTE_LOG_LABEL}[${method}]`, error)
+  return jsonError('INTERNAL_ERROR', WATCHED_ROUTE_ERROR_MESSAGE, 500)
+}
+
+export async function PUT(request: Request, { params }: WatchedRouteContext) {
   let body: unknown
 
   try {
@@ -76,18 +88,17 @@ export async function PUT(
     return buildInvalidJsonResponse()
   }
 
-  const confirmRemoveWant = (body as { confirmRemoveWant?: unknown })
-    ?.confirmRemoveWant
-  const preserveWatchedAt = (body as { preserveWatchedAt?: unknown })
-    ?.preserveWatchedAt
-  const watchedAtInput = (body as { watchedAt?: unknown })?.watchedAt
-  const ratingInput = (body as { rating?: unknown })?.rating
-  const reviewTextInput = (body as { reviewText?: unknown })?.reviewText
+  const payload = body as {
+    confirmRemoveWant?: unknown
+    preserveWatchedAt?: unknown
+    watchedAt?: unknown
+    rating?: unknown
+    reviewText?: unknown
+  }
+  const confirmRemoveWant = parseOptionalBoolean(payload.confirmRemoveWant)
+  const preserveWatchedAt = parseOptionalBoolean(payload.preserveWatchedAt)
 
-  if (
-    typeof confirmRemoveWant !== 'undefined' &&
-    typeof confirmRemoveWant !== 'boolean'
-  ) {
+  if (confirmRemoveWant === 'invalid') {
     return jsonError(
       'INVALID_CONFIRMATION',
       'confirmRemoveWant must be a boolean.',
@@ -95,10 +106,7 @@ export async function PUT(
     )
   }
 
-  if (
-    typeof preserveWatchedAt !== 'undefined' &&
-    typeof preserveWatchedAt !== 'boolean'
-  ) {
+  if (preserveWatchedAt === 'invalid') {
     return jsonError(
       'INVALID_PRESERVE_WATCHED_AT',
       'preserveWatchedAt must be a boolean.',
@@ -106,7 +114,7 @@ export async function PUT(
     )
   }
 
-  const watchedAt = parseWatchedAtInput(watchedAtInput)
+  const watchedAt = parseWatchedAtInput(payload.watchedAt)
 
   if (watchedAt === 'invalid') {
     return jsonError(
@@ -116,7 +124,7 @@ export async function PUT(
     )
   }
 
-  const rating = parseRatingInput(ratingInput)
+  const rating = parseRatingInput(payload.rating)
 
   if (rating === 'invalid') {
     return jsonError(
@@ -127,77 +135,54 @@ export async function PUT(
   }
 
   if (
-    typeof reviewTextInput !== 'undefined' &&
-    reviewTextInput !== null &&
-    typeof reviewTextInput !== 'string'
+    typeof payload.reviewText !== 'undefined' &&
+    payload.reviewText !== null &&
+    typeof payload.reviewText !== 'string'
   ) {
     return jsonError('INVALID_REVIEW', 'reviewText must be a string or null.', 400)
   }
 
-  const reviewText = typeof reviewTextInput === 'string' ? reviewTextInput : null
+  const reviewText = typeof payload.reviewText === 'string' ? payload.reviewText : null
 
   if (getReviewWordCount(reviewText) > 200) {
     return jsonError('REVIEW_TOO_LONG', 'reviewText must be 200 words or fewer.', 400)
   }
 
   try {
-    const [userId, movieId] = await Promise.all([
-      requireUserId(),
-      getPositiveIntegerParam(params, 'movieId'),
-    ])
+    const target = await resolveWatchedRouteTarget(params)
 
-    if (!movieId) {
-      return jsonError('INVALID_MOVIE_ID', 'movieId must be a positive integer.', 400)
+    if (target instanceof NextResponse) {
+      return target
     }
-
-    const result = await markWatched(userId, movieId, {
-      confirmRemoveWant,
-      preserveWatchedAt,
-      watchedAt: watchedAt || undefined,
-      rating,
-      reviewText,
-    })
 
     return NextResponse.json({
       ok: true,
-      ...result,
+      ...(await markWatched(target.userId, target.movieId, {
+        confirmRemoveWant,
+        preserveWatchedAt,
+        watchedAt: watchedAt || undefined,
+        rating,
+        reviewText,
+      })),
     })
   } catch (error) {
-    if (error instanceof AuthRequiredError) {
-      return buildUnauthorizedResponse(error.message)
-    }
-
-    console.error('[api][me][movies][watched][PUT]', error)
-    return jsonError('INTERNAL_ERROR', 'Could not update watched list right now.', 500)
+    return buildWatchedRouteErrorResponse('PUT', error)
   }
 }
 
-export async function DELETE(
-  _request: Request,
-  { params }: { params: Promise<{ movieId: string }> }
-) {
+export async function DELETE(_request: Request, { params }: WatchedRouteContext) {
   try {
-    const [userId, movieId] = await Promise.all([
-      requireUserId(),
-      getPositiveIntegerParam(params, 'movieId'),
-    ])
+    const target = await resolveWatchedRouteTarget(params)
 
-    if (!movieId) {
-      return jsonError('INVALID_MOVIE_ID', 'movieId must be a positive integer.', 400)
+    if (target instanceof NextResponse) {
+      return target
     }
-
-    const result = await removeWatched(userId, movieId)
 
     return NextResponse.json({
       ok: true,
-      ...result,
+      ...(await removeWatched(target.userId, target.movieId)),
     })
   } catch (error) {
-    if (error instanceof AuthRequiredError) {
-      return buildUnauthorizedResponse(error.message)
-    }
-
-    console.error('[api][me][movies][watched][DELETE]', error)
-    return jsonError('INTERNAL_ERROR', 'Could not update watched list right now.', 500)
+    return buildWatchedRouteErrorResponse('DELETE', error)
   }
 }

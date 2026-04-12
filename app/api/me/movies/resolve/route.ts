@@ -5,17 +5,20 @@ import {
 } from '@/lib/movie/resolve'
 
 export const POST = createTmdbResolveRoute({
-  resolveEntity: resolveMovieFromTmdbId,
-  buildSuccessBody: (movie) => ({
-    ok: true,
-    movieId: movie.id,
-    title: movie.title,
-  }),
-  customErrors: [
+  resolve: async (tmdbId) => {
+    const movie = await resolveMovieFromTmdbId(tmdbId)
+
+    return {
+      ok: true,
+      movieId: movie.id,
+      title: movie.title,
+    }
+  },
+  errors: [
     {
       code: 'TMDB_MOVIE_NOT_FOUND',
-      errorType: TmdbMovieNotFoundError,
       status: 404,
+      when: TmdbMovieNotFoundError,
     },
   ],
   internalErrorMessage: 'Could not resolve movie right now.',

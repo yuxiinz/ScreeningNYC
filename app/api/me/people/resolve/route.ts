@@ -6,22 +6,25 @@ import {
 } from '@/lib/people/resolve'
 
 export const POST = createTmdbResolveRoute({
-  resolveEntity: resolveDirectorFromTmdbId,
-  buildSuccessBody: (person) => ({
-    ok: true,
-    personId: person.id,
-    name: person.name,
-  }),
-  customErrors: [
+  resolve: async (tmdbId) => {
+    const person = await resolveDirectorFromTmdbId(tmdbId)
+
+    return {
+      ok: true,
+      personId: person.id,
+      name: person.name,
+    }
+  },
+  errors: [
     {
       code: 'TMDB_PERSON_NOT_FOUND',
-      errorType: TmdbPersonNotFoundError,
       status: 404,
+      when: TmdbPersonNotFoundError,
     },
     {
       code: 'TMDB_PERSON_NOT_DIRECTOR',
-      errorType: TmdbPersonNotDirectorError,
       status: 422,
+      when: TmdbPersonNotDirectorError,
     },
   ],
   internalErrorMessage: 'Could not resolve director right now.',

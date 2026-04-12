@@ -1,294 +1,278 @@
 # Screening NYC
 
-Screening NYC is a Next.js application built around movie showtimes in New York City.
+Screening NYC is a Next.js application for tracking repertory and specialty movie showtimes in New York City.
 
-Its core is not a traditional movie database, but focuses on three main functions:
+It is built around three product workflows:
 
-1. Discover current and upcoming showtimes across NYC cinemas  
-2. After login, add movies or directors to a want list and subscribe to notifications  
-3. After login, post movie ticket buy and sell information, with the platform acting only as an information board (no transactions handled on-site)
+1. Public showtime discovery for films currently screening or scheduled in NYC
+2. Logged-in watchlist and watched-history tools for films and directors
+3. Logged-in ticket marketplace posts for upcoming showtimes
 
 Live site: https://www.screeningnyc.com/
 
----
+## Product Scope
 
-## Core Features
+### 1. Public showtime discovery
 
-### 1. Browse On-Screening Showtimes
+Public users can:
 
-This is the main public entry point and does not require login.
+- browse the home grid of scheduled films at `/`
+- browse showtimes by date at `/date`
+- browse theaters on the map at `/map`
+- search films at `/api/movies/search`
+- open film detail pages at `/films/[id]`
+- browse directors at `/people` and person detail pages at `/people/[id]`
 
-Users can:
+The public layer is cache-heavy and reads from normalized Prisma data, not directly from source sites.
 
-- View currently screening films on the homepage `/`
-- Browse showtimes by date at `/date`
-- Explore theaters on a map at `/map`
-- View detailed showtimes for a film at `/films/[id]`
-- Search for films; logged-in users can also resolve external TMDB results into internal pages
+### 2. Personal watchlist and watched history
 
-Key code areas:
+Logged-in users can:
 
-- Pages
-  - `app/(browse)/page.tsx`
-  - `app/(browse)/date/page.tsx`
-  - `app/(browse)/map/page.tsx`
-  - `app/films/[id]/page.tsx`
-- UI components
-  - `components/FilmSearchBox.tsx`
-  - `components/TheaterFilter.tsx`
-  - `components/showtime/ShowtimeRow.tsx`
-  - `components/map/*`
-- Data fetching and caching
-  - `lib/cache/public-data.ts`
-  - `lib/movie/search-service.ts`
-  - `lib/api/search-route.ts`
-  - `lib/api/client-search.ts`
-- Data ingestion and persistence
-  - `lib/ingest/adapters/*`
-  - `lib/ingest/services/persist_service.ts`
-  - `lib/ingest/services/tmdb_service.ts`
-  - `scripts/ingest_theater.ts`
+- add films to a want list
+- add directors to a want list
+- mark films as watched
+- store ratings and short reviews
+- import want or watched history from Douban or Letterboxd CSV exports
+- manage watchlist and watched pages under `/me`
+- receive email reminders when wanted films begin screening
+- receive Friday summary emails for active watchlist matches
 
-Core data models:
+### 3. Ticket marketplace
 
-- `Movie`: film metadata  
-- `Theater`: cinema  
-- `Showtime`: a specific screening  
-- `Format`: screening format such as 35mm, 70mm, DCP  
+Logged-in users can:
 
----
+- browse active BUY and SELL posts at `/market`
+- create a marketplace post from `/market/new`
+- attach a post to one or more upcoming showtimes for a film
+- manage their own posts at `/me/market`
+- request contact details for matching posts
 
-### 2. Want List and Subscriptions (Logged-in Users)
+The marketplace is intentionally limited:
 
-This is the user state layer, covering both movies and directors.
+- Screening NYC is an information board, not a payment or escrow platform
+- the platform does not verify tickets, identities, or transaction outcomes
+- users exchange contact information and complete transactions off-platform
 
-After logging in, users can:
+## Architecture Overview
 
-- Add movies to a want list  
-- Add directors to a want list  
-- View lists at `/me/want-list`  
-- Enable or disable email notifications  
-- Receive a notification when a film starts screening  
-- Receive a weekly summary on Friday at noon  
+The codebase is organized by product domain rather than by strict technical layer.
 
-Key code areas:
+```text
+app/                 App Router pages and API routes
+components/          UI components grouped by product area
+lib/api/             shared route helpers for search, resolve, and collection actions
+lib/ingest/          scrapers, source normalization, TMDB enrichment, persistence helpers
+lib/movie/           movie search, matching, display, canonical lookup
+lib/people/          director search and TMDB resolution
+lib/user-movies/     want, watched, import, and review logic
+lib/user-directors/  director watchlist logic
+lib/marketplace/     marketplace validation, service layer, and HTTP helpers
+lib/watchlist-reminders/  email content and reminder orchestration
+lib/cache/           public cache helpers and cache tags
+prisma/              schema and migrations
+scripts/             operational jobs
+tests/               focused Node test suite
+```
 
-- Pages
-  - `app/(browse)/me/page.tsx`
-  - `app/(browse)/me/want-list/page.tsx`
-- API
-  - `app/api/me/movies/[movieId]/want/route.ts`
-  - `app/api/me/people/[personId]/want/route.ts`
-  - `app/api/me/movies/search/route.ts`
-  - `app/api/me/people/search/route.ts`
-  - `app/api/me/movies/resolve/route.ts`
-  - `app/api/me/people/resolve/route.ts`
-- Services
-  - `lib/user-movies/service.ts`
-  - `lib/user-directors/service.ts`
-  - `lib/watchlist-reminders/service.ts`
-  - `lib/watchlist-reminders/content.ts`
-- Components
-  - `components/movie/MovieListActions.tsx`
-  - `components/person/DirectorListActions.tsx`
-  - `components/me/want-list/*`
-  - `components/auth/EmailReminderToggle.tsx`
+`app/(browse)` is a route group only; it does not appear in public URLs.
 
-Notification logic:
+## How Data Flows
 
-- Weekdays: notify when films start screening  
-- Fridays: send a summary email  
-- Email is a reminder layer, not a replacement for the in-app want list  
+1. Theater-specific adapters in `lib/ingest/adapters/*` scrape source sites
+2. Ingest services normalize titles, formats, times, directors, and identifiers
+3. Prisma persists normalized `Movie`, `Person`, `Theater`, `Showtime`, and marketplace data
+4. Public pages read cached Prisma queries from `lib/cache/public-data.ts`
+5. Authenticated pages add user state on top of the same movie/showtime graph
+6. Reminder and marketplace flows read the same normalized showtime records
 
----
+This shared movie-showtime graph is the core of the product.
 
-### 3. Ticket Marketplace
+## Important Routes
 
-This is an information-only marketplace.
+### Public pages
 
-After logging in, users can:
+- `/`
+- `/date`
+- `/map`
+- `/films/[id]`
+- `/films/tmdb/[tmdbId]`
+- `/people`
+- `/people/[id]`
 
-- Browse active BUY and SELL posts at `/market`  
-- Create a post at `/market/new` in four steps:
-  1. Choose BUY or SELL  
-  2. Select a film  
-  3. Select a showtime  
-  4. Enter quantity, price, seat info, and contact details  
-- View posts per film and showtime at `/market/films/[id]`  
-- Manage their posts at `/me/market`  
+### Authenticated pages
 
-Platform boundaries:
+- `/me`
+- `/me/want-list`
+- `/me/watched`
+- `/me/market`
+- `/market/new`
 
-- Only displays user-submitted information  
-- Does not verify tickets or identities  
-- Does not handle payments or escrow  
-- Does not facilitate transactions on-site  
-- Users exchange contact info and complete transactions externally  
+### Core API routes
 
-Key code areas:
+- `app/api/movies/search/route.ts`
+- `app/api/people/search/route.ts`
+- `app/api/me/movies/[movieId]/want/route.ts`
+- `app/api/me/people/[personId]/want/route.ts`
+- `app/api/me/movies/[movieId]/watched/route.ts`
+- `app/api/me/movies/import/route.ts`
+- `app/api/me/movies/search/route.ts`
+- `app/api/me/people/search/route.ts`
+- `app/api/me/movies/resolve/route.ts`
+- `app/api/me/people/resolve/route.ts`
+- `app/api/me/marketplace/posts/route.ts`
+- `app/api/me/marketplace/posts/batch/route.ts`
+- `app/api/me/marketplace/posts/[postId]/route.ts`
+- `app/api/me/marketplace/posts/[postId]/contact/route.ts`
+- `app/api/cache/revalidate/route.ts`
 
-- Pages
-  - `app/(browse)/market/page.tsx`
-  - `app/(browse)/market/new/page.tsx`
-  - `app/(browse)/market/films/[id]/page.tsx`
-  - `app/(browse)/me/market/page.tsx`
-- API
-  - `app/api/me/marketplace/posts/route.ts`
-  - `app/api/me/marketplace/posts/batch/route.ts`
-  - `app/api/me/marketplace/posts/[postId]/route.ts`
-  - `app/api/me/marketplace/posts/[postId]/contact/route.ts`
-- Services
-  - `lib/marketplace/service.ts`
-  - `lib/marketplace/request-body.ts`
-  - `lib/marketplace/http.ts`
-  - `lib/marketplace/errors.ts`
-- Components
-  - `components/marketplace/*`
+## Core Data Model
 
-Design note: marketplace is structured as film -> showtime -> BUY or SELL, not a general second-hand platform.
+The main Prisma models are:
 
----
+- `Movie`
+- `Person`
+- `MoviePerson`
+- `Tag`
+- `MovieTag`
+- `Theater`
+- `Format`
+- `Showtime`
+- `WatchlistItem`
+- `DirectorWatchlistItem`
+- `UserMovieWatch`
+- `MarketplacePost`
+- `MarketplaceMatchNotification`
+- `WatchlistNotificationDelivery`
+- `WatchlistSummaryDelivery`
+- `DirectorWatchlistNotificationDelivery`
+- `DirectorWatchlistSummaryDelivery`
 
-## Supported Theaters
-
-The system currently ingests and normalizes showtimes from:
-
-- Metrograph  
-- Film Forum  
-- Film at Lincoln Center  
-- IFC Center  
-- Quad Cinema  
-- Cinema Village  
-- Spectacle  
-- Roxy Cinema  
-- MoMA  
-- Museum of the Moving Image  
-- Anthology Film Archives  
-- BAM  
-- Angelika New York  
-- Village East by Angelika  
-- Cinema 123 by Angelika  
-- Paris Theater  
-- Nitehawk Williamsburg  
-- Nitehawk Prospect Park  
-- Japan Society  
-
-Metadata is defined in `lib/ingest/config/theater_meta.ts`  
-Adapters are in `lib/ingest/adapters/index.ts`
-
----
-
-## Project Structure
-
-\`\`\`text
-screeningnyc/
-├── app/
-├── components/
-├── lib/
-├── prisma/
-├── scripts/
-└── tests/
-\`\`\`
-
-Organized by business domain rather than purely technical layers.
-
----
-
-## Tech Stack
-
-- Next.js 16.2 App Router  
-- React 19  
-- TypeScript  
-- Tailwind CSS v4  
-- Prisma  
-- PostgreSQL  
-- Luxon  
-- NextAuth v5 beta  
-- Cheerio + fetch / JSON scraping  
-- Leaflet / React Leaflet  
-- Resend  
-
----
+`Showtime` is the operational center of the product. Watchlists, reminders, market posts, and public browsing all depend on upcoming scheduled showtimes.
 
 ## Authentication
 
-Supported login methods:
+Authentication is configured in `auth.ts` with NextAuth v5.
 
-- Email and password  
-- Magic link via email  
-- Google login  
+Supported providers:
 
-Configured in `auth.ts`
-
----
+- email + password
+- magic link via Resend when configured
+- Google OAuth when configured
 
 ## Local Development
 
 ### Requirements
 
-- Node.js 20+  
-- PostgreSQL  
-
-### Environment Variables
-
-\`\`\`env
-DATABASE_URL="..."
-TMDB_API_KEY="..."
-AUTH_SECRET="..."
-APP_BASE_URL="http://localhost:3000"
-CRON_SECRET="..."
-REMINDER_BASE_URL="https://www.screeningnyc.com"
-EMAIL_FROM="auth@example.com"
-RESEND_API_KEY="..."
-GOOGLE_CLIENT_ID="..."
-GOOGLE_CLIENT_SECRET="..."
-\`\`\`
+- Node.js 20+
+- PostgreSQL
 
 ### Setup
 
-\`\`\`bash
+```bash
 npm install
 npx prisma migrate dev
 npm run dev
-\`\`\`
+```
 
----
+Open http://localhost:3000
+
+### Environment Variables
+
+Required for core app development:
+
+```env
+DATABASE_URL="postgresql://..."
+AUTH_SECRET="..."
+APP_BASE_URL="http://localhost:3000"
+```
+
+Required for TMDB-backed search/resolve and richer movie metadata:
+
+```env
+TMDB_API_KEY="..."
+```
+
+Optional auth and email features:
+
+```env
+EMAIL_FROM="Screening NYC <no-reply@example.com>"
+RESEND_API_KEY="..."
+GOOGLE_CLIENT_ID="..."
+GOOGLE_CLIENT_SECRET="..."
+```
+
+Optional automation and production operations:
+
+```env
+CRON_SECRET="..."
+REMINDER_BASE_URL="https://www.screeningnyc.com"
+```
+
+The app also accepts `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `AUTH_URL`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, and `AUTH_RESEND_KEY` as fallbacks in the auth env helper.
 
 ## Common Commands
 
-\`\`\`bash
+```bash
 npm run dev
 npm run typecheck
 npm test
 npm run lint
 npm run build
-\`\`\`
+```
 
----
+Operational scripts:
 
-## Data Ingestion
-
-\`\`\`bash
+```bash
 npm run ingest:theater
 npm run cleanup:showtimes
+npm run cleanup:orphan-people
+npm run backfill:showtime-end-times
+npm run backfill:movie-tags-and-directors
 npm run reminders:watchlist
-\`\`\`
+```
 
----
+## Automation and Operations
 
-## Automation
+GitHub Actions currently run:
 
-GitHub Actions handle:
+- `ci.yml`: typecheck, lint, and production build
+- `daily_ingest.yml`: daily ingest plus public cache revalidation
+- `cleanup_showtimes.yml`: expired showtime cleanup every 15 minutes plus today-sensitive cache revalidation
+- `watchlist_reminders.yml`: watchlist reminder job around noon America/New_York
 
-- CI checks  
-- Daily ingestion  
-- Cleanup of expired showtimes  
-- Watchlist reminders  
+Cache revalidation is handled by `app/api/cache/revalidate/route.ts` and protected by `CRON_SECRET`.
 
----
+## Ingest Coverage
 
-## Notes
+Current theater adapters cover:
 
-- `(browse)` is a route group and does not affect URLs  
-- Map page uses dynamic connection to avoid static snapshot issues  
-- Marketplace is strictly information sharing, not a transaction platform  
+- Metrograph
+- Film Forum
+- Film at Lincoln Center
+- IFC Center
+- Quad Cinema
+- Cinema Village
+- Spectacle
+- Roxy Cinema
+- MoMA
+- Museum of the Moving Image
+- Anthology Film Archives
+- BAM
+- Angelika New York
+- Village East by Angelika
+- Cinema 123 by Angelika
+- Paris Theater
+- Nitehawk Williamsburg
+- Nitehawk Prospect Park
+- Japan Society
+
+Theater metadata lives in `lib/ingest/config/theater_meta.ts`.
+
+## Notes and Constraints
+
+- The project is not a general movie encyclopedia; it is anchored to NYC screening data
+- some person pages combine local records with TMDB-only filmography when local coverage is incomplete
+- reminder delivery is designed around noon in `America/New_York`
+- the marketplace is intentionally narrow and tied to specific showtimes, not free-form listings
+- public pages rely on Next cache tags and scheduled revalidation jobs

@@ -8,53 +8,41 @@ import {
 import { AuthRequiredError, requireUserId } from '@/lib/auth/require-user-id'
 import { TmdbApiKeyMissingError } from '@/lib/tmdb/client'
 
-type ErrorConstructor = abstract new (...args: never[]) => Error
-
 type ResolveRouteErrorConfig = {
   code: string
-  errorType: ErrorConstructor
   status: number
+  when: abstract new (...args: never[]) => Error
 }
 
-type TmdbResolveRouteConfig<TResult> = {
-  buildSuccessBody: (result: TResult) => Record<string, unknown>
-  customErrors?: ResolveRouteErrorConfig[]
+type TmdbResolveRouteConfig = {
+  errors?: ResolveRouteErrorConfig[]
   internalErrorMessage: string
   logLabel: string
-  resolveEntity: (tmdbId: number) => Promise<TResult>
+  resolve: (tmdbId: number) => Promise<Record<string, unknown>>
 }
 
-async function parseJsonBody(request: Request) {
+async function parseTmdbId(request: Request) {
   try {
-    return await request.json()
+    const { tmdbId } = (await request.json()) as { tmdbId?: unknown }
+
+    if (typeof tmdbId === 'number' && Number.isInteger(tmdbId) && tmdbId > 0) {
+      return tmdbId
+    }
   } catch {
     return buildInvalidJsonResponse()
   }
+
+  return jsonError('INVALID_TMDB_ID', 'tmdbId must be a positive integer.', 400)
 }
 
-function parsePositiveInteger(value: unknown) {
-  if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
-    return jsonError('INVALID_TMDB_ID', 'tmdbId must be a positive integer.', 400)
-  }
-
-  return value
-}
-
-export function createTmdbResolveRoute<TResult>({
-  buildSuccessBody,
-  customErrors = [],
+export function createTmdbResolveRoute({
+  errors = [],
   internalErrorMessage,
   logLabel,
-  resolveEntity,
-}: TmdbResolveRouteConfig<TResult>) {
+  resolve,
+}: TmdbResolveRouteConfig) {
   return async (request: Request) => {
-    const body = await parseJsonBody(request)
-
-    if (body instanceof NextResponse) {
-      return body
-    }
-
-    const tmdbId = parsePositiveInteger((body as { tmdbId?: unknown })?.tmdbId)
+    const tmdbId = await parseTmdbId(request)
 
     if (tmdbId instanceof NextResponse) {
       return tmdbId
@@ -63,9 +51,7 @@ export function createTmdbResolveRoute<TResult>({
     try {
       await requireUserId()
 
-      const result = await resolveEntity(tmdbId)
-
-      return NextResponse.json(buildSuccessBody(result))
+      return NextResponse.json(await resolve(tmdbId))
     } catch (error) {
       if (error instanceof AuthRequiredError) {
         return buildUnauthorizedResponse(error.message)
@@ -75,9 +61,9 @@ export function createTmdbResolveRoute<TResult>({
         return jsonError('TMDB_NOT_CONFIGURED', error.message, 503)
       }
 
-      for (const config of customErrors) {
-        if (error instanceof config.errorType) {
-          return jsonError(config.code, error.message, config.status)
+      for (const { code, status, when } of errors) {
+        if (error instanceof when) {
+          return jsonError(code, error.message, status)
         }
       }
 
