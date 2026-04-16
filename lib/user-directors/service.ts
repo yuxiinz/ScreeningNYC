@@ -5,7 +5,7 @@ import {
   patchCollectionState,
 } from '@/lib/user-collections/state'
 
-export type DirectorCollectionState = {
+export type PersonCollectionState = {
   inWant: boolean
 }
 
@@ -33,11 +33,11 @@ async function getDirectorUpcomingMovieIds(personId: number, now: Date = new Dat
   return movies.map((movie) => movie.id)
 }
 
-export async function getDirectorStatesForUser(
+export async function getPersonStatesForUser(
   userId: string | null,
   personIds: number[]
 ) {
-  const createInitialState = (): DirectorCollectionState => ({
+  const createInitialState = (): PersonCollectionState => ({
     inWant: false,
   })
 
@@ -53,7 +53,7 @@ export async function getDirectorStatesForUser(
   })
 }
 
-export async function addDirectorWant(userId: string, personId: number) {
+export async function addPersonWant(userId: string, personId: number) {
   const existing = await prisma.directorWatchlistItem.findUnique({
     where: {
       userId_personId: {
@@ -113,7 +113,7 @@ export async function addDirectorWant(userId: string, personId: number) {
   }
 }
 
-export async function removeDirectorWant(userId: string, personId: number) {
+export async function removePersonWant(userId: string, personId: number) {
   await prisma.directorWatchlistItem.deleteMany({
     where: {
       userId,
@@ -127,7 +127,7 @@ export async function removeDirectorWant(userId: string, personId: number) {
   }
 }
 
-export async function getWantDirectorListPageData(userId: string) {
+export async function getWantPersonListPageData(userId: string) {
   const now = new Date()
   const items = await prisma.directorWatchlistItem.findMany({
     where: {
@@ -242,6 +242,6 @@ export async function getWantDirectorListPageData(userId: string) {
   }
 }
 
-export type WantDirectorListPageData = Awaited<
-  ReturnType<typeof getWantDirectorListPageData>
+export type WantPersonListPageData = Awaited<
+  ReturnType<typeof getWantPersonListPageData>
 >

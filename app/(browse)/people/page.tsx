@@ -1,14 +1,14 @@
 import Link from 'next/link'
 
 import BackToTopButton from '@/components/BackToTopButton'
-import DirectorSearchBox from '@/components/DirectorSearchBox'
+import PersonSearchBox from '@/components/PersonSearchBox'
 import PaginationControls from '@/components/PaginationControls'
-import DirectorListActions from '@/components/person/DirectorListActions'
+import PersonListActions from '@/components/person/PersonListActions'
 import PersonPhotoImage from '@/components/person/PersonPhotoImage'
 import { getCurrentUserId } from '@/lib/auth/require-user-id'
 import { prisma } from '@/lib/prisma'
 import { parsePositivePage } from '@/lib/routing/search-params'
-import { getDirectorStatesForUser } from '@/lib/user-directors/service'
+import { getPersonStatesForUser } from '@/lib/user-directors/service'
 
 const PEOPLE_PAGE_SIZE = 120
 
@@ -61,7 +61,7 @@ export default async function PeoplePage({
     take: PEOPLE_PAGE_SIZE,
   })
 
-  const directorStates = await getDirectorStatesForUser(
+  const directorStates = await getPersonStatesForUser(
     currentUserId,
     people.map((person) => person.id)
   )
@@ -71,7 +71,7 @@ export default async function PeoplePage({
   return (
     <>
       <div className="mx-auto mb-5 flex max-w-[var(--container-wide)] justify-end">
-        <DirectorSearchBox isAuthenticated={Boolean(currentUserId)} />
+        <PersonSearchBox isAuthenticated={Boolean(currentUserId)} />
       </div>
 
       <main className="mx-auto max-w-[var(--container-wide)]">
@@ -112,7 +112,7 @@ export default async function PeoplePage({
                   </Link>
 
                   {currentUserId ? (
-                    <DirectorListActions
+                    <PersonListActions
                       personId={person.id}
                       initialInWant={directorStates.get(person.id)?.inWant || false}
                       compact

@@ -2,12 +2,12 @@ import { notFound } from 'next/navigation'
 
 import BackButton from '@/components/BackButton'
 import MovieGridCard from '@/components/movie/MovieGridCard'
-import DirectorListActions from '@/components/person/DirectorListActions'
+import PersonListActions from '@/components/person/PersonListActions'
 import { fetchTmdbDirectorFilmography } from '@/lib/people/tmdb'
 import { getCurrentUserId } from '@/lib/auth/require-user-id'
 import { prisma } from '@/lib/prisma'
 import { TmdbApiKeyMissingError } from '@/lib/tmdb/client'
-import { getDirectorStatesForUser } from '@/lib/user-directors/service'
+import { getPersonStatesForUser } from '@/lib/user-directors/service'
 
 export default async function PersonDetailPage({
   params,
@@ -90,7 +90,7 @@ export default async function PersonDetailPage({
   )
   const currentUserId = await currentUserIdPromise
   const directorState = (
-    await getDirectorStatesForUser(currentUserId, [person.id])
+    await getPersonStatesForUser(currentUserId, [person.id])
   ).get(person.id)
 
   return (
@@ -107,7 +107,7 @@ export default async function PersonDetailPage({
         </p>
 
         {currentUserId ? (
-          <DirectorListActions
+          <PersonListActions
             personId={person.id}
             initialInWant={directorState?.inWant || false}
             className="mt-4"

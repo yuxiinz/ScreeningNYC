@@ -11,7 +11,7 @@ import type {
   MeDirectorSearchExternalResult,
 } from '@/lib/people/search-types'
 
-type DirectorSearchBoxProps = {
+type PersonSearchBoxProps = {
   isAuthenticated?: boolean
 }
 
@@ -19,7 +19,7 @@ function getFilmCountLabel(filmCount: number) {
   return `${filmCount} film${filmCount === 1 ? '' : 's'} in database`
 }
 
-const directorRoutes = createTmdbClientEntityRoutes<
+const personRoutes = createTmdbClientEntityRoutes<
   DirectorSearchResult,
   MeDirectorSearchExternalResult,
   DirectorSearchResult,
@@ -40,9 +40,9 @@ const directorRoutes = createTmdbClientEntityRoutes<
   },
 })
 
-export default function DirectorSearchBox({
+export default function PersonSearchBox({
   isAuthenticated = false,
-}: DirectorSearchBoxProps) {
+}: PersonSearchBoxProps) {
   const router = useRouter()
 
   return (
@@ -81,11 +81,11 @@ export default function DirectorSearchBox({
         </>
       )}
       resolveExternal={async (person) => {
-        const personId = await directorRoutes.resolve(person.tmdbId)
+        const personId = await personRoutes.resolve(person.tmdbId)
 
         router.push(`/people/${personId}`)
       }}
-      search={directorRoutes.search}
+      search={personRoutes.search}
     />
   )
 }

@@ -1,14 +1,14 @@
 import Link from 'next/link'
 
-import WantDirectorListSection from '@/components/me/want-list/WantDirectorListSection'
-import WantFilmListSection from '@/components/me/want-list/WantFilmListSection'
+import WantPersonListSection from '@/components/me/want-list/WantPersonListSection'
+import WantMovieListSection from '@/components/me/want-list/WantMovieListSection'
 import MovieCsvImportButton from '@/components/movie/MovieCsvImportButton'
 import { requireUserIdForPage } from '@/lib/auth/require-user-id'
 import {
   getMovieStatesForUser,
   getWantListPageData,
 } from '@/lib/user-movies/service'
-import { getWantDirectorListPageData } from '@/lib/user-directors/service'
+import { getWantPersonListPageData } from '@/lib/user-directors/service'
 
 const TAB_CLASS =
   'border-b-2 pb-[6px] text-[0.86rem] font-semibold tracking-[0.06em] transition-colors'
@@ -34,7 +34,7 @@ export default async function WantListPage({
     activeTab === 'films' ? await getWantListPageData(userId) : null
   const directorData =
     activeTab === 'directors'
-      ? await getWantDirectorListPageData(userId)
+      ? await getWantPersonListPageData(userId)
       : null
   const movieStates = filmData
     ? await getMovieStatesForUser(
@@ -98,12 +98,12 @@ export default async function WantListPage({
       </section>
 
       {activeTab === 'films' ? (
-        <WantFilmListSection
+        <WantMovieListSection
           items={filmData?.items || []}
           movieStates={movieStates || new Map()}
         />
       ) : (
-        <WantDirectorListSection items={directorData?.items || []} />
+        <WantPersonListSection items={directorData?.items || []} />
       )}
     </main>
   )

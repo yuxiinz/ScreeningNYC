@@ -8,19 +8,19 @@ import {
 } from '@/components/list-actions/shared'
 import { useRefreshOnPath } from '@/components/list-actions/useRefreshOnPath'
 
-type DirectorListActionsProps = {
+type PersonListActionsProps = {
   personId: number
   initialInWant: boolean
   compact?: boolean
   className?: string
 }
 
-export default function DirectorListActions({
+export default function PersonListActions({
   personId,
   initialInWant,
   compact = false,
   className,
-}: DirectorListActionsProps) {
+}: PersonListActionsProps) {
   const refreshIfOnWantList = useRefreshOnPath('/me/want-list')
   const [inWant, setInWant] = useState(initialInWant)
   const [pending, setPending] = useState(false)

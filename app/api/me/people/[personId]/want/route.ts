@@ -1,12 +1,12 @@
 import { createWantRouteHandlers } from '@/lib/api/want-route'
 import {
-  addDirectorWant,
-  removeDirectorWant,
+  addPersonWant,
+  removePersonWant,
 } from '@/lib/user-directors/service'
 
 export const { PUT, DELETE } = createWantRouteHandlers({
-  addWant: addDirectorWant,
-  removeWant: removeDirectorWant,
+  addWant: addPersonWant,
+  removeWant: removePersonWant,
   paramKey: 'personId',
   invalidParamCode: 'INVALID_PERSON_ID',
   invalidParamMessage: 'personId must be a positive integer.',

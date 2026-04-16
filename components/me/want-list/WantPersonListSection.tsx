@@ -1,8 +1,8 @@
 import Link from 'next/link'
 
-import DirectorListActions from '@/components/person/DirectorListActions'
+import PersonListActions from '@/components/person/PersonListActions'
 import PersonPhotoImage from '@/components/person/PersonPhotoImage'
-import type { WantDirectorListPageData } from '@/lib/user-directors/service'
+import type { WantPersonListPageData } from '@/lib/user-directors/service'
 import {
   formatDateKeyInAppTimezone,
   formatTimeInAppTimezone,
@@ -12,13 +12,13 @@ import {
 const DIRECTOR_PHOTO_CLASS =
   'flex aspect-[4/5] w-32 shrink-0 items-center justify-center overflow-hidden rounded-card border border-border-subtle bg-card-bg shadow-poster'
 
-type WantDirectorListSectionProps = {
-  items: WantDirectorListPageData['items']
+type WantPersonListSectionProps = {
+  items: WantPersonListPageData['items']
 }
 
-export default function WantDirectorListSection({
+export default function WantPersonListSection({
   items,
-}: WantDirectorListSectionProps) {
+}: WantPersonListSectionProps) {
   if (items.length === 0) {
     return (
       <div className="rounded-panel border border-border-default bg-card-bg p-6 shadow-card">
@@ -59,7 +59,7 @@ export default function WantDirectorListSection({
               </Link>
             </h2>
 
-            <DirectorListActions
+            <PersonListActions
               personId={item.person.id}
               initialInWant
               className="mb-4"

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 
 import BackToTopButton from '@/components/BackToTopButton'
-import FilmSearchBox from '@/components/FilmSearchBox'
+import MovieSearchBox from '@/components/MovieSearchBox'
 import HomeMovieGridSync from '@/components/HomeMovieGridSync'
 import MovieGridCard from '@/components/movie/MovieGridCard'
 import MovieListActions from '@/components/movie/MovieListActions'
@@ -106,7 +106,7 @@ export default async function HomePage({
   return (
     <>
       <div className="mx-auto mb-5 flex max-w-[var(--container-wide)] justify-end">
-        <FilmSearchBox isAuthenticated={Boolean(currentUserId)} />
+        <MovieSearchBox isAuthenticated={Boolean(currentUserId)} />
       </div>
 
       <main className="mx-auto max-w-[var(--container-wide)]">

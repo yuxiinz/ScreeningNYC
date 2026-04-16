@@ -1,4 +1,4 @@
-// components/FilmSearchBox.tsx
+// components/MovieSearchBox.tsx
 
 'use client'
 
@@ -14,7 +14,7 @@ import type {
   MovieSearchResult,
 } from '@/lib/movie/search-types'
 
-type FilmSearchBoxProps = {
+type MovieSearchBoxProps = {
   isAuthenticated?: boolean
 }
 
@@ -63,9 +63,9 @@ function getLocalMeta(movie: MeMovieSearchLocalResult) {
   return parts.join(' · ')
 }
 
-export default function FilmSearchBox({
+export default function MovieSearchBox({
   isAuthenticated = false,
-}: FilmSearchBoxProps) {
+}: MovieSearchBoxProps) {
   const router = useRouter()
 
   return (

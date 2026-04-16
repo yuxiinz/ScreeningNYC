@@ -20,15 +20,15 @@ import {
 const POSTER_CARD_CLASS =
   'flex aspect-[2/3] w-32 shrink-0 items-center justify-center overflow-hidden rounded-card border border-border-subtle bg-card-bg shadow-poster'
 
-type WantFilmListSectionProps = {
+type WantMovieListSectionProps = {
   items: WantListPageData['items']
   movieStates: Map<number, MovieCollectionState>
 }
 
-export default function WantFilmListSection({
+export default function WantMovieListSection({
   items,
   movieStates,
-}: WantFilmListSectionProps) {
+}: WantMovieListSectionProps) {
   if (items.length === 0) {
     return (
       <div className="rounded-panel border border-border-default bg-card-bg p-6 shadow-card">
