@@ -1,12 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
 
 import {
   buildListActionButtonClass,
   toggleListAction,
 } from '@/components/list-actions/shared'
+import { useRefreshOnPath } from '@/components/list-actions/useRefreshOnPath'
 
 type DirectorListActionsProps = {
   personId: number
@@ -21,8 +21,7 @@ export default function DirectorListActions({
   compact = false,
   className,
 }: DirectorListActionsProps) {
-  const router = useRouter()
-  const pathname = usePathname()
+  const refreshIfOnWantList = useRefreshOnPath('/me/want-list')
   const [inWant, setInWant] = useState(initialInWant)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
@@ -40,9 +39,7 @@ export default function DirectorListActions({
 
       setInWant(nextInWant)
 
-      if (pathname === '/me/want-list') {
-        router.refresh()
-      }
+      refreshIfOnWantList()
     } catch (nextError) {
       setError(
         nextError instanceof Error

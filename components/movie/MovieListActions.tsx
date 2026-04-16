@@ -1,12 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
 
 import {
   buildListActionButtonClass,
   toggleListAction,
 } from '@/components/list-actions/shared'
+import { useRefreshOnPath } from '@/components/list-actions/useRefreshOnPath'
 import WatchedReviewFields from '@/components/movie/WatchedReviewFields'
 import { getErrorMessageFromResponse } from '@/lib/api/client-response'
 import { getReviewWordCount } from '@/lib/user-movies/review'
@@ -32,8 +32,8 @@ export default function MovieListActions({
   compact = false,
   className,
 }: MovieListActionsProps) {
-  const router = useRouter()
-  const pathname = usePathname()
+  const refreshIfOnWantList = useRefreshOnPath('/me/want-list')
+  const refreshIfOnWatched = useRefreshOnPath('/me/watched')
   const [inWant, setInWant] = useState(initialInWant)
   const [inWatched, setInWatched] = useState(initialInWatched)
   const [pendingAction, setPendingAction] = useState<PendingAction>(null)
@@ -58,8 +58,8 @@ export default function MovieListActions({
 
       setInWant(nextInWant)
 
-      if (inWant && pathname === '/me/want-list') {
-        router.refresh()
+      if (inWant) {
+        refreshIfOnWantList()
       }
     } catch (nextError) {
       setError(
@@ -100,9 +100,7 @@ export default function MovieListActions({
 
       setInWatched(false)
 
-      if (pathname === '/me/watched') {
-        router.refresh()
-      }
+      refreshIfOnWatched()
     } catch (nextError) {
       setError(
         nextError instanceof Error
@@ -162,9 +160,7 @@ export default function MovieListActions({
       setInWant(nextInWant)
       setRemoveWantDialogOpen(false)
 
-      if (pathname === '/me/want-list') {
-        router.refresh()
-      }
+      refreshIfOnWantList()
     } catch (nextError) {
       setError(
         nextError instanceof Error
