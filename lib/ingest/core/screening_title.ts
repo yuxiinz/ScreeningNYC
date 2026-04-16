@@ -1,5 +1,5 @@
 import { parseFormat } from './meta'
-import { cleanText } from './text'
+import { cleanText, normalizeWhitespace, stripLeadingBullets } from './text'
 
 type ExtractedTitleYear = {
   text: string
@@ -23,6 +23,17 @@ type SplitCuratorialSuffix = {
   tmdbTitleCandidates?: string[]
 }
 
+type StripCuratorialPrefix = {
+  title: string
+  tmdbTitleCandidates?: string[]
+}
+
+type ExtractedEventSuffix = {
+  title: string
+  note?: string
+  tmdbTitleCandidates?: string[]
+}
+
 export type ParsedScreeningTitle = {
   title: string
   releaseYear?: number
@@ -37,12 +48,17 @@ const BRACKET_NOTE_PATTERNS = [
   /\bpreview\b/i,
   /\bencore\b/i,
   /\bq&a\b/i,
+  /\bqa\b/i,
   /\bin person\b/i,
   /\bwith\b/i,
   /\bopen captions?\b/i,
   /\bcaptioned\b/i,
   /\bintro(?:duced|duction)?\b/i,
   /\bdiscussion\b/i,
+  /\bpanel\b/i,
+  /\bconversation\b/i,
+  /\bpost-(?:film|screening)\b/i,
+  /\blive score\b/i,
   /\bspecial screening\b/i,
   /\bmember(?:s)?\b/i,
 ]
@@ -50,14 +66,20 @@ const BRACKET_NOTE_PATTERNS = [
 const STRONG_CURATORIAL_PATTERNS = [
   /\bclassics?\b/i,
   /\bwith\b.+\bin person\b/i,
+  /\bwith\b.+\b(?:filmmaker|director|star|cast|guest|moderator)\b/i,
   /\bin person\b/i,
   /\bq&a\b/i,
+  /\bqa\b/i,
   /\bintroduced by\b/i,
   /\bpost-screening\b/i,
+  /\bpost-film\b/i,
+  /\bpanel\b/i,
+  /\bconversation\b/i,
   /\bearly access\b/i,
   /\bopen captions?\b/i,
   /\bcaptioned\b/i,
   /\bsing-?along\b/i,
+  /\blive score\b/i,
   /\bretrospective\b/i,
   /\bseries\b/i,
   /\bspecial event\b/i,
@@ -84,6 +106,22 @@ const DISALLOWED_HYPHEN_SUFFIX_PATTERNS = [
 const INLINE_FORMAT_PATTERN =
   /^(.*?)(?:\s+in\s+|\s+)(4K\s*DCP|DCP|35\s*MM|16\s*MM|70\s*MM|IMAX|DIGITAL|BLU[\s-]?RAY|SUPER[\s-]?8(?:MM)?)$/i
 
+const PRESENTS_PREFIX_PATTERN = /^(.+?)\s+presents:?\s+(.+)$/i
+
+const EVENT_NOTE_PATTERNS = [
+  /^(?:q(?:\s*&\s*|\s+and\s+)a|qa)\b/i,
+  /^post-(?:film|screening)\s+(?:q(?:\s*&\s*|\s+and\s+)a|qa|conversation|discussion)\b/i,
+  /^(?:intro(?:duced|duction)?|discussion|panel|conversation|seminar|in person|live score|special screening|member(?:s)? preview|opening night|closing night)\b/i,
+  /^with\b.+\b(?:in person|filmmaker|director|star|cast|guest|moderator)\b/i,
+]
+
+const INLINE_EVENT_SUFFIX_PATTERNS = [
+  /\s+((?:q(?:\s*&\s*|\s+and\s+)a|qa)\b.*)$/i,
+  /\s+(post-(?:film|screening)\s+(?:q(?:\s*&\s*|\s+and\s+)a|qa|conversation|discussion)\b.*)$/i,
+  /\s+((?:introduced by|in person|live score)\b.*)$/i,
+  /\s+(with\b.+\b(?:in person|filmmaker|director|star|cast|guest|moderator)\b.*)$/i,
+]
+
 function uniqueValues(values: Array<string | undefined>): string[] {
   const seen = new Set<string>()
   const result: string[] = []
@@ -108,6 +146,13 @@ function isLikelyBracketedNote(descriptor: string): boolean {
 
 function isDisallowedHyphenSuffix(suffix: string): boolean {
   return DISALLOWED_HYPHEN_SUFFIX_PATTERNS.some((pattern) => pattern.test(suffix))
+}
+
+function isLikelyEventNote(suffix: string): boolean {
+  const cleaned = cleanText(suffix)
+  if (!cleaned) return false
+
+  return EVENT_NOTE_PATTERNS.some((pattern) => pattern.test(cleaned))
 }
 
 function scoreCuratorialSuffix(prefix: string, suffix: string): number {
@@ -210,6 +255,82 @@ export function extractBracketedDescriptor(
   }
 }
 
+function stripCuratorialPrefix(value?: string | null): StripCuratorialPrefix {
+  const cleaned = cleanText(value)
+  if (!cleaned) return { title: '' }
+
+  const match = cleaned.match(PRESENTS_PREFIX_PATTERN)
+  if (!match?.[1] || !match[2]) {
+    return { title: cleaned }
+  }
+
+  const prefix = cleanText(match[1])
+  const rest = cleanText(match[2])
+
+  if (!prefix || !rest || prefix.split(/\s+/).length > 6) {
+    return { title: cleaned }
+  }
+
+  return {
+    title: rest,
+    tmdbTitleCandidates: uniqueValues([cleaned, rest]),
+  }
+}
+
+function extractEventSuffix(value?: string | null): ExtractedEventSuffix {
+  const cleaned = cleanText(value)
+  if (!cleaned) return { title: '' }
+
+  const separatorPatterns = [
+    /^(.*?)\s+\|\s+(.+)$/,
+    /^(.*?)\s+\+\s+(.+)$/,
+    /^(.*?)\s+[-–—]\s+(.+)$/,
+    /^(.*?):\s+(.+)$/,
+  ]
+
+  for (const pattern of separatorPatterns) {
+    const match = cleaned.match(pattern)
+    if (!match?.[1] || !match[2]) continue
+
+    const prefix = cleanText(match[1])
+    const suffix = cleanText(match[2])
+
+    if (!prefix || !suffix || isDisallowedHyphenSuffix(suffix)) {
+      continue
+    }
+
+    if (!isLikelyEventNote(suffix)) {
+      continue
+    }
+
+    return {
+      title: prefix,
+      note: suffix,
+      tmdbTitleCandidates: uniqueValues([cleaned, prefix]),
+    }
+  }
+
+  for (const pattern of INLINE_EVENT_SUFFIX_PATTERNS) {
+    const match = cleaned.match(pattern)
+    if (!match?.[1] || typeof match.index !== 'number') continue
+
+    const suffix = cleanText(match[1])
+    const prefix = cleanText(cleaned.slice(0, match.index))
+
+    if (!prefix || !suffix || !isLikelyEventNote(suffix)) {
+      continue
+    }
+
+    return {
+      title: prefix,
+      note: suffix,
+      tmdbTitleCandidates: uniqueValues([cleaned, prefix]),
+    }
+  }
+
+  return { title: cleaned }
+}
+
 export function splitCuratorialSuffix(value?: string | null): SplitCuratorialSuffix {
   const cleaned = cleanText(value)
   if (!cleaned || !/\s+-\s+/.test(cleaned)) {
@@ -294,15 +415,21 @@ export function parseScreeningTitle(value?: string | null): ParsedScreeningTitle
     break
   }
 
-  const suffixSplit = splitCuratorialSuffix(remaining)
+  const prefixSplit = stripCuratorialPrefix(remaining)
+  const eventSplit = extractEventSuffix(prefixSplit.title)
+  const suffixSplit = splitCuratorialSuffix(eventSplit.title)
   const title = cleanText(suffixSplit.title)
 
   return {
     title,
     releaseYear,
     rawFormat,
-    showtimeNote: mergeShowtimeNotes(...bracketNotes, suffixSplit.note),
-    tmdbTitleCandidates: suffixSplit.tmdbTitleCandidates,
+    showtimeNote: mergeShowtimeNotes(...bracketNotes, eventSplit.note, suffixSplit.note),
+    tmdbTitleCandidates: uniqueValues([
+      ...(prefixSplit.tmdbTitleCandidates || []),
+      ...(eventSplit.tmdbTitleCandidates || []),
+      ...(suffixSplit.tmdbTitleCandidates || []),
+    ]),
     preferMovieTitleForDisplay: title !== cleaned,
   }
 }
@@ -313,4 +440,17 @@ export function normalizeScreeningMovieTitle(value?: string | null): string {
 
   const parsed = parseScreeningTitle(cleaned)
   return cleanText(parsed.title) || cleaned
+}
+
+export function canonicalizeTitle(title: string): string {
+  const cleaned = stripLeadingBullets(title)
+    .replace(/\bpreceded by\b.*$/i, '')
+    .replace(/\bmembers only:\b/i, '')
+    .replace(/\bace presents\b/i, '')
+    .replace(/\basc presents\b/i, '')
+    .replace(/\bpresented by\b.*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return normalizeWhitespace(normalizeScreeningMovieTitle(cleaned) || cleaned)
 }

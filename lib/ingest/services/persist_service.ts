@@ -1,16 +1,29 @@
-import crypto from 'crypto'
 import { Prisma } from '@prisma/client'
-import type { Movie } from '@prisma/client'
 import { DateTime } from 'luxon'
 import { prisma } from '../../prisma'
 import { APP_TIMEZONE } from '../../timezone'
 import type { TmdbMovie } from './tmdb_service'
-import { canonicalizeTitle } from './tmdb_service'
+import { canonicalizeTitle } from '../core/screening_title'
+import { normalizeWhitespace } from '../core/text'
 import { findLocalMovieByImportMatch } from '@/lib/movie/match'
 import {
   syncMovieDirectors,
   syncMovieTags,
 } from '@/lib/movie/relations'
+import { buildFingerprint } from '../core/fingerprint'
+import {
+  type FallbackMovieData,
+  buildMovieCreateData,
+  buildMovieMergeData,
+  mergeMovieMetadata,
+  chooseMergedReleaseDate,
+  shouldPreferIncomingMovieTitle,
+  getFallbackReleaseDate,
+} from '@/lib/movie/movie-data'
+import { reconcileCanonicalMovie } from '@/lib/movie/merge-service'
+
+export type { FallbackMovieData }
+export { buildFingerprint, mergeMovieMetadata, chooseMergedReleaseDate }
 
 type PersistConfig = {
   theaterName: string
@@ -22,24 +35,6 @@ type PersistConfig = {
   longitude?: number
 }
 
-export type FallbackMovieData = {
-  title: string
-  titleCandidates?: string[]
-  directorText?: string
-  releaseYear?: number
-  releaseDate?: Date
-  runtimeMinutes?: number
-  overview?: string
-  posterUrl?: string
-  imdbUrl?: string
-  doubanUrl?: string
-  letterboxdUrl?: string
-  officialSiteUrl?: string
-  genresText?: string
-  productionCountriesText?: string
-  preferTitle?: boolean
-}
-
 type DbClient = typeof prisma | Prisma.TransactionClient
 
 export class MovieIdentityConflictError extends Error {
@@ -49,194 +44,7 @@ export class MovieIdentityConflictError extends Error {
   }
 }
 
-let showtimeShownTitleColumnSupportPromise: Promise<boolean> | null = null
 const SHOWTIME_CANCEL_LOOKAHEAD_DAYS = 120
-
-function normalizeWhitespace(input?: string | null): string {
-  return (input || '').replace(/\s+/g, ' ').replace(/\u00a0/g, ' ').trim()
-}
-
-function normalizeComparableMovieTitle(input?: string | null): string {
-  return canonicalizeTitle(input || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[’']/g, '')
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim()
-}
-
-function scoreMovieTitleNoise(input?: string | null): number {
-  const title = normalizeWhitespace(input)
-  if (!title) return 0
-
-  let score = 0
-
-  if (/^.+?\s+presents:?\s+.+/i.test(title)) {
-    score += 6
-  }
-
-  if (
-    /\s+\+\s*(?:q(?:\s*&\s*|\s+and\s+)a|q&a|qa|intro(?:duction)?|seminar|discussion|panel|conversation|in person)\b/i.test(
-      title
-    )
-  ) {
-    score += 5
-  }
-
-  if (/\s+\|\s+.+/.test(title)) {
-    score += 4
-  }
-
-  if (
-    /\s*[-–—]\s*(4K\s*DCP|DCP|35\s*MM|16\s*MM|70\s*MM|IMAX|DIGITAL|BLU[\s-]?RAY|SUPER[\s-]?8(?:MM)?)\b/i.test(
-      title
-    )
-  ) {
-    score += 4
-  }
-
-  if (/[-–—:|]\s*$/.test(title)) {
-    score += 3
-  }
-
-  return score
-}
-
-function shouldPreferIncomingMovieTitle(
-  existingTitle?: string | null,
-  incomingTitle?: string | null
-): boolean {
-  const existing = canonicalizeTitle(existingTitle || '')
-  const incoming = canonicalizeTitle(incomingTitle || '')
-
-  if (!incoming || existing === incoming) {
-    return false
-  }
-
-  if (!existing) {
-    return true
-  }
-
-  const existingNoise = scoreMovieTitleNoise(existing)
-  const incomingNoise = scoreMovieTitleNoise(incoming)
-
-  if (incomingNoise >= existingNoise) {
-    return false
-  }
-
-  const existingComparable = normalizeComparableMovieTitle(existing)
-  const incomingComparable = normalizeComparableMovieTitle(incoming)
-
-  if (!existingComparable || !incomingComparable) {
-    return false
-  }
-
-  if (
-    existingComparable.includes(incomingComparable) ||
-    incomingComparable.includes(existingComparable)
-  ) {
-    return true
-  }
-
-  return existingNoise > 0 && incoming.length < existing.length
-}
-
-function releaseYearToDate(year?: number): Date | undefined {
-  if (!year || Number.isNaN(year)) return undefined
-  return new Date(`${year}-01-01T00:00:00.000Z`)
-}
-
-function getFallbackReleaseDate(fallback?: FallbackMovieData) {
-  return fallback?.releaseDate || releaseYearToDate(fallback?.releaseYear)
-}
-
-function isYearOnlyReleaseDate(date?: Date | null) {
-  if (!date) return false
-
-  return (
-    date.getUTCMonth() === 0 &&
-    date.getUTCDate() === 1 &&
-    date.getUTCHours() === 0 &&
-    date.getUTCMinutes() === 0 &&
-    date.getUTCSeconds() === 0 &&
-    date.getUTCMilliseconds() === 0
-  )
-}
-
-export function chooseMergedReleaseDate(params: {
-  existing: Pick<Movie, 'tmdbId' | 'releaseDate'>
-  tmdb?: TmdbMovie | null
-  fallbackReleaseDate?: Date
-}) {
-  const { existing, tmdb, fallbackReleaseDate } = params
-
-  if (tmdb?.releaseDate) {
-    if (!existing.releaseDate) {
-      return tmdb.releaseDate
-    }
-
-    if (!existing.tmdbId || isYearOnlyReleaseDate(existing.releaseDate)) {
-      return tmdb.releaseDate
-    }
-  }
-
-  return existing.releaseDate || tmdb?.releaseDate || fallbackReleaseDate
-}
-
-function isBadPosterUrl(url?: string | null): boolean {
-  const s = normalizeWhitespace(url).toLowerCase()
-  if (!s) return true
-
-  return (
-    s.includes('ticketing.uswest.veezi.com/media/poster') ||
-    s.includes('ticketing.us.veezi.com/media/poster') ||
-    s.includes('cropped-logo_metrograph') ||
-    s.includes('/logo_metrograph') ||
-    s.includes('metrographred.png') ||
-    s.includes('bam_logo.gif') ||
-    s.includes('/static/img/logo/')
-  )
-}
-
-function choosePosterUrl(params: {
-  tmdbPosterUrl?: string | null
-  existingPosterUrl?: string | null
-  fallbackPosterUrl?: string | null
-}): string | undefined {
-  if (params.tmdbPosterUrl) return params.tmdbPosterUrl
-
-  const existingGood =
-    params.existingPosterUrl && !isBadPosterUrl(params.existingPosterUrl)
-      ? params.existingPosterUrl
-      : undefined
-
-  const fallbackGood =
-    params.fallbackPosterUrl && !isBadPosterUrl(params.fallbackPosterUrl)
-      ? params.fallbackPosterUrl
-      : undefined
-
-  return existingGood || fallbackGood || undefined
-}
-
-async function supportsShowtimeShownTitleColumn(): Promise<boolean> {
-  if (!showtimeShownTitleColumnSupportPromise) {
-    showtimeShownTitleColumnSupportPromise = prisma
-      .$queryRawUnsafe<Array<{ exists: boolean }>>(
-        `select exists (
-          select 1
-          from information_schema.columns
-          where table_schema = 'public'
-            and table_name = 'Showtime'
-            and column_name = 'shownTitle'
-        ) as "exists"`
-      )
-      .then((rows) => Boolean(rows[0]?.exists))
-      .catch(() => false)
-  }
-
-  return showtimeShownTitleColumnSupportPromise
-}
 
 export function normalizeFormat(raw?: string | null): string {
   const s = normalizeWhitespace(raw).toLowerCase()
@@ -425,22 +233,6 @@ export function parseStartTime(raw: string): Date | null {
   return null
 }
 
-export function buildFingerprint(params: {
-  theaterSlug: string
-  movieTitle: string
-  startTimeUtcIso: string
-  formatName: string
-}): string {
-  const raw = [
-    params.theaterSlug.toLowerCase(),
-    canonicalizeTitle(params.movieTitle).toLowerCase(),
-    params.startTimeUtcIso,
-    params.formatName.toLowerCase(),
-  ].join('|')
-
-  return crypto.createHash('sha256').update(raw).digest('hex')
-}
-
 export async function upsertTheater(config: PersistConfig) {
   return prisma.theater.upsert({
     where: { slug: config.theaterSlug },
@@ -469,114 +261,6 @@ export async function upsertFormat(name: string) {
     where: { name },
     update: {},
     create: { name },
-  })
-}
-
-function buildMovieCreateData(
-  tmdb: TmdbMovie | null,
-  fallback: FallbackMovieData | undefined,
-  preferredTitle: string,
-  fallbackReleaseDate: Date | undefined
-) {
-  return {
-    ...(tmdb?.tmdbId ? { tmdbId: tmdb.tmdbId } : {}),
-    title: preferredTitle,
-    originalTitle: tmdb?.originalTitle,
-    releaseDate: tmdb?.releaseDate || fallbackReleaseDate,
-    runtimeMinutes: tmdb?.runtimeMinutes || fallback?.runtimeMinutes,
-    overview: tmdb?.overview || fallback?.overview,
-    posterUrl: choosePosterUrl({
-      tmdbPosterUrl: tmdb?.posterUrl,
-      fallbackPosterUrl: fallback?.posterUrl,
-    }),
-    backdropUrl: tmdb?.backdropUrl,
-    imdbUrl: tmdb?.imdbUrl || fallback?.imdbUrl,
-    doubanUrl: fallback?.doubanUrl,
-    letterboxdUrl: fallback?.letterboxdUrl,
-    officialSiteUrl: tmdb?.officialSiteUrl || fallback?.officialSiteUrl,
-    genresText: tmdb?.genresText || fallback?.genresText,
-    productionCountriesText:
-      tmdb?.productionCountriesText || fallback?.productionCountriesText,
-    directorText: tmdb?.directorText || fallback?.directorText,
-    castText: tmdb?.castText,
-  }
-}
-
-function buildMovieMergeData(params: {
-  existing: Movie
-  tmdb?: TmdbMovie | null
-  fallback?: FallbackMovieData
-  preferredTitle?: string
-  fallbackReleaseDate?: Date
-  preferIncomingTitle?: boolean
-}) {
-  const { existing, tmdb, fallback, preferredTitle, fallbackReleaseDate } = params
-  const existingProductionCountriesText =
-    'productionCountriesText' in existing
-      ? (existing.productionCountriesText ?? null)
-      : null
-
-  return {
-    title:
-      params.preferIncomingTitle && preferredTitle ? preferredTitle : existing.title,
-    originalTitle: existing.originalTitle || tmdb?.originalTitle,
-    releaseDate: chooseMergedReleaseDate({
-      existing,
-      tmdb,
-      fallbackReleaseDate,
-    }),
-    runtimeMinutes: existing.runtimeMinutes || tmdb?.runtimeMinutes || fallback?.runtimeMinutes,
-    overview: existing.overview || tmdb?.overview || fallback?.overview,
-    posterUrl: choosePosterUrl({
-      tmdbPosterUrl: tmdb?.posterUrl,
-      existingPosterUrl: existing.posterUrl,
-      fallbackPosterUrl: fallback?.posterUrl,
-    }),
-    backdropUrl: existing.backdropUrl || tmdb?.backdropUrl,
-    imdbUrl: existing.imdbUrl || tmdb?.imdbUrl || fallback?.imdbUrl,
-    doubanUrl: existing.doubanUrl || fallback?.doubanUrl,
-    letterboxdUrl: existing.letterboxdUrl || fallback?.letterboxdUrl,
-    officialSiteUrl:
-      existing.officialSiteUrl || tmdb?.officialSiteUrl || fallback?.officialSiteUrl,
-    genresText: existing.genresText || tmdb?.genresText || fallback?.genresText,
-    productionCountriesText:
-      existingProductionCountriesText || tmdb?.productionCountriesText || fallback?.productionCountriesText,
-    directorText: existing.directorText || tmdb?.directorText || fallback?.directorText,
-    castText: existing.castText || tmdb?.castText,
-  }
-}
-
-export async function mergeMovieMetadata(
-  movieId: number,
-  fallback: FallbackMovieData,
-  db: DbClient = prisma
-) {
-  const existing = await db.movie.findUnique({
-    where: {
-      id: movieId,
-    },
-  })
-
-  if (!existing) {
-    return null
-  }
-
-  const normalizedFallbackTitle = canonicalizeTitle(fallback.title)
-
-  return db.movie.update({
-    where: { id: existing.id },
-    data: buildMovieMergeData({
-      existing,
-      fallback: {
-        ...fallback,
-        title: normalizedFallbackTitle,
-      },
-      fallbackReleaseDate: getFallbackReleaseDate(fallback),
-      preferredTitle: normalizedFallbackTitle,
-      preferIncomingTitle:
-        fallback.preferTitle ||
-        shouldPreferIncomingMovieTitle(existing.title, normalizedFallbackTitle),
-    }),
   })
 }
 
@@ -641,7 +325,13 @@ export async function upsertLocalMovie(fallback: FallbackMovieData) {
     await syncMovieTags(movie.id, movie.genresText)
     await syncMovieDirectors(movie.id, [])
 
-    return movie
+    return reconcileCanonicalMovie({
+      movieId: movie.id,
+      seedTitles: [
+        fallback.title,
+        ...(fallback.titleCandidates || []),
+      ],
+    })
   }
 
   const movie = await prisma.movie.create({
@@ -659,14 +349,19 @@ export async function upsertLocalMovie(fallback: FallbackMovieData) {
   await syncMovieTags(movie.id, movie.genresText)
   await syncMovieDirectors(movie.id, [])
 
-  return movie
+  return reconcileCanonicalMovie({
+    movieId: movie.id,
+    seedTitles: [
+      fallback.title,
+      ...(fallback.titleCandidates || []),
+    ],
+  })
 }
 
 export async function upsertMovie(tmdb: TmdbMovie, fallback?: FallbackMovieData) {
   const fallbackTitle = canonicalizeTitle(fallback?.title || tmdb.title || 'Untitled')
   const fallbackReleaseDate = getFallbackReleaseDate(fallback)
-  const preferredTitle =
-    fallback?.preferTitle && fallbackTitle ? fallbackTitle : tmdb.title || fallbackTitle
+  const preferredTitle = canonicalizeTitle(tmdb.title || fallbackTitle || 'Untitled')
   const releaseYear =
     fallback?.releaseYear ||
     (fallbackReleaseDate ? fallbackReleaseDate.getUTCFullYear() : undefined) ||
@@ -793,10 +488,22 @@ export async function upsertMovie(tmdb: TmdbMovie, fallback?: FallbackMovieData)
     }
   })
 
-  await syncMovieTags(movie.id, movie.genresText || fallback?.genresText)
-  await syncMovieDirectors(movie.id, tmdb.directorCredits || [])
+  const reconciledMovie = await reconcileCanonicalMovie({
+    movieId: movie.id,
+    desiredTmdbId: tmdb.tmdbId,
+    seedTitles: [
+      fallback?.title,
+      ...(fallback?.titleCandidates || []),
+      tmdb.title,
+      tmdb.originalTitle,
+      tmdb.matchedQueryTitle,
+    ],
+  })
 
-  return movie
+  await syncMovieTags(reconciledMovie.id, reconciledMovie.genresText || fallback?.genresText)
+  await syncMovieDirectors(reconciledMovie.id, tmdb.directorCredits || [])
+
+  return reconciledMovie
 }
 
 export async function upsertShowtime(params: {
@@ -813,7 +520,6 @@ export async function upsertShowtime(params: {
   fingerprint: string
   sourceName: string
 }) {
-  const shownTitleSupported = await supportsShowtimeShownTitleColumn()
   const updateData = {
     movieId: params.movieId,
     runtimeMinutes: params.runtimeMinutes,
@@ -826,7 +532,7 @@ export async function upsertShowtime(params: {
     startTime: params.startTime,
     status: 'SCHEDULED' as const,
     lastVerifiedAt: new Date(),
-    ...(shownTitleSupported ? { shownTitle: params.shownTitle } : {}),
+    shownTitle: params.shownTitle,
   }
   const createData = {
     movieId: params.movieId,
@@ -842,7 +548,7 @@ export async function upsertShowtime(params: {
     fingerprint: params.fingerprint,
     status: 'SCHEDULED' as const,
     lastVerifiedAt: new Date(),
-    ...(shownTitleSupported ? { shownTitle: params.shownTitle } : {}),
+    shownTitle: params.shownTitle,
   }
 
   return prisma.showtime.upsert({

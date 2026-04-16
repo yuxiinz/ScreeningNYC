@@ -23,12 +23,9 @@ const VISTA_API_BASE =
   process.env.PARIS_VISTA_API_BASE ||
   'https://digital-api.paristheaternyc.com/ocapi/v1'
 const VISTA_SITE_ID = process.env.PARIS_VISTA_SITE_ID || '2001'
-const VISTA_USERNAME =
-  process.env.PARIS_VISTA_USERNAME || 'webhost-browsing-parisnyc'
-const VISTA_PASSWORD =
-  process.env.PARIS_VISTA_PASSWORD || 'HzaJe65EAPNto7sR5'
-const VISTA_CLIENT_ID =
-  process.env.PARIS_VISTA_CLIENT_ID || 'webhost-browsing-parisnyc'
+const VISTA_USERNAME = process.env.PARIS_VISTA_USERNAME
+const VISTA_PASSWORD = process.env.PARIS_VISTA_PASSWORD
+const VISTA_CLIENT_ID = process.env.PARIS_VISTA_CLIENT_ID
 
 type ParisEventRow = {
   eventDate: string

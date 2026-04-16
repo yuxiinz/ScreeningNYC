@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 let matchModule: typeof import('../lib/movie/match') | null = null
 let canonicalLookupModule: typeof import('../lib/movie/canonical-lookup') | null = null
 let persistServiceModule: typeof import('../lib/ingest/services/persist_service') | null = null
+let normalizeModule: typeof import('@/lib/movie/normalize') | null = null
 
 async function loadMatchModule() {
   process.env.DATABASE_URL ||= 'postgresql://localhost:5432/screeningnyc-test'
@@ -35,9 +36,32 @@ async function loadPersistServiceModule() {
   return persistServiceModule
 }
 
+async function loadNormalizeModule() {
+  process.env.DATABASE_URL ||= 'postgresql://localhost:5432/screeningnyc-test'
+
+  if (!normalizeModule) {
+    normalizeModule = await import('@/lib/movie/normalize')
+  }
+
+  return normalizeModule
+}
+
 test('normalizeMovieName removes diacritic differences', async () => {
-  const { normalizeMovieName } = await loadMatchModule()
+  const { normalizeMovieName } = await loadNormalizeModule()  
   assert.equal(normalizeMovieName('Sirât'), normalizeMovieName('Sirāt'))
+})
+
+test('normalizeMovieName strips event suffixes and curatorial prefixes', async () => {
+  const { normalizeMovieName } = await loadNormalizeModule()  
+
+  assert.equal(
+    normalizeMovieName('MOTHER MARY: Q&A with Filmmaker David Lowery'),
+    normalizeMovieName('Mother Mary')
+  )
+  assert.equal(
+    normalizeMovieName('Roxy Presents: Mother Mary'),
+    normalizeMovieName('Mother Mary')
+  )
 })
 
 test('findLocalMovieByImportMatch falls back to normalized title equality', async () => {

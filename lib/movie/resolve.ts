@@ -6,7 +6,15 @@ import {
   type FallbackMovieData,
   upsertMovie,
 } from '@/lib/ingest/services/persist_service'
-import { searchTmdbMovie, type TmdbMovie } from '@/lib/ingest/services/tmdb_service'
+import {
+  searchTmdbMovie,
+  type TmdbMovie,
+  type TmdbSearchMovieResult,
+  type TmdbSearchMovieResponse,
+  type TmdbMovieDetailResponse,
+  type TmdbCreditsResponse,
+  type TmdbExternalIdsResponse,
+} from '@/lib/ingest/services/tmdb_service'
 import {
   extractImdbIdFromUrl,
   findLocalMovieByImportMatch,
@@ -19,54 +27,6 @@ import {
   TmdbApiKeyMissingError,
 } from '@/lib/tmdb/client'
 
-type TmdbSearchMovieResult = {
-  id: number
-  title?: string
-  release_date?: string
-  poster_path?: string | null
-}
-
-type TmdbSearchMovieResponse = {
-  results?: TmdbSearchMovieResult[]
-}
-
-type TmdbMovieDetailResponse = {
-  id: number
-  title?: string
-  original_title?: string
-  release_date?: string
-  runtime?: number
-  overview?: string
-  poster_path?: string | null
-  backdrop_path?: string | null
-  homepage?: string | null
-  genres?: Array<{
-    name?: string
-  }>
-  production_countries?: Array<{
-    name?: string
-  }>
-}
-
-type TmdbCreditsResponse = {
-  crew?: Array<{
-    id: number
-    job?: string
-    name?: string
-    gender?: number | null
-    order?: number
-  }>
-  cast?: Array<{
-    id: number
-    name?: string
-    gender?: number | null
-    order?: number
-  }>
-}
-
-type TmdbExternalIdsResponse = {
-  imdb_id?: string | null
-}
 
 export type TmdbCandidate = {
   source: 'TMDB'
@@ -152,7 +112,7 @@ export async function searchTmdbCandidates(
     }))
 }
 
-async function fetchTmdbMovieById(tmdbId: number): Promise<TmdbMovie> {
+export async function fetchTmdbMovieById(tmdbId: number): Promise<TmdbMovie> {
   const apiKey = getTmdbApiKey()
 
   try {

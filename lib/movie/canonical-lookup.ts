@@ -1,6 +1,7 @@
 import type { Movie } from '@prisma/client'
 
-import { extractImdbIdFromUrl, normalizeMovieName } from '@/lib/movie/match'
+import { normalizeMovieName } from '@/lib/movie/normalize'
+import { extractImdbIdFromUrl } from '@/lib/movie/match'
 
 export type CanonicalLookupInput = {
   title: string

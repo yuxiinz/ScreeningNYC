@@ -4,8 +4,14 @@ export function normalizeWhitespace(input?: string | null): string {
   return (input || '').replace(/\s+/g, ' ').trim()
 }
 
+export function decodeEscapedUnicode(input?: string | null): string {
+  return (input || '').replace(/\\u([0-9a-fA-F]{4})/g, (_, hex: string) =>
+    String.fromCharCode(Number.parseInt(hex, 16))
+  )
+}
+
 export function cleanText(input?: string | null): string {
-  return normalizeWhitespace((input || '').replace(/\u00a0/g, ' '))
+  return normalizeWhitespace(decodeEscapedUnicode(input).replace(/\u00a0/g, ' '))
 }
 
 export function stripOuterQuotes(input?: string | null): string {

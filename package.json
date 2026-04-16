@@ -16,6 +16,7 @@
     "cleanup:orphan-people": "tsx scripts/cleanup_orphan_people.ts",
     "backfill:showtime-end-times": "tsx scripts/backfill_showtime_end_times.ts",
     "backfill:movie-tags-and-directors": "tsx scripts/backfill_movie_tags_and_directors.ts",
+    "backfill:canonical-movies": "tsx scripts/backfill_canonical_movies.ts",
     "reminders:watchlist": "tsx scripts/send_watchlist_reminders.ts"
   },
   "dependencies": {
@@ -47,6 +48,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.0",
+    "eslint-plugin-import": "^2.31.0",
     "prisma": "^7.5.0",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",

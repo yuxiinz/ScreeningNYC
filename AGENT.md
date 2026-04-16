@@ -58,3 +58,7 @@ Over-engineering is not permitted; maintain the shortest possible implementation
 ## Safe coding reminders
 - This repo runs on Next.js 16 with breaking changes—check `node_modules/next/dist/docs/` before altering app code.
 - Timezone-sensitive logic assumes `America/New_York`; avoid hardcoding other zones.
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.

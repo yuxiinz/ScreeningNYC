@@ -1,7 +1,8 @@
 import type { Movie, Prisma } from '@prisma/client'
 
-import { canonicalizeTitle } from '@/lib/ingest/services/tmdb_service'
+import { canonicalizeTitle } from '@/lib/ingest/core/screening_title'
 import { prisma } from '@/lib/prisma'
+import { normalizeMovieName } from '@/lib/movie/normalize'
 
 type DbClient = typeof prisma | Prisma.TransactionClient
 
@@ -16,23 +17,13 @@ export type MovieMatchInput = {
   letterboxdUrl?: string
 }
 
-export function normalizeMovieName(input?: string | null): string {
-  return canonicalizeTitle(input || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[’']/g, '')
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim()
-}
-
 export function normalizeDirectorName(input?: string | null): string {
   return (input || '')
     .replace(/^directed by\s*/i, '')
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[’']/g, '')
+    .replace(/['']/g, '')
     .replace(/[^\p{L}\p{N},\s]+/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim()

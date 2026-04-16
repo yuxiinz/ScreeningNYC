@@ -1,9 +1,8 @@
 // lib/ingest/services/tmdb_service.ts
 
-import { normalizeScreeningMovieTitle } from '../core/screening_title'
+import { canonicalizeTitle, normalizeScreeningMovieTitle } from '../core/screening_title'
 import {
   normalizeWhitespace,
-  stripLeadingBullets,
   isLikelyProgramTitle,
 } from '../core/text'
 import { fetchJson } from '@/lib/http/server-fetch'
@@ -39,15 +38,18 @@ type SearchTmdbParams = {
   tmdbApiKey?: string
 }
 
-type TmdbSearchMovieResult = {
+export type TmdbSearchMovieResult = {
   id: number
+  title?: string
+  release_date?: string
+  poster_path?: string | null
 }
 
-type TmdbSearchMovieResponse = {
+export type TmdbSearchMovieResponse = {
   results?: TmdbSearchMovieResult[]
 }
 
-type TmdbMovieDetailResponse = {
+export type TmdbMovieDetailResponse = {
   id: number
   title?: string
   original_title?: string
@@ -65,7 +67,7 @@ type TmdbMovieDetailResponse = {
   }>
 }
 
-type TmdbCreditsPerson = {
+export type TmdbCreditsPerson = {
   id: number
   job?: string
   name?: string
@@ -73,24 +75,13 @@ type TmdbCreditsPerson = {
   order?: number
 }
 
-type TmdbCreditsResponse = {
+export type TmdbCreditsResponse = {
   crew?: TmdbCreditsPerson[]
   cast?: TmdbCreditsPerson[]
 }
 
-type TmdbExternalIdsResponse = {
+export type TmdbExternalIdsResponse = {
   imdb_id?: string | null
-}
-
-export function canonicalizeTitle(title: string): string {
-  return stripLeadingBullets(title)
-    .replace(/\bpreceded by\b.*$/i, '')
-    .replace(/\bmembers only:\b/i, '')
-    .replace(/\bace presents\b/i, '')
-    .replace(/\basc presents\b/i, '')
-    .replace(/\bpresented by\b.*$/i, '')
-    .replace(/\s+/g, ' ')
-    .trim()
 }
 
 function normalizeName(name?: string) {

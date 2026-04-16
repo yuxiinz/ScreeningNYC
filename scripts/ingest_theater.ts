@@ -10,10 +10,8 @@ import { isSourceAccessBlockedError } from '../lib/ingest/core/source_access'
 import { APP_TIMEZONE } from '../lib/timezone'
 import { findLocalMovieByImportMatch } from '../lib/movie/match'
 import { shouldAttemptCanonicalTmdbLookup } from '../lib/movie/canonical-lookup'
-import {
-  searchTmdbMovie,
-  canonicalizeTitle,
-} from '../lib/ingest/services/tmdb_service'
+import { canonicalizeTitle } from '../lib/ingest/core/screening_title'
+import { searchTmdbMovie } from '../lib/ingest/services/tmdb_service'
 import {
   upsertTheater,
   upsertFormat,

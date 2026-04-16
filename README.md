@@ -209,6 +209,15 @@ CRON_SECRET="..."
 REMINDER_BASE_URL="https://www.screeningnyc.com"
 ```
 
+```env
+PARIS_VISTA_AUTH_URL="https://auth.moviexchange.com/connect/token"
+PARIS_VISTA_API_BASE="https://digital-api.paristheaternyc.com/ocapi/v1"
+PARIS_VISTA_SITE_ID="2001"
+PARIS_VISTA_USERNAME="<required-username>"
+PARIS_VISTA_PASSWORD="<required-password>"
+PARIS_VISTA_CLIENT_ID="<required-client-id>"
+```
+
 The app also accepts `NEXTAUTH_SECRET`, `NEXTAUTH_URL`, `AUTH_URL`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, and `AUTH_RESEND_KEY` as fallbacks in the auth env helper.
 
 ## Common Commands
