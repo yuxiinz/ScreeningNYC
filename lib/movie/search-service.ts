@@ -1,22 +1,13 @@
-import { getReleaseYear } from '@/lib/movie/display'
+import { getReleaseYear } from ‘@/lib/movie/display’
 import type {
   MovieSearchResult,
   MovieSearchStatus,
-} from '@/lib/movie/search-types'
-import { prisma } from '@/lib/prisma'
+} from ‘@/lib/movie/search-types’
+import { prisma } from ‘@/lib/prisma’
+import { normalizeMovieName } from ‘@/lib/movie/normalize’
 
 export type LocalMovieSearchItem = MovieSearchResult & {
   tmdbId: number | null
-}
-
-function normalizeSearchTitle(title?: string | null) {
-  return (title || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[’']/g, '')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
 }
 
 export async function searchLocalMovies(
@@ -71,7 +62,7 @@ export async function searchLocalMovies(
 
   const dedupedMovies = movies.filter((movie, index, items) => {
     const firstShowtime = movie.showtimes[0]
-    const normalizedTitle = normalizeSearchTitle(movie.title)
+    const normalizedTitle = normalizeMovieName(movie.title)
     const year = getReleaseYear(movie.releaseDate)
     const dedupeKey = firstShowtime
       ? `${normalizedTitle}|${firstShowtime.startTime.toISOString()}|${firstShowtime.theaterId}`
@@ -80,7 +71,7 @@ export async function searchLocalMovies(
     return (
       items.findIndex((candidate) => {
         const candidateFirstShowtime = candidate.showtimes[0]
-        const candidateTitle = normalizeSearchTitle(candidate.title)
+        const candidateTitle = normalizeMovieName(candidate.title)
         const candidateYear = getReleaseYear(candidate.releaseDate)
         const candidateKey = candidateFirstShowtime
           ? `${candidateTitle}|${candidateFirstShowtime.startTime.toISOString()}|${candidateFirstShowtime.theaterId}`
