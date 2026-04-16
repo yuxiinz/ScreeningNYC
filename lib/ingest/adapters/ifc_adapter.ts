@@ -364,7 +364,7 @@ async function scrapeIfcRaw(): Promise<IfcIngestResult> {
   }
 }
 
-export async function scrapeIfcCenter(): Promise<ScrapedShowtime[]> {
+export async function scrapeIfcCenterShowtimes(): Promise<ScrapedShowtime[]> {
   const { movies, showtimes } = await scrapeIfcRaw()
 
   const movieByDetailUrl = new Map(movies.map((m) => [m.detailUrl, m]))

@@ -2,7 +2,7 @@
 
 import { scrapeMetrographShowtimes } from './metrograph_adapter'
 import { scrapeFilmForumShowtimes } from './filmforum_adapter'
-import { scrapeIfcCenter } from './ifc_adapter'
+import { scrapeIfcCenterShowtimes } from './ifc_adapter'
 import { scrapeQuadCinemaShowtimes } from './quad_adapter'
 import { scrapeCinemaVillageShowtimes } from './cinemavillage_adapter'
 import { scrapeSpectacleShowtimes } from './spectacle_adapter'
@@ -24,7 +24,7 @@ export function getShowtimeScraper(theaterSlug: string) {
     case 'filmforum':
       return scrapeFilmForumShowtimes
     case 'ifc':
-      return scrapeIfcCenter
+      return scrapeIfcCenterShowtimes
     case 'quad':
       return scrapeQuadCinemaShowtimes
     case 'cinemavillage':

@@ -148,7 +148,55 @@ The main Prisma models are:
 - `DirectorWatchlistNotificationDelivery`
 - `DirectorWatchlistSummaryDelivery`
 
+<<<<<<< HEAD
 `Showtime` is the operational center of the product. Watchlists, reminders, market posts, and public browsing all depend on upcoming scheduled showtimes.
+=======
+## Supported Theaters
+
+The system currently ingests and normalizes showtimes from:
+
+- Metrograph  
+- Film Forum  
+- Film at Lincoln Center  
+- IFC Center  
+- Quad Cinema  
+- Cinema Village  
+- Spectacle  
+- Roxy Cinema  
+- MoMA  
+- Museum of the Moving Image  
+- Anthology Film Archives  
+- BAM  
+- Angelika New York  
+- Village East by Angelika  
+- Cinema 123 by Angelika  
+- Paris Theater  
+- Nitehawk Williamsburg  
+- Nitehawk Prospect Park  
+- Japan Society  
+
+Metadata is defined in `lib/ingest/config/theater_meta.ts`  
+Adapters are in `lib/ingest/adapters/index.ts`
+
+---
+
+
+## Tech Stack
+
+- Next.js 16.2 App Router  
+- React 19  
+- TypeScript  
+- Tailwind CSS v4  
+- Prisma  
+- PostgreSQL  
+- Luxon  
+- NextAuth v5 beta  
+- Cheerio + fetch / JSON scraping  
+- Leaflet / React Leaflet  
+- Resend  
+
+---
+>>>>>>> 2ffe081557732dfa01a0a63fa4150d35d41a8a15
 
 ## Authentication
 
@@ -164,8 +212,28 @@ Supported providers:
 
 ### Requirements
 
+<<<<<<< HEAD
 - Node.js 20+
 - PostgreSQL
+=======
+- Node.js 20+  
+- PostgreSQL  
+
+### Environment Variables
+
+```env
+DATABASE_URL="..."
+TMDB_API_KEY="..."
+AUTH_SECRET="..."
+APP_BASE_URL="http://localhost:3000"
+CRON_SECRET="..."
+REMINDER_BASE_URL="https://www.screeningnyc.com"
+EMAIL_FROM="auth@example.com"
+RESEND_API_KEY="..."
+GOOGLE_CLIENT_ID="..."
+GOOGLE_CLIENT_SECRET="..."
+```
+>>>>>>> 2ffe081557732dfa01a0a63fa4150d35d41a8a15
 
 ### Setup
 
@@ -232,6 +300,11 @@ npm run build
 
 Operational scripts:
 
+<<<<<<< HEAD
+=======
+## Data Ingestion
+
+>>>>>>> 2ffe081557732dfa01a0a63fa4150d35d41a8a15
 ```bash
 npm run ingest:theater
 npm run cleanup:showtimes
@@ -256,6 +329,7 @@ Cache revalidation is handled by `app/api/cache/revalidate/route.ts` and protect
 
 Current theater adapters cover:
 
+<<<<<<< HEAD
 - Metrograph
 - Film Forum
 - Film at Lincoln Center
@@ -285,3 +359,8 @@ Theater metadata lives in `lib/ingest/config/theater_meta.ts`.
 - reminder delivery is designed around noon in `America/New_York`
 - the marketplace is intentionally narrow and tied to specific showtimes, not free-form listings
 - public pages rely on Next cache tags and scheduled revalidation jobs
+=======
+- `(browse)` is a route group and does not affect URLs  
+- Map page uses dynamic connection to avoid static snapshot issues  
+- Marketplace is strictly information sharing, not a transaction platform  
+>>>>>>> 2ffe081557732dfa01a0a63fa4150d35d41a8a15
