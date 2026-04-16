@@ -41,8 +41,8 @@ export function getShowtimeScraper(theaterSlug: string) {
       return scrapeAnthologyShowtimes
     case 'bam':
       return scrapeBamShowtimes
-    case 'angelikaNYC':
-    case 'angelikaEV':
+    case 'angelikanyc':
+    case 'angelikaev':
     case 'angelika123':
       return scrapeAngelikaShowtimes
     case 'paris':

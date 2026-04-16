@@ -56,12 +56,12 @@ export const THEATER_META = {
     longitude: -73.977705,
     address: '30 Lafayette Ave, Brooklyn, NY 11217',
   },
-  angelikaNYC: {
+  angelikanyc: {
     latitude: 40.7257247,
     longitude: -73.9970561,
     address: '18 W Houston St, New York, NY 10012',
   },
-  angelikaEV: {
+  angelikaev: {
     latitude: 40.7309569,
     longitude: -73.9863984,
     address: '181-189 2nd Ave, New York, NY 10003',

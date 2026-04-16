@@ -3,6 +3,7 @@ import type { Movie, Prisma } from '@prisma/client'
 import { canonicalizeTitle } from '@/lib/ingest/core/screening_title'
 import { prisma } from '@/lib/prisma'
 import { normalizeMovieName } from '@/lib/movie/normalize'
+import { getMovieReleaseYear } from '@/lib/movie/canonical'
 
 type DbClient = typeof prisma | Prisma.TransactionClient
 
@@ -71,9 +72,6 @@ function getTitleCandidates(input: MovieMatchInput) {
   return [...deduped.values()]
 }
 
-function getMovieReleaseYear(movie: Pick<Movie, 'releaseDate'>) {
-  return movie.releaseDate ? new Date(movie.releaseDate).getUTCFullYear() : undefined
-}
 
 function directorMatches(inputDirector?: string, movieDirector?: string | null) {
   const normalizedInput = normalizeDirectorName(inputDirector)

@@ -177,7 +177,7 @@ const THEATER_CONFIGS: TheaterIngestConfig[] = [
   },
   {
     theaterName: 'Angelika New York',
-    theaterSlug: 'angelikaNYC',
+    theaterSlug: 'angelikanyc',
     sourceName: 'angelika',
     sourceUrl:
       process.env.ANGELIKA_NYC_SHOWTIMES_URL ||
@@ -188,7 +188,7 @@ const THEATER_CONFIGS: TheaterIngestConfig[] = [
   },
   {
     theaterName: 'Village East by Angelika',
-    theaterSlug: 'angelikaEV',
+    theaterSlug: 'angelikaev',
     sourceName: 'angelika',
     sourceUrl:
       process.env.ANGELIKA_EV_SHOWTIMES_URL ||
@@ -569,12 +569,10 @@ async function main() {
 
   if (requestedSlugs.length > 0) {
     enabledConfigs = enabledConfigs.filter((config) =>
-      requestedSlugs.includes(String(config.theaterSlug).toLowerCase())
+      requestedSlugs.includes(config.theaterSlug)
     )
 
-    const foundSlugs = enabledConfigs.map((c) =>
-      String(c.theaterSlug).toLowerCase()
-    )
+    const foundSlugs: string[] = enabledConfigs.map((c) => c.theaterSlug)
     const missingSlugs = requestedSlugs.filter((slug) => !foundSlugs.includes(slug))
 
     if (missingSlugs.length > 0) {
