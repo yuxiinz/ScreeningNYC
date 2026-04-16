@@ -30,3 +30,22 @@ export function patchCollectionState<TState extends object>(
     ...patch,
   })
 }
+
+export async function buildCollectionStateMap<TState>(
+  ids: number[],
+  userId: string | null,
+  createInitialState: () => TState,
+  populate: (
+    uniqueIds: number[],
+    states: Map<number, TState>,
+    userId: string
+  ) => Promise<void>
+): Promise<Map<number, TState>> {
+  const { states, uniqueIds } = createCollectionStateMap(ids, createInitialState)
+
+  if (userId && uniqueIds.length > 0) {
+    await populate(uniqueIds, states, userId)
+  }
+
+  return states
+}

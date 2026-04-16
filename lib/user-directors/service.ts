@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { getUpcomingShowtimeWhere } from '@/lib/showtime/queries'
 import {
-  createCollectionStateMap,
+  buildCollectionStateMap,
   patchCollectionState,
 } from '@/lib/user-collections/state'
 
@@ -40,34 +40,17 @@ export async function getDirectorStatesForUser(
   const createInitialState = (): DirectorCollectionState => ({
     inWant: false,
   })
-  const {
-    states,
-    uniqueIds: uniquePersonIds,
-  } = createCollectionStateMap(personIds, createInitialState)
 
-  if (!userId || uniquePersonIds.length === 0) {
-    return states
-  }
+  return buildCollectionStateMap(personIds, userId, createInitialState, async (uniquePersonIds, states, uid) => {
+    const items = await prisma.directorWatchlistItem.findMany({
+      where: { userId: uid, personId: { in: uniquePersonIds } },
+      select: { personId: true },
+    })
 
-  const items = await prisma.directorWatchlistItem.findMany({
-    where: {
-      userId,
-      personId: {
-        in: uniquePersonIds,
-      },
-    },
-    select: {
-      personId: true,
-    },
+    items.forEach(({ personId }) => {
+      patchCollectionState(states, personId, { inWant: true }, createInitialState)
+    })
   })
-
-  items.forEach(({ personId }) => {
-    patchCollectionState(states, personId, {
-      inWant: true,
-    }, createInitialState)
-  })
-
-  return states
 }
 
 export async function addDirectorWant(userId: string, personId: number) {

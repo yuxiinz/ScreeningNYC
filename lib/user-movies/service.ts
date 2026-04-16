@@ -2,7 +2,7 @@ import { Prisma } from '@prisma/client'
 
 import { prisma } from '@/lib/prisma'
 import {
-  createCollectionStateMap,
+  buildCollectionStateMap,
   getUniquePositiveIds,
   patchCollectionState,
 } from '@/lib/user-collections/state'
@@ -55,53 +55,26 @@ export async function getMovieStatesForUser(
     inWant: false,
     inWatched: false,
   })
-  const {
-    states,
-    uniqueIds: uniqueMovieIds,
-  } = createCollectionStateMap(movieIds, createInitialState)
 
-  if (!userId || uniqueMovieIds.length === 0) {
-    return states
-  }
+  return buildCollectionStateMap(movieIds, userId, createInitialState, async (uniqueMovieIds, states, uid) => {
+    const [watchlistItems, watchedMovies] = await prisma.$transaction([
+      prisma.watchlistItem.findMany({
+        where: { userId: uid, movieId: { in: uniqueMovieIds } },
+        select: { movieId: true },
+      }),
+      prisma.userMovieWatch.findMany({
+        where: { userId: uid, movieId: { in: uniqueMovieIds } },
+        select: { movieId: true },
+      }),
+    ])
 
-  const [watchlistItems, watchedMovies] = await prisma.$transaction([
-    prisma.watchlistItem.findMany({
-      where: {
-        userId,
-        movieId: {
-          in: uniqueMovieIds,
-        },
-      },
-      select: {
-        movieId: true,
-      },
-    }),
-    prisma.userMovieWatch.findMany({
-      where: {
-        userId,
-        movieId: {
-          in: uniqueMovieIds,
-        },
-      },
-      select: {
-        movieId: true,
-      },
-    }),
-  ])
-
-  watchlistItems.forEach(({ movieId }) => {
-    patchCollectionState(states, movieId, {
-      inWant: true,
-    }, createInitialState)
+    watchlistItems.forEach(({ movieId }) => {
+      patchCollectionState(states, movieId, { inWant: true }, createInitialState)
+    })
+    watchedMovies.forEach(({ movieId }) => {
+      patchCollectionState(states, movieId, { inWatched: true }, createInitialState)
+    })
   })
-
-  watchedMovies.forEach(({ movieId }) => {
-    patchCollectionState(states, movieId, {
-      inWatched: true,
-    }, createInitialState)
-  })
-
-  return states
 }
 
 export async function getWantedMovieIdsForUser(

@@ -220,6 +220,38 @@ function choosePosterUrl(params: {
   return existingGood || fallbackGood || undefined
 }
 
+function buildSharedMovieFields(params: {
+  existing?: Movie
+  tmdb?: TmdbMovie | null
+  fallback?: FallbackMovieData
+}) {
+  const { existing, tmdb, fallback } = params
+  const existingProductionCountriesText =
+    existing && 'productionCountriesText' in existing
+      ? (existing.productionCountriesText ?? null)
+      : null
+
+  return {
+    runtimeMinutes: existing?.runtimeMinutes || tmdb?.runtimeMinutes || fallback?.runtimeMinutes,
+    overview: existing?.overview || tmdb?.overview || fallback?.overview,
+    posterUrl: choosePosterUrl({
+      tmdbPosterUrl: tmdb?.posterUrl,
+      existingPosterUrl: existing?.posterUrl,
+      fallbackPosterUrl: fallback?.posterUrl,
+    }),
+    backdropUrl: existing?.backdropUrl || tmdb?.backdropUrl,
+    imdbUrl: existing?.imdbUrl || tmdb?.imdbUrl || fallback?.imdbUrl,
+    doubanUrl: existing?.doubanUrl || fallback?.doubanUrl,
+    letterboxdUrl: existing?.letterboxdUrl || fallback?.letterboxdUrl,
+    officialSiteUrl: existing?.officialSiteUrl || tmdb?.officialSiteUrl || fallback?.officialSiteUrl,
+    genresText: existing?.genresText || tmdb?.genresText || fallback?.genresText,
+    productionCountriesText:
+      existingProductionCountriesText || tmdb?.productionCountriesText || fallback?.productionCountriesText,
+    directorText: existing?.directorText || tmdb?.directorText || fallback?.directorText,
+    castText: existing?.castText || tmdb?.castText,
+  }
+}
+
 export function buildMovieCreateData(
   tmdb: TmdbMovie | null,
   fallback: FallbackMovieData | undefined,
@@ -241,22 +273,7 @@ export function buildMovieCreateData(
       fallback,
     }),
     releaseDate: tmdb?.releaseDate || fallbackReleaseDate,
-    runtimeMinutes: tmdb?.runtimeMinutes || fallback?.runtimeMinutes,
-    overview: tmdb?.overview || fallback?.overview,
-    posterUrl: choosePosterUrl({
-      tmdbPosterUrl: tmdb?.posterUrl,
-      fallbackPosterUrl: fallback?.posterUrl,
-    }),
-    backdropUrl: tmdb?.backdropUrl,
-    imdbUrl: tmdb?.imdbUrl || fallback?.imdbUrl,
-    doubanUrl: fallback?.doubanUrl,
-    letterboxdUrl: fallback?.letterboxdUrl,
-    officialSiteUrl: tmdb?.officialSiteUrl || fallback?.officialSiteUrl,
-    genresText: tmdb?.genresText || fallback?.genresText,
-    productionCountriesText:
-      tmdb?.productionCountriesText || fallback?.productionCountriesText,
-    directorText: tmdb?.directorText || fallback?.directorText,
-    castText: tmdb?.castText,
+    ...buildSharedMovieFields({ tmdb, fallback }),
   }
 }
 
@@ -269,10 +286,6 @@ export function buildMovieMergeData(params: {
   preferIncomingTitle?: boolean
 }) {
   const { existing, tmdb, fallback, preferredTitle, fallbackReleaseDate } = params
-  const existingProductionCountriesText =
-    'productionCountriesText' in existing
-      ? (existing.productionCountriesText ?? null)
-      : null
   const canonicalTitle = chooseCanonicalMovieTitle({
     existing,
     tmdb,
@@ -293,24 +306,7 @@ export function buildMovieMergeData(params: {
       tmdb,
       fallbackReleaseDate,
     }),
-    runtimeMinutes: existing.runtimeMinutes || tmdb?.runtimeMinutes || fallback?.runtimeMinutes,
-    overview: existing.overview || tmdb?.overview || fallback?.overview,
-    posterUrl: choosePosterUrl({
-      tmdbPosterUrl: tmdb?.posterUrl,
-      existingPosterUrl: existing.posterUrl,
-      fallbackPosterUrl: fallback?.posterUrl,
-    }),
-    backdropUrl: existing.backdropUrl || tmdb?.backdropUrl,
-    imdbUrl: existing.imdbUrl || tmdb?.imdbUrl || fallback?.imdbUrl,
-    doubanUrl: existing.doubanUrl || fallback?.doubanUrl,
-    letterboxdUrl: existing.letterboxdUrl || fallback?.letterboxdUrl,
-    officialSiteUrl:
-      existing.officialSiteUrl || tmdb?.officialSiteUrl || fallback?.officialSiteUrl,
-    genresText: existing.genresText || tmdb?.genresText || fallback?.genresText,
-    productionCountriesText:
-      existingProductionCountriesText || tmdb?.productionCountriesText || fallback?.productionCountriesText,
-    directorText: existing.directorText || tmdb?.directorText || fallback?.directorText,
-    castText: existing.castText || tmdb?.castText,
+    ...buildSharedMovieFields({ existing, tmdb, fallback }),
   }
 }
 
