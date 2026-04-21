@@ -4,7 +4,7 @@ import Link from 'next/link'
 
 import MarketplaceContactButton from '@/components/marketplace/MarketplaceContactButton'
 import MarketplaceOwnPostActions from '@/components/marketplace/MarketplaceOwnPostActions'
-import type { MarketplacePostPublicCard } from '@/lib/marketplace/service'
+import type { MarketplacePostPublicCard } from '@/lib/marketplace/selects'
 import { APP_TIMEZONE } from '@/lib/timezone'
 
 type MarketplacePostCardProps = {

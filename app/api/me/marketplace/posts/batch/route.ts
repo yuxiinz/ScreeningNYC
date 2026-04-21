@@ -1,6 +1,6 @@
 import { createMarketplaceBodyRoute } from '@/lib/marketplace/http'
 import { parseMarketplacePostsBatchBody } from '@/lib/marketplace/request-body'
-import { upsertMarketplacePosts } from '@/lib/marketplace/service'
+import { upsertMarketplacePosts } from '@/lib/marketplace/mutations'
 
 export const POST = createMarketplaceBodyRoute({
   parseBody: parseMarketplacePostsBatchBody,

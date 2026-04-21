@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation'
 import MarketplacePostCard from '@/components/marketplace/MarketplacePostCard'
 import ShowtimeRow from '@/components/showtime/ShowtimeRow'
 import { getCurrentUserId } from '@/lib/auth/require-user-id'
-import { getMarketplaceMoviePageData } from '@/lib/marketplace/service'
+import { getMarketplaceMoviePageData } from '@/lib/marketplace/queries'
 
 const ACTION_LINK_CLASS =
   'rounded-panel border border-border-input px-4 py-3 text-[0.8rem] font-semibold tracking-[0.08em] text-text-secondary transition-colors hover:border-text-primary hover:text-text-primary'

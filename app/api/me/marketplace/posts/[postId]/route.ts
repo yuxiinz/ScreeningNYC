@@ -1,5 +1,5 @@
 import { createMarketplacePostIdRoute, readJsonBody } from '@/lib/marketplace/http'
-import { cancelMarketplacePost, completeMarketplacePost } from '@/lib/marketplace/service'
+import { cancelMarketplacePost, completeMarketplacePost } from '@/lib/marketplace/mutations'
 import { MarketplaceValidationError } from '@/lib/marketplace/errors'
 
 function parsePatchBody(body: unknown) {

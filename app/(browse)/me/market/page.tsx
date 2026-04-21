@@ -3,7 +3,7 @@ import Link from 'next/link'
 import MarketplaceOwnPostActions from '@/components/marketplace/MarketplaceOwnPostActions'
 import ShowtimeRow from '@/components/showtime/ShowtimeRow'
 import { requireUserIdForPage } from '@/lib/auth/require-user-id'
-import { getMyMarketplacePostsPageData } from '@/lib/marketplace/service'
+import { getMyMarketplacePostsPageData } from '@/lib/marketplace/queries'
 import { APP_TIMEZONE } from '@/lib/timezone'
 
 const DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-US', {

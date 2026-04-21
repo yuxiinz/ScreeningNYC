@@ -1,5 +1,5 @@
 import { createMarketplacePostIdRoute } from '@/lib/marketplace/http'
-import { getMarketplacePostContact } from '@/lib/marketplace/service'
+import { getMarketplacePostContact } from '@/lib/marketplace/mutations'
 
 export const GET = createMarketplacePostIdRoute({
   run: ({ userId, postId }) => getMarketplacePostContact(userId, postId),

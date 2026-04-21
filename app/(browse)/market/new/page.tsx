@@ -4,7 +4,7 @@ import MarketplaceMovieSearchBox from '@/components/marketplace/MarketplaceMovie
 import MarketplacePostForm from '@/components/marketplace/MarketplacePostForm'
 import MarketplaceShowtimeSelector from '@/components/marketplace/MarketplaceShowtimeSelectorIsland'
 import { requireUserIdForPage } from '@/lib/auth/require-user-id'
-import { getMarketplaceNewPageData } from '@/lib/marketplace/service'
+import { getMarketplaceNewPageData } from '@/lib/marketplace/queries'
 import { normalizeMarketplacePostType } from '@/lib/marketplace/shared'
 import { getFirstSearchParamValue } from '@/lib/routing/search-params'
 

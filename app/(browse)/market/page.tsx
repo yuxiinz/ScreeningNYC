@@ -2,7 +2,7 @@ import Link from 'next/link'
 
 import MovieGridCard from '@/components/movie/MovieGridCard'
 import { getCurrentUserId } from '@/lib/auth/require-user-id'
-import { getMarketplaceHomePageData } from '@/lib/marketplace/service'
+import { getMarketplaceHomePageData } from '@/lib/marketplace/queries'
 
 const CTA_LINK_CLASS =
   'rounded-panel border border-text-primary px-4 py-3 text-[0.8rem] font-semibold tracking-[0.08em] transition-colors hover:bg-text-primary hover:text-page-bg'
