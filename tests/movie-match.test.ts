@@ -118,7 +118,7 @@ test('shouldAttemptCanonicalTmdbLookup retries when a matched local movie lacks 
       posterUrl: 'https://www.bam.org/globalassets/programs/cinema/2026fy/0426/example.jpg',
     },
     {
-      title: 'Solomon Northup’s Odyssey',
+      title: "Solomon Northup's Odyssey",
       directorText: 'Gordon Parks',
       releaseYear: 1984,
     }
@@ -160,7 +160,7 @@ test('findLocalMovieByImportMatch tolerates one-year release differences', async
 
   const match = await findLocalMovieByImportMatch(
     {
-      title: 'Palestine ‘36',
+      title: "Palestine '36",
       directorText: 'Annemarie Jacir',
       releaseYear: 2025,
     },
@@ -175,7 +175,7 @@ test('findLocalMovieByImportMatch prefers canonical tmdb movie over exact local 
 
   const localDuplicate = {
     id: 48090,
-    title: 'Palestine ‘36',
+    title: "Palestine '36",
     originalTitle: null,
     directorText: 'Annemarie Jacir',
     releaseDate: new Date('2025-01-01T00:00:00.000Z'),
@@ -217,7 +217,7 @@ test('findLocalMovieByImportMatch prefers canonical tmdb movie over exact local 
 
   const match = await findLocalMovieByImportMatch(
     {
-      title: 'Palestine ‘36',
+      title: "Palestine '36",
       directorText: 'Annemarie Jacir',
       releaseYear: 2025,
     },

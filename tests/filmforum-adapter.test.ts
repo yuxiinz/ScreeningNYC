@@ -27,11 +27,11 @@ test('resolveFilmForumTitleFields keeps event copy in shownTitle and base film i
 test('resolveFilmForumTitleFields strips director cut suffix into shownTitle', () => {
   assert.deepEqual(
     resolveFilmForumTitleFields({
-      movieTitle: 'BAD SANTA: THE DIRECTOR’S CUT',
+      movieTitle: "BAD SANTA: THE DIRECTOR'S CUT",
     }),
     {
       movieTitle: 'BAD SANTA',
-      shownTitle: 'BAD SANTA: THE DIRECTOR’S CUT',
+      shownTitle: "BAD SANTA: THE DIRECTOR'S CUT",
     }
   )
 })
@@ -87,7 +87,7 @@ test('mergeFilmForumDuplicateRows prefers event metadata for duplicate showtimes
 test('mergeFilmForumDuplicateRows normalizes director cut titles before returning rows', () => {
   const rows: ScrapedShowtime[] = [
     {
-      movieTitle: 'BAD SANTA: THE DIRECTOR’S CUT',
+      movieTitle: "BAD SANTA: THE DIRECTOR'S CUT",
       startTimeRaw: 'Monday, April 20, 2026 2:30 PM',
       ticketUrl: 'https://my.filmforum.org/events/bad-santa',
       sourceUrl: 'https://filmforum.org/film/bad-santa-zwigoff',
@@ -97,7 +97,7 @@ test('mergeFilmForumDuplicateRows normalizes director cut titles before returnin
   assert.deepEqual(mergeFilmForumDuplicateRows(rows), [
     {
       movieTitle: 'BAD SANTA',
-      shownTitle: 'BAD SANTA: THE DIRECTOR’S CUT',
+      shownTitle: "BAD SANTA: THE DIRECTOR'S CUT",
       startTimeRaw: 'Monday, April 20, 2026 2:30 PM',
       ticketUrl: 'https://my.filmforum.org/events/bad-santa',
       sourceUrl: 'https://filmforum.org/film/bad-santa-zwigoff',

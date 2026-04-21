@@ -89,7 +89,7 @@ function normalizeName(name?: string) {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[’']/g, '')
+    .replace(/['']/g, '')
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim()
 }
@@ -122,7 +122,7 @@ function addArticleSplitVariant(title: string, variants: Set<string>) {
 
     const remainder = compact.slice(prefix.length)
 
-    if (!/^\p{L}[\p{L}\p{N}'’.-]*$/u.test(remainder)) {
+    if (!/^\p{L}[\p{L}\p{N}''.-]*$/u.test(remainder)) {
       continue
     }
 

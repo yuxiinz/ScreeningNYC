@@ -1,10 +1,10 @@
-import { getReleaseYear } from ‘@/lib/movie/display’
+import { getReleaseYear } from '@/lib/movie/display'
 import type {
   MovieSearchResult,
   MovieSearchStatus,
-} from ‘@/lib/movie/search-types’
-import { prisma } from ‘@/lib/prisma’
-import { normalizeMovieName } from ‘@/lib/movie/normalize’
+} from '@/lib/movie/search-types'
+import { prisma } from '@/lib/prisma'
+import { normalizeMovieName } from '@/lib/movie/normalize'
 
 export type LocalMovieSearchItem = MovieSearchResult & {
   tmdbId: number | null

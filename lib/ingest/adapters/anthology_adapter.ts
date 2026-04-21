@@ -281,7 +281,7 @@ function looksLikePersonName(line?: string): boolean {
   const parts = cleaned.split(/\s+/)
   if (parts.length < 1 || parts.length > 5) return false
 
-  return /^[A-ZÀ-Ý][\p{L}.'’\-]+(?:\s+[A-ZÀ-Ý][\p{L}.'’\-]+){0,4}$/u.test(cleaned)
+  return /^[A-ZÀ-Ý][\p{L}.''\-]+(?:\s+[A-ZÀ-Ý][\p{L}.''\-]+){0,4}$/u.test(cleaned)
 }
 
 function looksLikeTitle(line?: string): boolean {
@@ -343,8 +343,8 @@ function cleanAnthologyTitle(input?: string | null): string {
   if (!title) return ''
 
   title = title
-    .replace(/^["“”'‘’]+/, '')
-    .replace(/["“”'‘’]+$/, '')
+    .replace(/^["""''']+/, '')
+    .replace(/["""''']+$/, '')
     .trim()
 
   return title
@@ -385,7 +385,7 @@ function stripCreatorPossessiveTitle(
   }
 
   const match =
-    cleanedTitle.match(/^(.+?)’s\s+(.+)$/i) ||
+    cleanedTitle.match(/^(.+?)'s\s+(.+)$/i) ||
     cleanedTitle.match(/^(.+?)'s\s+(.+)$/i)
 
   if (!match?.[1] || !match?.[2]) {
@@ -403,7 +403,7 @@ function stripCreatorPossessiveTitle(
     return cleanedTitle
   }
 
-  if (!looksLikePersonName(owner) && !/^[A-ZÀ-Ý][\p{L}.'’\-]{2,}$/u.test(owner)) {
+  if (!looksLikePersonName(owner) && !/^[A-ZÀ-Ý][\p{L}.''\-]{2,}$/u.test(owner)) {
     return cleanedTitle
   }
 
@@ -436,7 +436,7 @@ function chooseMovieTitle(input: {
   const rawTitle = cleanAnthologyTitle(input.rawTitle)
   if (!rawTitle) return ''
 
-  const quotedMatch = rawTitle.match(/\bPRESENTS\s+["“](.+?)["”]/i)
+  const quotedMatch = rawTitle.match(/\bPRESENTS\s+[""](.+?)[""]/i)
   if (quotedMatch?.[1]) {
     return cleanAnthologyTitle(quotedMatch[1])
   }
@@ -593,7 +593,7 @@ function buildTitleVariants(title: string, directorText?: string): string[] {
     }
   }
 
-  const quotedMatch = cleaned.match(/\bPRESENTS\s+["“](.+?)["”]/i)
+  const quotedMatch = cleaned.match(/\bPRESENTS\s+[""](.+?)[""]/i)
   if (quotedMatch?.[1]) {
     variants.add(cleanAnthologyTitle(quotedMatch[1]))
   }

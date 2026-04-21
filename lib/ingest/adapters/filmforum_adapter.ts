@@ -57,7 +57,7 @@ type FilmForumTitleFields = {
 
 const filmForumDetailPageCache = new Map<string, Promise<DetailMovieInfo>>()
 const DIRECTORS_CUT_SUFFIX_PATTERN =
-  /^(.*?)(?::\s*(?:THE\s+)?DIRECTOR[’']S\s+CUT)$/i
+  /^(.*?)(?::\s*(?:THE\s+)?DIRECTOR['']S\s+CUT)$/i
 
 function cleanTitleText(text: string): string {
   if (!text) return ''
@@ -72,12 +72,12 @@ function cleanTitleText(text: string): string {
   s = s
     .replace(/^AGNÈS VARDA:\s*A COMPREHENSIVE RETROSPECTIVE\s*/i, '')
     .replace(/^Satyajit Ray:\s*/i, '')
-    .replace(/^Satyajit Ray’s\s*/i, '')
-    .replace(/^Pixar’s\s*/i, '')
-    .replace(/^Tim Burton’s\s*/i, '')
-    .replace(/^Spike Lee’s\s*/i, '')
-    .replace(/^Hayao Miyazaki’s\s*/i, '')
-    .replace(/^Elvira Notari’s\s*/i, '')
+    .replace(/^Satyajit Ray's\s*/i, '')
+    .replace(/^Pixar's\s*/i, '')
+    .replace(/^Tim Burton's\s*/i, '')
+    .replace(/^Spike Lee's\s*/i, '')
+    .replace(/^Hayao Miyazaki's\s*/i, '')
+    .replace(/^Elvira Notari's\s*/i, '')
     .replace(/^Harold Lloyd in\s*/i, '')
     .trim()
 

@@ -16,8 +16,8 @@ export function cleanText(input?: string | null): string {
 
 export function stripOuterQuotes(input?: string | null): string {
   return cleanText(input)
-    .replace(/^["“”'‘’]+/, '')
-    .replace(/["“”'‘’]+$/, '')
+    .replace(/^["""''']+/, '')
+    .replace(/["""''']+$/, '')
     .trim()
 }
 
@@ -27,21 +27,21 @@ export function decodeHtmlEntities(text?: string | null): string {
   return input
     .replace(/&amp;/g, '&')
     .replace(/&#038;/g, '&')
-    .replace(/&#8217;/g, '’')
-    .replace(/&#8216;/g, '‘')
+    .replace(/&#8217;/g, '\u2019')
+    .replace(/&#8216;/g, '\u2018')
     .replace(/&quot;/g, '"')
-    .replace(/&#8220;/g, '“')
-    .replace(/&#8221;/g, '”')
+    .replace(/&#8220;/g, '"')
+    .replace(/&#8221;/g, '"')
     .replace(/&nbsp;/g, ' ')
     .replace(/&#160;/g, ' ')
     .replace(/&hellip;/g, '…')
     .replace(/&#8230;/g, '…')
     .replace(/&ndash;/g, '–')
     .replace(/&mdash;/g, '—')
-    .replace(/&rsquo;/g, '’')
-    .replace(/&lsquo;/g, '‘')
-    .replace(/&rdquo;/g, '”')
-    .replace(/&ldquo;/g, '“')
+    .replace(/&rsquo;/g, '\u2019')
+    .replace(/&lsquo;/g, '\u2018')
+    .replace(/&rdquo;/g, '"')
+    .replace(/&ldquo;/g, '"')
 }
 
 export function normalizeComparableText(input?: string | null): string {
@@ -54,7 +54,7 @@ export function normalizeLooseComparableText(input?: string | null): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/&/g, ' and ')
-    .replace(/[’']/g, '')
+    .replace(/['']/g, '')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim()
 }
@@ -92,18 +92,18 @@ export function cleanPossessivePrefixTitle(text?: string | null): string {
     .replace(/^Film Forum\s*(?:[·•:]\s*)?/i, '')
     .replace(/^Metrograph\s*(?:[·•:]\s*)?/i, '')
     .replace(/^The Young Film Forum\s*\(YFF\)\s*Archive Dive:\s*/i, '')
-    .replace(/^\s*["'“”‘’]+/, '')
-    .replace(/["'“”‘’]+\s*$/, '')
+    .replace(/^\s*["'""'']+/, '')
+    .replace(/["'""'']+\s*$/, '')
     .trim()
 
   const possessivePrefix =
-    s.match(/^(.+?)(’s|'s|’|')\s+(.+)$/i)
+    s.match(/^(.+?)('s|'s|'|')\s+(.+)$/i)
 
   if (possessivePrefix) {
     const owner = normalizeWhitespace(possessivePrefix[1])
     const suffix = possessivePrefix[2]
     const rest = normalizeWhitespace(possessivePrefix[3])
-    const isBareApostropheSuffix = suffix === '’' || suffix === "'"
+    const isBareApostropheSuffix = suffix === '\u2019' || suffix === "'"
 
     if (isBareApostropheSuffix && !/[sS]$/.test(owner)) {
       return s.trim()

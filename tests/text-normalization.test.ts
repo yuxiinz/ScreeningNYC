@@ -8,7 +8,7 @@ import {
 
 test('cleanPossessivePrefixTitle strips site labels with separators before possessive prefixes', () => {
   assert.equal(
-    cleanPossessivePrefixTitle('Film Forum · Mel Brooks’ YOUNG FRANKENSTEIN'),
+    cleanPossessivePrefixTitle("Film Forum · Mel Brooks' YOUNG FRANKENSTEIN"),
     'YOUNG FRANKENSTEIN'
   )
 })

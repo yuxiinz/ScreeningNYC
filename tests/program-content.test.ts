@@ -6,7 +6,7 @@ import { isProgramContent } from '../lib/ingest/core/program_content'
 test('isProgramContent does not flag single features just because synopsis mentions retrospective or festival', () => {
   assert.equal(
     isProgramContent({
-      title: 'Palestine ‘36',
+      title: "Palestine '36",
       overview:
         'Writer-director Annemarie Jacir (who was last at BAM for a full retrospective in 2018) returns with her most ambitious project to date.',
     }),
@@ -17,7 +17,7 @@ test('isProgramContent does not flag single features just because synopsis menti
     isProgramContent({
       title: 'Sirât',
       overview:
-        'Sirāt shared the Jury Prize at this year’s Cannes Film Festival.',
+        "Sirāt shared the Jury Prize at this year's Cannes Film Festival.",
     }),
     false
   )
