@@ -65,6 +65,7 @@ function parsePositiveIntegerList(value: unknown, fieldName: string) {
     )
   }
 
+  const seen = new Set<number>()
   const parsedValues: number[] = []
 
   for (const entry of value) {
@@ -74,7 +75,8 @@ function parsePositiveIntegerList(value: unknown, fieldName: string) {
       )
     }
 
-    if (!parsedValues.includes(entry)) {
+    if (!seen.has(entry)) {
+      seen.add(entry)
       parsedValues.push(entry)
     }
   }

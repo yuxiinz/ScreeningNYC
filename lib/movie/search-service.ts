@@ -60,7 +60,9 @@ export async function searchLocalMovies(
     },
   })
 
-  const dedupedMovies = movies.filter((movie, index, items) => {
+  const seen = new Map<string, typeof movies[number]>()
+
+  for (const movie of movies) {
     const firstShowtime = movie.showtimes[0]
     const normalizedTitle = normalizeMovieName(movie.title)
     const year = getReleaseYear(movie.releaseDate)
@@ -68,19 +70,12 @@ export async function searchLocalMovies(
       ? `${normalizedTitle}|${firstShowtime.startTime.toISOString()}|${firstShowtime.theaterId}`
       : `${normalizedTitle}|${year ?? ''}`
 
-    return (
-      items.findIndex((candidate) => {
-        const candidateFirstShowtime = candidate.showtimes[0]
-        const candidateTitle = normalizeMovieName(candidate.title)
-        const candidateYear = getReleaseYear(candidate.releaseDate)
-        const candidateKey = candidateFirstShowtime
-          ? `${candidateTitle}|${candidateFirstShowtime.startTime.toISOString()}|${candidateFirstShowtime.theaterId}`
-          : `${candidateTitle}|${candidateYear ?? ''}`
+    if (!seen.has(dedupeKey)) {
+      seen.set(dedupeKey, movie)
+    }
+  }
 
-        return candidateKey === dedupeKey
-      }) === index
-    )
-  })
+  const dedupedMovies = [...seen.values()]
 
   return dedupedMovies.map((movie) => {
     let status: MovieSearchStatus = 'NONE'
