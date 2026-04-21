@@ -63,6 +63,21 @@ test('normalizeScreeningMovieTitle strips curatorial presents prefixes', () => {
     normalizeScreeningMovieTitle('Roxy Presents: MOTHER MARY'),
     'MOTHER MARY'
   )
+  assert.equal(
+    normalizeScreeningMovieTitle('Debra Granik Presents ConBody VS Everybody'),
+    'ConBody VS Everybody'
+  )
+  assert.equal(
+    normalizeScreeningMovieTitle('MIX NYC presents Barbara Hammer Through The Eyes of Others'),
+    'Barbara Hammer Through The Eyes of Others'
+  )
+})
+
+test('normalizeScreeningMovieTitle strips panel-discussion event wrappers', () => {
+  assert.equal(
+    normalizeScreeningMovieTitle('SHIGEKO KUBOTA: PANEL DISCUSSION (FREE!)'),
+    'SHIGEKO KUBOTA'
+  )
 })
 
 test('normalizeScreeningMovieTitle returns a clean canonical title', () => {

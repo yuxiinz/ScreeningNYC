@@ -85,6 +85,102 @@ test('isLikelyCanonicalDuplicate matches localized rows through originalTitle al
   )
 })
 
+test('isLikelyCanonicalDuplicate keeps curatorial program prefixes mergeable when the single-film title is intact', () => {
+  assert.equal(
+    isLikelyCanonicalDuplicate(
+      {
+        id: 29010,
+        title: 'Paint Me a Road Out of Here',
+        originalTitle: 'Paint Me a Road Out of Here',
+        directorText: 'Catherine Gund',
+        releaseDate: new Date('2024-01-01T00:00:00.000Z'),
+        tmdbId: 1283226,
+      },
+      {
+        id: 60553,
+        title: 'ARTIST LEGACY PGM 7 PAINT ME A ROAD OUT OF HERE',
+        originalTitle: null,
+        directorText: 'Catherine Gund',
+        releaseDate: new Date('2024-01-01T00:00:00.000Z'),
+        tmdbId: null,
+      }
+    ),
+    true
+  )
+})
+
+test('isLikelyCanonicalDuplicate refuses to merge double-bill titles into a single film', () => {
+  assert.equal(
+    isLikelyCanonicalDuplicate(
+      {
+        id: 29536,
+        title: 'La mort de Molière',
+        originalTitle: 'La mort de Molière',
+        directorText: 'Robert Wilson',
+        releaseDate: new Date('1994-01-01T00:00:00.000Z'),
+        tmdbId: 927799,
+      },
+      {
+        id: 57868,
+        title: 'STATIONS + LA MORT DE MOLIÈRE',
+        originalTitle: null,
+        directorText: null,
+        releaseDate: new Date('1982-01-01T00:00:00.000Z'),
+        tmdbId: null,
+      }
+    ),
+    false
+  )
+})
+
+test('isLikelyCanonicalDuplicate refuses program-header substring matches like PGM 1 vs PGM 11', () => {
+  assert.equal(
+    isLikelyCanonicalDuplicate(
+      {
+        id: 60537,
+        title: 'ALLEN GINSBERG PGM 1',
+        originalTitle: null,
+        directorText: null,
+        releaseDate: new Date('1959-01-01T00:00:00.000Z'),
+        tmdbId: null,
+      },
+      {
+        id: 60539,
+        title: 'Rolling Thunder Revue: A Bob Dylan Story by Martin Scorsese',
+        originalTitle: 'ALLEN GINSBERG PGM 11: ROLLING THUNDER REVUE',
+        directorText: 'Martin Scorsese',
+        releaseDate: new Date('2019-01-01T00:00:00.000Z'),
+        tmdbId: 574638,
+      }
+    ),
+    false
+  )
+})
+
+test('isLikelyCanonicalDuplicate refuses loose one-word containment matches', () => {
+  assert.equal(
+    isLikelyCanonicalDuplicate(
+      {
+        id: 57816,
+        title: 'CREELEY',
+        originalTitle: null,
+        directorText: null,
+        releaseDate: new Date('1982-01-01T00:00:00.000Z'),
+        tmdbId: null,
+      },
+      {
+        id: 57817,
+        title: 'Two: Creeley/McClure',
+        originalTitle: 'CREELEY/BRAKHAGE',
+        directorText: 'Stan Brakhage',
+        releaseDate: new Date('1965-01-01T00:00:00.000Z'),
+        tmdbId: 146810,
+      }
+    ),
+    false
+  )
+})
+
 test('isLikelyCanonicalDuplicate refuses to merge different tmdb ids', () => {
   assert.equal(
     isLikelyCanonicalDuplicate(

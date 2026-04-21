@@ -15,6 +15,59 @@ type DirectorNameParts = {
   last: string
 }
 
+type TitleOverlapResult =
+  | {
+      exact: true
+    }
+  | {
+      exact: false
+      shorterTitle: string
+    }
+
+const MERGE_EXEMPT_PROGRAM_PATTERNS = [
+  /\bafter dark\b/i,
+  /\bdouble (?:bill|feature)\b/i,
+  /\s+\+\s+/,
+]
+
+const TRAILING_PROGRAM_HEADER_PATTERN = /\b(?:pgm|program)\s+\d+\s*$/i
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function countTitleTokens(value: string) {
+  return value.split(/\s+/).filter(Boolean).length
+}
+
+function containsStandaloneNormalizedTitle(longerTitle: string, shorterTitle: string) {
+  if (!longerTitle || !shorterTitle || shorterTitle.length > longerTitle.length) {
+    return false
+  }
+
+  const pattern = new RegExp(`(?:^| )${escapeRegExp(shorterTitle)}(?:$| )`)
+  return pattern.test(longerTitle)
+}
+
+function titleLooksMergeExemptForCanonicalDuplicate(title?: string | null) {
+  const cleaned = cleanText(title)
+  if (!cleaned) return false
+
+  return (
+    TRAILING_PROGRAM_HEADER_PATTERN.test(cleaned) ||
+    MERGE_EXEMPT_PROGRAM_PATTERNS.some((pattern) => pattern.test(cleaned))
+  )
+}
+
+function movieLooksMergeExemptForCanonicalDuplicate(
+  movie: Pick<Movie, 'title' | 'originalTitle'>
+) {
+  return (
+    titleLooksMergeExemptForCanonicalDuplicate(movie.title) ||
+    titleLooksMergeExemptForCanonicalDuplicate(movie.originalTitle)
+  )
+}
+
 
 function splitDirectorNames(input?: string | null) {
   return normalizeWhitespace(input)
@@ -112,9 +165,12 @@ function directorNamesLikelyMatch(left?: string | null, right?: string | null) {
   )
 }
 
-function titleCandidatesOverlap(leftTitles: string[], rightTitles: string[]) {
+function titleCandidatesOverlap(
+  leftTitles: string[],
+  rightTitles: string[]
+): TitleOverlapResult | null {
   if (!leftTitles.length || !rightTitles.length) {
-    return false
+    return null
   }
 
   for (const left of leftTitles) {
@@ -122,18 +178,34 @@ function titleCandidatesOverlap(leftTitles: string[], rightTitles: string[]) {
       if (!left || !right) continue
 
       if (left === right) {
-        return true
+        return { exact: true }
+      }
+    }
+  }
+
+  for (const left of leftTitles) {
+    for (const right of rightTitles) {
+      if (!left || !right) continue
+      if (left.length < 4 || right.length < 4) continue
+
+      const [shorterTitle, longerTitle] =
+        left.length <= right.length ? [left, right] : [right, left]
+
+      // Single-token containment like "CREELEY" inside a longer title is too noisy.
+      if (countTitleTokens(shorterTitle) < 2) {
+        continue
       }
 
-      if (left.length >= 4 && right.length >= 4) {
-        if (left.includes(right) || right.includes(left)) {
-          return true
+      if (containsStandaloneNormalizedTitle(longerTitle, shorterTitle)) {
+        return {
+          exact: false,
+          shorterTitle,
         }
       }
     }
   }
 
-  return false
+  return null
 }
 
 function getRawTitleCandidates(values: Array<string | undefined>) {
@@ -177,6 +249,7 @@ export function titleLooksSuspiciousForCanonicalMerge(title?: string | null) {
   return (
     cleaned !== canonicalizeTitle(cleaned) ||
     /\\u[0-9a-fA-F]{4}/.test(cleaned) ||
+    titleLooksMergeExemptForCanonicalDuplicate(cleaned) ||
     /\bpresents:?\b/i.test(cleaned) ||
     /\b(q(?:\s*&\s*|\s+and\s+)a|q&a|qa|in person|discussion|panel|conversation|filmmaker|director|guest|live score)\b/i.test(
       cleaned
@@ -243,8 +316,17 @@ export function isLikelyCanonicalDuplicate(
   const candidateTitles = collectCanonicalMovieTitleCandidates(candidateMovie).map(
     normalizeMovieName
   )
+  const titleOverlap = titleCandidatesOverlap(targetTitles, candidateTitles)
 
-  if (!titleCandidatesOverlap(targetTitles, candidateTitles)) {
+  if (!titleOverlap) {
+    return false
+  }
+
+  if (
+    !titleOverlap.exact &&
+    (movieLooksMergeExemptForCanonicalDuplicate(targetMovie) ||
+      movieLooksMergeExemptForCanonicalDuplicate(candidateMovie))
+  ) {
     return false
   }
 
