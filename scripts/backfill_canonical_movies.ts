@@ -6,12 +6,12 @@ import {
   disconnectPrisma,
   type FallbackMovieData,
   upsertMovie,
-} from '@/lib/ingest/services/persist_service'
-import { canonicalizeTitle } from '@/lib/ingest/core/screening_title'
+} from '@/lib/ingest/services/persist-service'
+import { canonicalizeTitle } from '@/lib/ingest/core/screening-title'
 import {
   searchTmdbMovie,
   type TmdbMovie,
-} from '@/lib/ingest/services/tmdb_service'
+} from '@/lib/ingest/services/tmdb-service'
 import {
   collectCanonicalMovieTitleCandidates,
   getMovieReleaseYear,

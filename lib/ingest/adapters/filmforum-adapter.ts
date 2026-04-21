@@ -1,4 +1,4 @@
-// lib/ingest/adapters/filmforum_adapter.ts
+// lib/ingest/adapters/filmforum-adapter.ts
 
 import * as cheerio from 'cheerio'
 import type { ScrapedShowtime, TheaterAdapterConfig } from './types'

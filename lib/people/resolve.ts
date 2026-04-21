@@ -196,7 +196,7 @@ export async function resolveDirectorFromTmdbId(tmdbId: number) {
   })
 
   if (existingPerson) {
-    await prisma.person.update({
+    return prisma.person.update({
       where: {
         id: existingPerson.id,
       },
@@ -204,12 +204,6 @@ export async function resolveDirectorFromTmdbId(tmdbId: number) {
         name: director.name,
         gender: director.gender,
         ...(director.photoUrl ? { photoUrl: director.photoUrl } : {}),
-      },
-    })
-
-    return prisma.person.findUniqueOrThrow({
-      where: {
-        id: existingPerson.id,
       },
     })
   }

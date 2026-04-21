@@ -1,6 +1,6 @@
-// lib/ingest/services/tmdb_service.ts
+// lib/ingest/services/tmdb-service.ts
 
-import { canonicalizeTitle, normalizeScreeningMovieTitle } from '../core/screening_title'
+import { canonicalizeTitle, normalizeScreeningMovieTitle } from '../core/screening-title'
 import {
   normalizeWhitespace,
   isLikelyProgramTitle,

@@ -1,4 +1,4 @@
-// lib/ingest/adapters/metrograph_adapter.ts
+// lib/ingest/adapters/metrograph-adapter.ts
 
 import * as cheerio from 'cheerio'
 import type { ScrapedShowtime, TheaterAdapterConfig } from './types'

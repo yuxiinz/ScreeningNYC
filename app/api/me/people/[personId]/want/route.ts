@@ -2,7 +2,7 @@ import { createWantRouteHandlers } from '@/lib/api/want-route'
 import {
   addPersonWant,
   removePersonWant,
-} from '@/lib/user-directors/service'
+} from '@/lib/user-people/service'
 
 export const { PUT, DELETE } = createWantRouteHandlers({
   addWant: addPersonWant,

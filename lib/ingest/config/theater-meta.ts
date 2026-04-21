@@ -1,4 +1,4 @@
-// lib/ingest/config/theater_meta.ts
+// lib/ingest/config/theater-meta.ts
 
 export const THEATER_META = {
   metrograph: {

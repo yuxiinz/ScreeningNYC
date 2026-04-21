@@ -1,4 +1,4 @@
-// lib/ingest/adapters/spectacle_adapter.ts
+// lib/ingest/adapters/spectacle-adapter.ts
 
 import * as cheerio from 'cheerio'
 import type { AnyNode } from 'domhandler'
@@ -9,7 +9,7 @@ import { cleanText, decodeHtmlEntities, normalizeWhitespace } from '../core/text
 import { buildAbsoluteUrl } from '../core/url'
 import { parseRuntimeMinutes, parseYear } from '../core/meta'
 import { buildShowtimeRaw, parseShowtime } from '../core/datetime'
-import { parseScreeningTitle } from '../core/screening_title'
+import { parseScreeningTitle } from '../core/screening-title'
 import { APP_TIMEZONE } from '../../timezone'
 
 const SPECTACLE_BASE_URL = 'https://www.spectacletheater.com'

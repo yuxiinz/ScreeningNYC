@@ -2,7 +2,7 @@ import 'dotenv/config'
 import {
   deleteExpiredShowtimesBatch,
   disconnectPrisma,
-} from '../lib/ingest/services/persist_service'
+} from '../lib/ingest/services/persist-service'
 
 const DEFAULT_BATCH_SIZE = 1000
 

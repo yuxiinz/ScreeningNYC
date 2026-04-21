@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 
 let matchModule: typeof import('../lib/movie/match') | null = null
 let canonicalLookupModule: typeof import('../lib/movie/canonical-lookup') | null = null
-let persistServiceModule: typeof import('../lib/ingest/services/persist_service') | null = null
+let persistServiceModule: typeof import('../lib/ingest/services/persist-service') | null = null
 let normalizeModule: typeof import('@/lib/movie/normalize') | null = null
 
 async function loadMatchModule() {
@@ -30,7 +30,7 @@ async function loadPersistServiceModule() {
   process.env.DATABASE_URL ||= 'postgresql://localhost:5432/screeningnyc-test'
 
   if (!persistServiceModule) {
-    persistServiceModule = await import('../lib/ingest/services/persist_service')
+    persistServiceModule = await import('../lib/ingest/services/persist-service')
   }
 
   return persistServiceModule

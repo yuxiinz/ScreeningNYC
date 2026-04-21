@@ -1,4 +1,4 @@
-// lib/ingest/adapters/anthology_adapter.ts
+// lib/ingest/adapters/anthology-adapter.ts
 
 import * as cheerio from 'cheerio'
 import type { AnyNode } from 'domhandler'

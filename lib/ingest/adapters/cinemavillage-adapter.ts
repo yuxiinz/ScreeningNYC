@@ -1,4 +1,4 @@
-// lib/ingest/adapters/cinemavillage_adapter.ts
+// lib/ingest/adapters/cinemavillage-adapter.ts
 
 import * as cheerio from 'cheerio'
 import { DateTime } from 'luxon'
@@ -8,11 +8,11 @@ import { cleanText, decodeHtmlEntities, normalizeWhitespace } from '../core/text
 import { buildAbsoluteUrl } from '../core/url'
 import { parseRuntimeMinutes, parseYear } from '../core/meta'
 import { buildShowtimeRaw, parseShowtime } from '../core/datetime'
-import { parseScreeningTitle } from '../core/screening_title'
+import { parseScreeningTitle } from '../core/screening-title'
 import {
   responseLooksBlocked,
   SourceAccessBlockedError,
-} from '../core/source_access'
+} from '../core/source-access'
 import { APP_TIMEZONE } from '../../timezone'
 
 const CINEMA_VILLAGE_BASE_URL = 'https://www.cinemavillage.com'

@@ -2,7 +2,7 @@ import Link from 'next/link'
 
 import PersonListActions from '@/components/person/PersonListActions'
 import PersonPhotoImage from '@/components/person/PersonPhotoImage'
-import type { WantPersonListPageData } from '@/lib/user-directors/service'
+import type { WantPersonListPageData } from '@/lib/user-people/service'
 import {
   formatDateKeyInAppTimezone,
   formatTimeInAppTimezone,

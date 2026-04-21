@@ -4,7 +4,7 @@ import { test } from 'node:test'
 import {
   buildTmdbQueryCandidates,
   expandTmdbQueryVariants,
-} from '../lib/ingest/services/tmdb_service'
+} from '../lib/ingest/services/tmdb-service'
 import {
   detectCsvProvider,
   parseDoubanCsv,

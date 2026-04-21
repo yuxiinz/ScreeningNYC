@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { isProgramContent } from '../lib/ingest/core/program_content'
+import { isProgramContent } from '../lib/ingest/core/program-content'
 
 test('isProgramContent does not flag single features just because synopsis mentions retrospective or festival', () => {
   assert.equal(

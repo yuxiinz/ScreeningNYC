@@ -3,7 +3,7 @@ import type { ScrapedShowtime, TheaterAdapterConfig } from './types'
 import { dedupeByKeys } from '../core/collection'
 import { fetchHtml } from '../core/http'
 import { parseFormat, parseRuntimeMinutes, parseYear } from '../core/meta'
-import { parseScreeningTitle } from '../core/screening_title'
+import { parseScreeningTitle } from '../core/screening-title'
 import {
   cleanText,
   decodeHtmlEntities,

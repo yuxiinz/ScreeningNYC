@@ -1,4 +1,4 @@
-// lib/ingest/adapters/moma_adapter.ts
+// lib/ingest/adapters/moma-adapter.ts
 
 import * as cheerio from 'cheerio'
 import type { AnyNode } from 'domhandler'

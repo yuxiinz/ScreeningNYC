@@ -3,15 +3,15 @@
 import 'dotenv/config'
 import { DateTime } from 'luxon'
 import { getShowtimeScraper } from '../lib/ingest/adapters'
-import { THEATER_META } from '../lib/ingest/config/theater_meta'
-import { normalizeScreeningMovieTitle } from '../lib/ingest/core/screening_title'
-import { isProgramContent } from '../lib/ingest/core/program_content'
-import { isSourceAccessBlockedError } from '../lib/ingest/core/source_access'
+import { THEATER_META } from '../lib/ingest/config/theater-meta'
+import { normalizeScreeningMovieTitle } from '../lib/ingest/core/screening-title'
+import { isProgramContent } from '../lib/ingest/core/program-content'
+import { isSourceAccessBlockedError } from '../lib/ingest/core/source-access'
 import { APP_TIMEZONE } from '../lib/timezone'
 import { findLocalMovieByImportMatch } from '../lib/movie/match'
 import { shouldAttemptCanonicalTmdbLookup } from '../lib/movie/canonical-lookup'
-import { canonicalizeTitle } from '../lib/ingest/core/screening_title'
-import { searchTmdbMovie } from '../lib/ingest/services/tmdb_service'
+import { canonicalizeTitle } from '../lib/ingest/core/screening-title'
+import { searchTmdbMovie } from '../lib/ingest/services/tmdb-service'
 import {
   upsertTheater,
   upsertFormat,
@@ -26,7 +26,7 @@ import {
   buildFingerprint,
   deleteExpiredShowtimesBatch,
   disconnectPrisma,
-} from '../lib/ingest/services/persist_service'
+} from '../lib/ingest/services/persist-service'
 
 type KnownTheaterSlug = keyof typeof THEATER_META
 

@@ -6,7 +6,7 @@ import {
   isAllowedFlcVenue,
   mapFlcApiFilmToShowtimes,
   resolveFlcTitleFields,
-} from '../lib/ingest/adapters/filmlinc_adapter'
+} from '../lib/ingest/adapters/filmlinc-adapter'
 
 test('isAllowedFlcVenue keeps only FLC-operated venues', () => {
   assert.equal(isAllowedFlcVenue('Walter Reade Theater'), true)

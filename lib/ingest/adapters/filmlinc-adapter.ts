@@ -1,7 +1,7 @@
 import type { ScrapedShowtime, TheaterAdapterConfig } from './types'
 import { fetchJson } from '@/lib/http/server-fetch'
 import { parseRuntimeMinutes } from '../core/meta'
-import { parseScreeningTitle } from '../core/screening_title'
+import { parseScreeningTitle } from '../core/screening-title'
 import {
   cleanText,
   decodeHtmlEntities,

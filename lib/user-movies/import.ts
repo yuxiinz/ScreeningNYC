@@ -1,4 +1,4 @@
-import { MovieIdentityConflictError } from '@/lib/ingest/services/persist_service'
+import { MovieIdentityConflictError } from '@/lib/ingest/services/persist-service'
 import { resolveMovieFromImportInput } from '@/lib/movie/resolve'
 import {
   detectCsvProvider,

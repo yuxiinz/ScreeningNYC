@@ -4,8 +4,8 @@ import assert from 'node:assert/strict'
 import {
   normalizeScreeningMovieTitle,
   parseScreeningTitle,
-} from '../lib/ingest/core/screening_title'
-import { searchTmdbMovie } from '../lib/ingest/services/tmdb_service'
+} from '../lib/ingest/core/screening-title'
+import { searchTmdbMovie } from '../lib/ingest/services/tmdb-service'
 
 test('parseScreeningTitle strips bracketed formats into rawFormat', () => {
   const parsed = parseScreeningTitle('Mulholland Drive [35mm]')

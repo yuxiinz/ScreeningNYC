@@ -6,7 +6,7 @@ import {
   mergeMovieRecords,
   type MergeMovieStats,
 } from '../lib/movie/merge-service'
-import { disconnectPrisma } from '../lib/ingest/services/persist_service'
+import { disconnectPrisma } from '../lib/ingest/services/persist-service'
 
 type CliArgs = {
   fromId: number

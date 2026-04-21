@@ -1,4 +1,4 @@
-// lib/ingest/adapters/momi_adapter.ts
+// lib/ingest/adapters/momi-adapter.ts
 
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'

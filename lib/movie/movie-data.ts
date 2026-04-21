@@ -1,10 +1,10 @@
 import type { Movie, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { canonicalizeTitle } from '@/lib/ingest/core/screening_title'
+import { canonicalizeTitle } from '@/lib/ingest/core/screening-title'
 import { normalizeWhitespace } from '@/lib/ingest/core/text'
 import { normalizeMovieName } from '@/lib/movie/normalize'
 import { pickDistinctOriginalTitle } from '@/lib/movie/canonical'
-import type { TmdbMovie } from '@/lib/ingest/services/tmdb_service'
+import type { TmdbMovie } from '@/lib/ingest/services/tmdb-service'
 
 type DbClient = typeof prisma | Prisma.TransactionClient
 

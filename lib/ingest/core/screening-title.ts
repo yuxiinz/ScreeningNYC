@@ -1,5 +1,5 @@
 import { parseFormat } from './meta'
-import { cleanText, normalizeWhitespace, stripLeadingBullets } from './text'
+import { cleanText, getUniqueStrings, normalizeWhitespace, stripLeadingBullets } from './text'
 
 type ExtractedTitleYear = {
   text: string
@@ -123,21 +123,7 @@ const INLINE_EVENT_SUFFIX_PATTERNS = [
 ]
 
 function uniqueValues(values: Array<string | undefined>): string[] {
-  const seen = new Set<string>()
-  const result: string[] = []
-
-  for (const value of values) {
-    const cleaned = cleanText(value)
-    if (!cleaned) continue
-
-    const normalized = cleaned.toLowerCase()
-    if (seen.has(normalized)) continue
-
-    seen.add(normalized)
-    result.push(cleaned)
-  }
-
-  return result
+  return getUniqueStrings(values) ?? []
 }
 
 function isLikelyBracketedNote(descriptor: string): boolean {

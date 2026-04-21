@@ -2,8 +2,8 @@ import { Prisma } from '@prisma/client'
 import { DateTime } from 'luxon'
 import { prisma } from '../../prisma'
 import { APP_TIMEZONE } from '../../timezone'
-import type { TmdbMovie } from './tmdb_service'
-import { canonicalizeTitle } from '../core/screening_title'
+import type { TmdbMovie } from './tmdb-service'
+import { canonicalizeTitle } from '../core/screening-title'
 import { normalizeWhitespace } from '../core/text'
 import { findLocalMovieByImportMatch } from '@/lib/movie/match'
 import {
@@ -520,23 +520,8 @@ export async function upsertShowtime(params: {
   fingerprint: string
   sourceName: string
 }) {
-  const updateData = {
+  const sharedData = {
     movieId: params.movieId,
-    runtimeMinutes: params.runtimeMinutes,
-    endTime: params.endTime,
-    ticketUrl: params.ticketUrl,
-    sourceUrl: params.sourceUrl,
-    sourceName: params.sourceName,
-    sourceShowtimeId: params.sourceShowtimeId,
-    formatId: params.formatId,
-    startTime: params.startTime,
-    status: 'SCHEDULED' as const,
-    lastVerifiedAt: new Date(),
-    shownTitle: params.shownTitle,
-  }
-  const createData = {
-    movieId: params.movieId,
-    theaterId: params.theaterId,
     formatId: params.formatId,
     startTime: params.startTime,
     endTime: params.endTime,
@@ -545,7 +530,6 @@ export async function upsertShowtime(params: {
     sourceUrl: params.sourceUrl,
     sourceName: params.sourceName,
     sourceShowtimeId: params.sourceShowtimeId,
-    fingerprint: params.fingerprint,
     status: 'SCHEDULED' as const,
     lastVerifiedAt: new Date(),
     shownTitle: params.shownTitle,
@@ -553,8 +537,12 @@ export async function upsertShowtime(params: {
 
   return prisma.showtime.upsert({
     where: { fingerprint: params.fingerprint },
-    update: updateData,
-    create: createData,
+    update: sharedData,
+    create: {
+      ...sharedData,
+      theaterId: params.theaterId,
+      fingerprint: params.fingerprint,
+    },
   })
 }
 

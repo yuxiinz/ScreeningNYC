@@ -1,4 +1,4 @@
-import { canonicalizeTitle } from '@/lib/ingest/core/screening_title'
+import { canonicalizeTitle } from '@/lib/ingest/core/screening-title'
 
 export function normalizeMovieName(input?: string | null): string {
   return canonicalizeTitle(input || '')

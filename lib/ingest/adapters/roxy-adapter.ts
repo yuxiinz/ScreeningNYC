@@ -1,4 +1,4 @@
-// lib/ingest/adapters/roxy_adapter.ts
+// lib/ingest/adapters/roxy-adapter.ts
 
 import * as cheerio from 'cheerio'
 import type { ScrapedShowtime, TheaterAdapterConfig } from './types'
@@ -6,7 +6,7 @@ import { fetchHtml } from '../core/http'
 import { cleanText, decodeHtmlEntities } from '../core/text'
 import { buildAbsoluteUrl } from '../core/url'
 import { parseRuntimeMinutes, parseYear } from '../core/meta'
-import { parseScreeningTitle } from '../core/screening_title'
+import { parseScreeningTitle } from '../core/screening-title'
 
 const ROXY_BASE_URL = 'https://www.roxycinemanewyork.com'
 const DEFAULT_NOW_SHOWING_URL = 'https://www.roxycinemanewyork.com/now-showing/'

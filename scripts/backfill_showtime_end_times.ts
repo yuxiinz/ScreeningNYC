@@ -3,7 +3,7 @@ import {
   backfillMissingShowtimeEndTimesBatch,
   deleteExpiredShowtimesBatch,
   disconnectPrisma,
-} from '../lib/ingest/services/persist_service'
+} from '../lib/ingest/services/persist-service'
 
 const BACKFILL_BATCH_SIZE = 500
 const CLEANUP_BATCH_SIZE = 1000

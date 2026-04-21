@@ -1,5 +1,5 @@
 import crypto from 'crypto'
-import { canonicalizeTitle } from './screening_title'
+import { canonicalizeTitle } from './screening-title'
 
 export function buildFingerprint(params: {
   theaterSlug: string

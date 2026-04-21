@@ -58,23 +58,21 @@ const MARKETPLACE_MY_POST_SHOWTIME_SELECT = {
   },
 } as const
 
-function getMarketplacePostSelect() {
-  return {
-    id: true,
-    userId: true,
-    type: true,
-    quantity: true,
-    priceCents: true,
-    seatInfo: true,
-    updatedAt: true,
-    user: {
-      select: {
-        name: true,
-        image: true,
-      },
+const MARKETPLACE_POST_SELECT = {
+  id: true,
+  userId: true,
+  type: true,
+  quantity: true,
+  priceCents: true,
+  seatInfo: true,
+  updatedAt: true,
+  user: {
+    select: {
+      name: true,
+      image: true,
     },
-  } as const
-}
+  },
+} as const
 
 export type MarketplaceHomeMovieCard = {
   movie: MarketplaceMovieSummary
@@ -630,7 +628,7 @@ export async function getMarketplaceMoviePageData(
           orderBy: {
             updatedAt: 'desc',
           },
-          select: getMarketplacePostSelect(),
+          select: MARKETPLACE_POST_SELECT,
         },
       },
     }),

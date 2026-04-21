@@ -1,7 +1,7 @@
 import type { Movie } from '@prisma/client'
 
-import { cleanText, normalizeWhitespace } from '@/lib/ingest/core/text'
-import { canonicalizeTitle } from '@/lib/ingest/core/screening_title'
+import { cleanText, getUniqueStrings, normalizeWhitespace } from '@/lib/ingest/core/text'
+import { canonicalizeTitle } from '@/lib/ingest/core/screening-title'
 import { normalizeMovieName } from '@/lib/movie/normalize'
 
 
@@ -15,23 +15,6 @@ type DirectorNameParts = {
   last: string
 }
 
-function uniqueStrings(values: Array<string | undefined>) {
-  const seen = new Set<string>()
-  const result: string[] = []
-
-  for (const value of values) {
-    const cleaned = cleanText(value)
-    if (!cleaned) continue
-
-    const normalized = cleaned.toLowerCase()
-    if (seen.has(normalized)) continue
-
-    seen.add(normalized)
-    result.push(cleaned)
-  }
-
-  return result
-}
 
 function splitDirectorNames(input?: string | null) {
   return normalizeWhitespace(input)
@@ -154,12 +137,12 @@ function titleCandidatesOverlap(leftTitles: string[], rightTitles: string[]) {
 }
 
 function getRawTitleCandidates(values: Array<string | undefined>) {
-  return uniqueStrings(
+  return getUniqueStrings(
     values.map((value) => {
       const cleaned = canonicalizeTitle(value || '')
       return cleaned || undefined
     })
-  )
+  ) ?? []
 }
 
 export function getMovieReleaseYear(movie?: Pick<Movie, 'releaseDate'> | null) {

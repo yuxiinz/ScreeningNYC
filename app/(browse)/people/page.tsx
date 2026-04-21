@@ -8,7 +8,7 @@ import PersonPhotoImage from '@/components/person/PersonPhotoImage'
 import { getCurrentUserId } from '@/lib/auth/require-user-id'
 import { prisma } from '@/lib/prisma'
 import { parsePositivePage } from '@/lib/routing/search-params'
-import { getPersonStatesForUser } from '@/lib/user-directors/service'
+import { getPersonStatesForUser } from '@/lib/user-people/service'
 
 const PEOPLE_PAGE_SIZE = 120
 

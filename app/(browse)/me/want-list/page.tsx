@@ -8,7 +8,7 @@ import {
   getMovieStatesForUser,
   getWantListPageData,
 } from '@/lib/user-movies/service'
-import { getWantPersonListPageData } from '@/lib/user-directors/service'
+import { getWantPersonListPageData } from '@/lib/user-people/service'
 
 const TAB_CLASS =
   'border-b-2 pb-[6px] text-[0.86rem] font-semibold tracking-[0.06em] transition-colors'

@@ -1,4 +1,4 @@
-// lib/ingest/adapters/ifc_adapter.ts
+// lib/ingest/adapters/ifc-adapter.ts
 
 import * as cheerio from 'cheerio'
 import type { ScrapedShowtime } from './types'

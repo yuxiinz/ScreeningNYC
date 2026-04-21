@@ -5,7 +5,7 @@ import {
   isSourceAccessBlockedError,
   responseLooksBlocked,
   SourceAccessBlockedError,
-} from '../lib/ingest/core/source_access'
+} from '../lib/ingest/core/source-access'
 
 test('responseLooksBlocked detects explicit 403 responses', () => {
   assert.equal(

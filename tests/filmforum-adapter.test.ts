@@ -5,7 +5,7 @@ import type { ScrapedShowtime } from '../lib/ingest/adapters/types'
 import {
   mergeFilmForumDuplicateRows,
   resolveFilmForumTitleFields,
-} from '../lib/ingest/adapters/filmforum_adapter'
+} from '../lib/ingest/adapters/filmforum-adapter'
 
 test('resolveFilmForumTitleFields keeps event copy in shownTitle and base film in movieTitle', () => {
   assert.deepEqual(

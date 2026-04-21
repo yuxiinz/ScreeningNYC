@@ -1,4 +1,4 @@
-// lib/ingest/adapters/quad_adapter.ts
+// lib/ingest/adapters/quad-adapter.ts
 
 import * as cheerio from 'cheerio'
 import type { ScrapedShowtime, TheaterAdapterConfig } from './types'

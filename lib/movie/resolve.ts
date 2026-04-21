@@ -5,7 +5,7 @@ import {
   mergeMovieImportLinks,
   type FallbackMovieData,
   upsertMovie,
-} from '@/lib/ingest/services/persist_service'
+} from '@/lib/ingest/services/persist-service'
 import {
   searchTmdbMovie,
   type TmdbMovie,
@@ -14,7 +14,7 @@ import {
   type TmdbMovieDetailResponse,
   type TmdbCreditsResponse,
   type TmdbExternalIdsResponse,
-} from '@/lib/ingest/services/tmdb_service'
+} from '@/lib/ingest/services/tmdb-service'
 import {
   extractImdbIdFromUrl,
   findLocalMovieByImportMatch,

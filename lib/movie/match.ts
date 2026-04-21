@@ -1,6 +1,6 @@
 import type { Movie, Prisma } from '@prisma/client'
 
-import { canonicalizeTitle } from '@/lib/ingest/core/screening_title'
+import { canonicalizeTitle } from '@/lib/ingest/core/screening-title'
 import { prisma } from '@/lib/prisma'
 import { normalizeMovieName } from '@/lib/movie/normalize'
 import { getMovieReleaseYear } from '@/lib/movie/canonical'

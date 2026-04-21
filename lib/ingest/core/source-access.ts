@@ -1,4 +1,4 @@
-// lib/ingest/core/source_access.ts
+// lib/ingest/core/source-access.ts
 
 type BlockedResponse = {
   status?: number
