@@ -21,12 +21,13 @@ import {
   upsertLocalMovie,
   upsertShowtime,
   markMissingShowtimesAsCanceled,
+} from '../lib/ingest/services/persist-service'
+import { normalizeFormat, parseStartTime } from '../lib/ingest/core/showtime-parse'
+import {
   getIngestTableCounts,
-  normalizeFormat,
-  parseStartTime,
   deleteExpiredShowtimesBatch,
   disconnectPrisma,
-} from '../lib/ingest/services/persist-service'
+} from '../lib/ingest/services/db-admin'
 
 type KnownTheaterSlug = keyof typeof THEATER_META
 

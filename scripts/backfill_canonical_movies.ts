@@ -3,10 +3,8 @@ import 'dotenv/config'
 import { Prisma } from '@prisma/client'
 
 import { type FallbackMovieData } from '@/lib/movie/movie-data'
-import {
-  disconnectPrisma,
-  upsertMovie,
-} from '@/lib/ingest/services/persist-service'
+import { upsertMovie } from '@/lib/ingest/services/persist-service'
+import { disconnectPrisma } from '@/lib/ingest/services/db-admin'
 import { canonicalizeTitle } from '@/lib/ingest/core/screening-title'
 import {
   searchTmdbMovie,
