@@ -1,9 +1,9 @@
 import type { Movie } from '@prisma/client'
 
 import { fetchJson, isHttpError } from '@/lib/http/server-fetch'
+import { type FallbackMovieData } from '@/lib/movie/movie-data'
 import {
   mergeMovieImportLinks,
-  type FallbackMovieData,
   upsertMovie,
 } from '@/lib/ingest/services/persist-service'
 import {

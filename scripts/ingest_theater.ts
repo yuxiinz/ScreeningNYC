@@ -12,18 +12,18 @@ import { findLocalMovieByImportMatch } from '../lib/movie/match'
 import { shouldAttemptCanonicalTmdbLookup } from '../lib/movie/canonical-lookup'
 import { canonicalizeTitle } from '../lib/ingest/core/screening-title'
 import { searchTmdbMovie } from '../lib/ingest/services/tmdb-service'
+import { buildFingerprint } from '../lib/ingest/core/fingerprint'
+import { mergeMovieMetadata } from '../lib/movie/movie-data'
 import {
   upsertTheater,
   upsertFormat,
   upsertMovie,
   upsertLocalMovie,
-  mergeMovieMetadata,
   upsertShowtime,
   markMissingShowtimesAsCanceled,
   getIngestTableCounts,
   normalizeFormat,
   parseStartTime,
-  buildFingerprint,
   deleteExpiredShowtimesBatch,
   disconnectPrisma,
 } from '../lib/ingest/services/persist-service'

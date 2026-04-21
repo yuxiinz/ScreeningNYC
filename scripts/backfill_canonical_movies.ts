@@ -2,9 +2,9 @@ import 'dotenv/config'
 
 import { Prisma } from '@prisma/client'
 
+import { type FallbackMovieData } from '@/lib/movie/movie-data'
 import {
   disconnectPrisma,
-  type FallbackMovieData,
   upsertMovie,
 } from '@/lib/ingest/services/persist-service'
 import { canonicalizeTitle } from '@/lib/ingest/core/screening-title'

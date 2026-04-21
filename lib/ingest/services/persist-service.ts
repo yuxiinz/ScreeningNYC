@@ -22,8 +22,6 @@ import {
 } from '@/lib/movie/movie-data'
 import { reconcileCanonicalMovie } from '@/lib/movie/merge-service'
 
-export type { FallbackMovieData }
-export { buildFingerprint, mergeMovieMetadata, chooseMergedReleaseDate }
 
 type PersistConfig = {
   theaterName: string

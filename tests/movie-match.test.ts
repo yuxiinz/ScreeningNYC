@@ -1,9 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
+import { chooseMergedReleaseDate } from '@/lib/movie/movie-data'
+
 let matchModule: typeof import('../lib/movie/match') | null = null
 let canonicalLookupModule: typeof import('../lib/movie/canonical-lookup') | null = null
-let persistServiceModule: typeof import('../lib/ingest/services/persist-service') | null = null
 let normalizeModule: typeof import('@/lib/movie/normalize') | null = null
 
 async function loadMatchModule() {
@@ -26,15 +27,6 @@ async function loadCanonicalLookupModule() {
   return canonicalLookupModule
 }
 
-async function loadPersistServiceModule() {
-  process.env.DATABASE_URL ||= 'postgresql://localhost:5432/screeningnyc-test'
-
-  if (!persistServiceModule) {
-    persistServiceModule = await import('../lib/ingest/services/persist-service')
-  }
-
-  return persistServiceModule
-}
 
 async function loadNormalizeModule() {
   process.env.DATABASE_URL ||= 'postgresql://localhost:5432/screeningnyc-test'
@@ -227,9 +219,7 @@ test('findLocalMovieByImportMatch prefers canonical tmdb movie over exact local 
   assert.equal(match?.id, 2422)
 })
 
-test('chooseMergedReleaseDate prefers tmdb dates over local year-only placeholders', async () => {
-  const { chooseMergedReleaseDate } = await loadPersistServiceModule()
-
+test('chooseMergedReleaseDate prefers tmdb dates over local year-only placeholders', () => {
   const result = chooseMergedReleaseDate({
     existing: {
       tmdbId: null,
