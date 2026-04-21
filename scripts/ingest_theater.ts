@@ -381,7 +381,7 @@ async function ingestOneTheater(
 
     const format = await upsertFormat(formatName)
 
-    const isProgram = isProgramContent({
+    const isProgram = item.forceLocalOnly || isProgramContent({
       title: canonicalTitle || item.movieTitle,
       overview: item.overview,
     })
@@ -391,6 +391,7 @@ async function ingestOneTheater(
     if (isProgram) {
       movie = await upsertLocalMovie({
         title: fallbackMovieTitle,
+        titleCandidates: item.tmdbTitleCandidates,
         releaseYear: item.releaseYear,
         runtimeMinutes: item.runtimeMinutes,
         overview: item.overview,
@@ -481,6 +482,7 @@ async function ingestOneTheater(
         } else {
           movie = await upsertLocalMovie({
             title: fallbackMovieTitle,
+            titleCandidates: item.tmdbTitleCandidates,
             releaseYear: item.releaseYear,
             runtimeMinutes: item.runtimeMinutes,
             overview: item.overview,
@@ -493,6 +495,7 @@ async function ingestOneTheater(
       } else {
         movie = await upsertLocalMovie({
           title: fallbackMovieTitle,
+          titleCandidates: item.tmdbTitleCandidates,
           releaseYear: item.releaseYear,
           runtimeMinutes: item.runtimeMinutes,
           overview: item.overview,

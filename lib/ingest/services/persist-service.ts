@@ -3,7 +3,6 @@ import { DateTime } from 'luxon'
 import { prisma } from '../../prisma'
 import { APP_TIMEZONE } from '../../timezone'
 import type { TmdbMovie } from './tmdb-service'
-import { canonicalizeTitle } from '../core/screening-title'
 import { findLocalMovieByImportMatch } from '@/lib/movie/match'
 import {
   syncMovieDirectors,
@@ -15,6 +14,7 @@ import {
   buildMovieCreateData,
   buildMovieMergeData,
   mergeMovieMetadata,
+  normalizeFallbackMovieTitle,
   chooseMergedReleaseDate,
   shouldPreferIncomingMovieTitle,
   getFallbackReleaseDate,
@@ -110,7 +110,7 @@ export async function mergeMovieImportLinks(
 }
 
 export async function upsertLocalMovie(fallback: FallbackMovieData) {
-  const canonicalTitle = canonicalizeTitle(fallback.title)
+  const canonicalTitle = normalizeFallbackMovieTitle(fallback.title)
   const existing = await findLocalMovieByImportMatch({
     title: canonicalTitle,
     titleCandidates: fallback.titleCandidates,
@@ -169,9 +169,9 @@ export async function upsertLocalMovie(fallback: FallbackMovieData) {
 }
 
 export async function upsertMovie(tmdb: TmdbMovie, fallback?: FallbackMovieData) {
-  const fallbackTitle = canonicalizeTitle(fallback?.title || tmdb.title || 'Untitled')
+  const fallbackTitle = normalizeFallbackMovieTitle(fallback?.title || tmdb.title || 'Untitled')
   const fallbackReleaseDate = getFallbackReleaseDate(fallback)
-  const preferredTitle = canonicalizeTitle(tmdb.title || fallbackTitle || 'Untitled')
+  const preferredTitle = normalizeFallbackMovieTitle(tmdb.title || fallbackTitle || 'Untitled')
   const releaseYear =
     fallback?.releaseYear ||
     (fallbackReleaseDate ? fallbackReleaseDate.getUTCFullYear() : undefined) ||
@@ -381,4 +381,3 @@ export async function markMissingShowtimesAsCanceled(
     },
   })
 }
-

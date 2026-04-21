@@ -434,7 +434,7 @@ export function canonicalizeTitle(title: string): string {
     .replace(/\bmembers only:\b/i, '')
     .replace(/\bace presents\b/i, '')
     .replace(/\basc presents\b/i, '')
-    .replace(/\bpresented by\b.*$/i, '')
+    .replace(/\bpresented by\b[^:]*:\s*/i, '')
     .replace(/\s+/g, ' ')
     .trim()
 

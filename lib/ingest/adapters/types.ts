@@ -16,6 +16,7 @@ export type ScrapedShowtime = {
   tmdbTitleCandidates?: string[]
   preferMovieTitleForDisplay?: boolean
   matchedMovieTitleHint?: string
+  forceLocalOnly?: boolean
 }
 
 export type TheaterAdapterConfig = {

@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  canonicalizeTitle,
   normalizeScreeningMovieTitle,
   parseScreeningTitle,
 } from '../lib/ingest/core/screening-title'
@@ -82,6 +83,32 @@ test('normalizeScreeningMovieTitle strips panel-discussion event wrappers', () =
 
 test('normalizeScreeningMovieTitle returns a clean canonical title', () => {
   assert.equal(normalizeScreeningMovieTitle('2001: A Space Odyssey [70mm]'), '2001: A Space Odyssey')
+})
+
+test('canonicalizeTitle extracts film title from "PRESENTED BY X: TITLE" pattern', () => {
+  assert.equal(
+    canonicalizeTitle('PRESENTED BY RAYMOND FOYE: JORDAN BELSON RARITIES'),
+    'JORDAN BELSON RARITIES'
+  )
+  assert.equal(
+    canonicalizeTitle('PRESENTED BY METROGRAPH: THE NIGHT OF THE HUNTER'),
+    'THE NIGHT OF THE HUNTER'
+  )
+  assert.equal(
+    canonicalizeTitle('Presented by the Film Foundation: Singin\' in the Rain'),
+    'Singin\' in the Rain'
+  )
+})
+
+test('canonicalizeTitle does not wipe "PRESENTED BY X" when there is no colon', () => {
+  const result = canonicalizeTitle('PRESENTED BY THE FILM FOUNDATION')
+  assert.ok(result.length > 0, 'should not produce an empty string')
+  assert.ok(result.toLowerCase().includes('presented by'), 'should preserve the original text')
+})
+
+test('canonicalizeTitle strips known inline prefixes without destroying the title', () => {
+  assert.equal(canonicalizeTitle('ACE Presents Chinatown'), 'Chinatown')
+  assert.equal(canonicalizeTitle('ASC Presents The Godfather'), 'The Godfather')
 })
 
 test('searchTmdbMovie fallback normalizes bracketed formats before returning a local title', async () => {

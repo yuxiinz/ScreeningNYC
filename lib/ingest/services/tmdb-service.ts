@@ -214,6 +214,7 @@ function normalizeTmdbQueryTitle(title?: string | null): string {
 function shouldSkipTmdbSearch(params: SearchTmdbParams): boolean {
   const title = normalizeTmdbQueryTitle(params.title)
   if (!title) return true
+  if (title.length < 2) return true
   if (isLikelyProgramTitle(title)) return true
 
   const lower = title.toLowerCase()

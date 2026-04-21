@@ -10,6 +10,23 @@ type MovieIdentityLike = Pick<
   'id' | 'title' | 'originalTitle' | 'directorText' | 'releaseDate' | 'tmdbId'
 >
 
+export type CanonicalMergePlanMovie = MovieIdentityLike &
+  Pick<Movie, 'posterUrl' | 'imdbUrl'> & {
+    showtimeCount?: number
+  }
+
+export type CanonicalMergePlan =
+  | {
+      kind: 'merge'
+      target: CanonicalMergePlanMovie
+      sources: CanonicalMergePlanMovie[]
+    }
+  | {
+      kind: 'conflict'
+      rows: CanonicalMergePlanMovie[]
+      tmdbIds: number[]
+    }
+
 type DirectorNameParts = {
   first: string
   last: string
@@ -397,4 +414,62 @@ export function scoreCanonicalMovieTarget(
   }
 
   return score
+}
+
+function countDirectorNames(input?: string | null) {
+  return buildDirectorSetSignature(input).split('|').filter(Boolean).length
+}
+
+export function planCanonicalMovieMerge(params: {
+  currentMovie: CanonicalMergePlanMovie
+  candidates: CanonicalMergePlanMovie[]
+  desiredTmdbId?: number
+}): CanonicalMergePlan {
+  const rows = [params.currentMovie, ...params.candidates]
+  const tmdbIds = [...new Set(
+    rows
+      .map((row) => row.tmdbId)
+      .filter((tmdbId): tmdbId is number => typeof tmdbId === 'number')
+  )].sort((left, right) => left - right)
+
+  if (tmdbIds.length > 1) {
+    return {
+      kind: 'conflict',
+      rows,
+      tmdbIds,
+    }
+  }
+
+  const target = [...rows].sort((left, right) => {
+    const scoreDiff =
+      scoreCanonicalMovieTarget(right, params.desiredTmdbId) -
+      scoreCanonicalMovieTarget(left, params.desiredTmdbId)
+
+    if (scoreDiff !== 0) {
+      return scoreDiff
+    }
+
+    return left.id - right.id
+  })[0]
+
+  const sources = rows
+    .filter((row) => row.id !== target.id)
+    .sort((left, right) => {
+      if (left.tmdbId && !right.tmdbId) return 1
+      if (!left.tmdbId && right.tmdbId) return -1
+
+      const leftDirectorCount = countDirectorNames(left.directorText)
+      const rightDirectorCount = countDirectorNames(right.directorText)
+      if (leftDirectorCount !== rightDirectorCount) {
+        return leftDirectorCount - rightDirectorCount
+      }
+
+      return left.id - right.id
+    })
+
+  return {
+    kind: 'merge',
+    target,
+    sources,
+  }
 }

@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import {
   directorTextLikelyMatches,
   isLikelyCanonicalDuplicate,
+  planCanonicalMovieMerge,
   pickDistinctOriginalTitle,
   scoreCanonicalMovieTarget,
 } from '../lib/movie/canonical'
@@ -202,6 +203,57 @@ test('isLikelyCanonicalDuplicate refuses to merge different tmdb ids', () => {
       }
     ),
     false
+  )
+})
+
+test('planCanonicalMovieMerge stops before merge when a local row bridges multiple tmdb ids', () => {
+  const plan = planCanonicalMovieMerge({
+    currentMovie: {
+      id: 60554,
+      title: 'JORDAN BELSON RARITIES',
+      originalTitle: null,
+      directorText: null,
+      releaseDate: new Date('2026-01-01T00:00:00.000Z'),
+      tmdbId: null,
+      posterUrl: null,
+      imdbUrl: null,
+      showtimeCount: 1,
+    },
+    candidates: [
+      {
+        id: 18624,
+        title: 'Untitled Labyrinth Sequel',
+        originalTitle: null,
+        directorText: 'Robert Eggers',
+        releaseDate: new Date('2026-01-01T00:00:00.000Z'),
+        tmdbId: 452381,
+        posterUrl: null,
+        imdbUrl: null,
+        showtimeCount: 0,
+      },
+      {
+        id: 18966,
+        title: 'Untitled Mission: Impossible 9',
+        originalTitle: null,
+        directorText: null,
+        releaseDate: new Date('2026-01-01T00:00:00.000Z'),
+        tmdbId: 1637876,
+        posterUrl: null,
+        imdbUrl: null,
+        showtimeCount: 0,
+      },
+    ],
+  })
+
+  assert.equal(plan.kind, 'conflict')
+  if (plan.kind !== 'conflict') {
+    assert.fail('expected a conflict plan')
+  }
+
+  assert.deepEqual(plan.tmdbIds, [452381, 1637876])
+  assert.deepEqual(
+    plan.rows.map((row) => row.id),
+    [60554, 18624, 18966]
   )
 })
 

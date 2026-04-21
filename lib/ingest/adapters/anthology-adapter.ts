@@ -558,6 +558,12 @@ function normalizePosterUrl(url?: string): string | undefined {
   return cleaned
 }
 
+export function isCuratorialPresentation(rawTitle: string): boolean {
+  const cleaned = cleanAnthologyTitle(rawTitle)
+  if (!cleaned) return false
+  return /^(?:presented|co-presented)\s+by\b/i.test(cleaned)
+}
+
 function buildTitleVariants(title: string, directorText?: string): string[] {
   const variants = new Set<string>()
   const cleaned = cleanAnthologyTitle(title)
@@ -722,7 +728,7 @@ function isCalendarSourceUrl(url?: string): boolean {
   return cleanText(url).includes('anthologyfilmarchives.org')
 }
 
-function mergeRows(
+export function mergeAnthologyRows(
   primary: ScrapedShowtime,
   secondary?: ScrapedShowtime
 ): ScrapedShowtime {
@@ -771,6 +777,7 @@ function mergeRows(
       primary.preferMovieTitleForDisplay || secondary?.preferMovieTitleForDisplay,
     matchedMovieTitleHint:
       primary.matchedMovieTitleHint || secondary?.matchedMovieTitleHint,
+    forceLocalOnly: primary.forceLocalOnly || secondary?.forceLocalOnly,
   }
 }
 
@@ -860,6 +867,8 @@ function parseCalendarShowingRows(
     absoluteAnthologyUrl(noteRoot.find('a[href*="ticketing"]').first().attr('href')) ||
     absoluteAnthologyUrl(noteRoot.find('a[href*="veezi"]').first().attr('href'))
 
+  const forceLocalOnly = isCuratorialPresentation(rawTitle)
+
   return timeEntries.map((entry) => ({
     movieTitle: normalizedMovieTitle,
     shownTitle,
@@ -878,6 +887,7 @@ function parseCalendarShowingRows(
     tmdbTitleCandidates,
     preferMovieTitleForDisplay: normalizedMovieTitle !== shownTitle,
     matchedMovieTitleHint: normalizedMovieTitle,
+    forceLocalOnly: forceLocalOnly || undefined,
   }))
 }
 
@@ -938,6 +948,7 @@ function parseVeeziFilmBlock(
     rawTitle,
   })
 
+  const forceLocalOnly = isCuratorialPresentation(rawTitle)
   const rows: ScrapedShowtime[] = []
 
   film.find('.sessions .date-container').each((_, dateContainerEl) => {
@@ -967,6 +978,7 @@ function parseVeeziFilmBlock(
         tmdbTitleCandidates,
         preferMovieTitleForDisplay: normalizedMovieTitle !== shownTitle,
         matchedMovieTitleHint: normalizedMovieTitle,
+        forceLocalOnly: forceLocalOnly || undefined,
       })
     })
   })
@@ -1038,7 +1050,7 @@ export async function scrapeAnthologyShowtimes(
       }
     }
 
-    mergedRows.push(finalizeFallbackPoster(mergeRows(veeziRow, matchedCalendarRow)))
+    mergedRows.push(finalizeFallbackPoster(mergeAnthologyRows(veeziRow, matchedCalendarRow)))
   }
 
   calendarRows.forEach((calendarRow, index) => {

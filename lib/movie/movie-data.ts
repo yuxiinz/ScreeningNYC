@@ -1,7 +1,7 @@
 import type { Movie, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { canonicalizeTitle } from '@/lib/ingest/core/screening-title'
-import { normalizeWhitespace } from '@/lib/ingest/core/text'
+import { cleanText, normalizeWhitespace } from '@/lib/ingest/core/text'
 import { normalizeMovieName } from '@/lib/movie/normalize'
 import { pickDistinctOriginalTitle } from '@/lib/movie/canonical'
 import type { TmdbMovie } from '@/lib/ingest/services/tmdb-service'
@@ -24,6 +24,10 @@ export type FallbackMovieData = {
   genresText?: string
   productionCountriesText?: string
   preferTitle?: boolean
+}
+
+export function normalizeFallbackMovieTitle(title?: string | null) {
+  return canonicalizeTitle(title || '') || cleanText(title) || 'Untitled'
 }
 
 function scoreMovieTitleNoise(input?: string | null): number {
@@ -325,7 +329,7 @@ export async function mergeMovieMetadata(
     return null
   }
 
-  const normalizedFallbackTitle = canonicalizeTitle(fallback.title)
+  const normalizedFallbackTitle = normalizeFallbackMovieTitle(fallback.title)
 
   return db.movie.update({
     where: { id: existing.id },
