@@ -1,10 +1,9 @@
 import type { Movie, Prisma } from '@prisma/client'
 
 import {
-  buildDirectorSetSignature,
   collectCanonicalMovieTitleCandidates,
   isLikelyCanonicalDuplicate,
-  scoreCanonicalMovieTarget,
+  planCanonicalMovieMerge,
 } from '@/lib/movie/canonical'
 import { prisma } from '@/lib/prisma'
 import { mergeMovieRecords } from '@/lib/movie/merge-service'
@@ -17,6 +16,20 @@ type MergeCandidateMovie = Pick<
 > & {
   _count: {
     showtimes: number
+  }
+}
+
+function buildCanonicalMergePlanMovie(row: MergeCandidateMovie) {
+  return {
+    id: row.id,
+    title: row.title,
+    originalTitle: row.originalTitle,
+    directorText: row.directorText,
+    releaseDate: row.releaseDate,
+    tmdbId: row.tmdbId,
+    posterUrl: row.posterUrl,
+    imdbUrl: row.imdbUrl,
+    showtimeCount: row._count.showtimes,
   }
 }
 
@@ -164,44 +177,32 @@ export async function reconcileCanonicalMovie(params: {
     return movie
   }
 
-  const allRows: MergeCandidateMovie[] = [currentMovie, ...candidates]
-  const target = [...allRows].sort((left, right) => {
-    const scoreDiff =
-      scoreCanonicalMovieTarget(right, params.desiredTmdbId) -
-      scoreCanonicalMovieTarget(left, params.desiredTmdbId)
+  const mergePlan = planCanonicalMovieMerge({
+    currentMovie: buildCanonicalMergePlanMovie(currentMovie),
+    candidates: candidates.map(buildCanonicalMergePlanMovie),
+    desiredTmdbId: params.desiredTmdbId,
+  })
 
-    if (scoreDiff !== 0) {
-      return scoreDiff
-    }
+  if (mergePlan.kind === 'conflict') {
+    const rowSummary = mergePlan.rows
+      .map((row) => `${row.id}:${row.tmdbId ?? 'local'}:${row.title}`)
+      .join(' | ')
 
-    return left.id - right.id
-  })[0]
+    throw new Error(
+      `[canonical] Refusing to reconcile movie ${currentMovie.id}: candidate set spans multiple TMDB ids (${mergePlan.tmdbIds.join(', ')}). rows=${rowSummary}`
+    )
+  }
 
-  const sourceRows = allRows
-    .filter((row) => row.id !== target.id)
-    .sort((left, right) => {
-      if (left.tmdbId && !right.tmdbId) return 1
-      if (!left.tmdbId && right.tmdbId) return -1
-
-      const leftDirectorCount = buildDirectorSetSignature(left.directorText).split('|').filter(Boolean).length
-      const rightDirectorCount = buildDirectorSetSignature(right.directorText).split('|').filter(Boolean).length
-      if (leftDirectorCount !== rightDirectorCount) {
-        return leftDirectorCount - rightDirectorCount
-      }
-
-      return left.id - right.id
-    })
-
-  for (const sourceRow of sourceRows) {
-    await mergeMovieRecords(sourceRow.id, target.id)
+  for (const sourceRow of mergePlan.sources) {
+    await mergeMovieRecords(sourceRow.id, mergePlan.target.id)
   }
 
   const reconciledMovie = await prisma.movie.findUnique({
-    where: { id: target.id },
+    where: { id: mergePlan.target.id },
   })
 
   if (!reconciledMovie) {
-    throw new Error(`Movie ${target.id} disappeared after canonical reconciliation.`)
+    throw new Error(`Movie ${mergePlan.target.id} disappeared after canonical reconciliation.`)
   }
 
   return reconciledMovie

@@ -19,7 +19,7 @@ import {
   shouldPreferIncomingMovieTitle,
   getFallbackReleaseDate,
 } from '@/lib/movie/movie-data'
-import { reconcileCanonicalMovie } from '@/lib/movie/merge-service'
+import { reconcileCanonicalMovie } from '@/lib/movie/canonical-merge'
 
 
 type PersistConfig = {

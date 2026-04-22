@@ -19,7 +19,7 @@ import {
 import {
   findCanonicalMergeCandidates,
   reconcileCanonicalMovie,
-} from '@/lib/movie/merge-service'
+} from '@/lib/movie/canonical-merge'
 import { fetchTmdbMovieById } from '@/lib/movie/resolve'
 import { prisma } from '@/lib/prisma'
 import {
