@@ -1,3 +1,12 @@
+export function getUpcomingShowtimeWhere(now: Date = new Date()) {
+  return {
+    startTime: {
+      gt: now,
+    },
+    status: 'SCHEDULED' as const,
+  }
+}
+
 export function getShowtimeDisplayTitle(
   shownTitle?: string | null,
   movieTitle?: string | null

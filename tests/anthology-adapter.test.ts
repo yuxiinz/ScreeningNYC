@@ -3,8 +3,10 @@ import assert from 'node:assert/strict'
 
 import type { ScrapedShowtime } from '../lib/ingest/adapters/types'
 import {
+  extractAnthologyProgramFeatureTitle,
   isCuratorialPresentation,
   mergeAnthologyRows,
+  shouldForceAnthologyLocalOnly,
 } from '../lib/ingest/adapters/anthology-adapter'
 
 test('isCuratorialPresentation only flags presented-by curatorial headers', () => {
@@ -22,7 +24,7 @@ test('isCuratorialPresentation only flags presented-by curatorial headers', () =
   )
 })
 
-test('mergeAnthologyRows preserves forceLocalOnly when calendar metadata is merged in', () => {
+test('mergeAnthologyRows preserves forceLocalOnly and drops TMDB candidates for local-only rows', () => {
   const veeziRow: ScrapedShowtime = {
     movieTitle: 'JORDAN BELSON RARITIES',
     shownTitle: 'JORDAN BELSON RARITIES',
@@ -30,6 +32,7 @@ test('mergeAnthologyRows preserves forceLocalOnly when calendar metadata is merg
     ticketUrl: 'https://ticketing.uswest.veezi.com/purchase/12345',
     sourceUrl: 'https://ticketing.uswest.veezi.com/sessions/example',
     matchedMovieTitleHint: 'JORDAN BELSON RARITIES',
+    tmdbTitleCandidates: ['JORDAN BELSON RARITIES'],
   }
 
   const calendarRow: ScrapedShowtime = {
@@ -52,12 +55,55 @@ test('mergeAnthologyRows preserves forceLocalOnly when calendar metadata is merg
     merged.sourceUrl,
     'https://www.anthologyfilmarchives.org/film_screenings/calendar#showing-12345'
   )
-  assert.ok(merged.tmdbTitleCandidates?.includes('PRESENTED BY RAYMOND FOYE'))
-  assert.ok(merged.tmdbTitleCandidates?.includes('JORDAN BELSON RARITIES'))
-  assert.ok(
-    merged.tmdbTitleCandidates?.includes(
-      'PRESENTED BY RAYMOND FOYE: JORDAN BELSON RARITIES'
-    )
-  )
+  assert.equal(merged.tmdbTitleCandidates, undefined)
   assert.equal(merged.forceLocalOnly, true)
+})
+
+test('extractAnthologyProgramFeatureTitle pulls concrete feature titles out of PGM headers', () => {
+  assert.equal(
+    extractAnthologyProgramFeatureTitle(
+      'ALLEN GINSBERG PGM 11: ROLLING THUNDER REVUE'
+    ),
+    'ROLLING THUNDER REVUE'
+  )
+  assert.equal(
+    extractAnthologyProgramFeatureTitle(
+      'ROBERT CREELEY, PGM 1: POETRY IN MOTION'
+    ),
+    'POETRY IN MOTION'
+  )
+  assert.equal(
+    extractAnthologyProgramFeatureTitle('ALLEN GINSBERG PGM 1'),
+    undefined
+  )
+  assert.equal(
+    extractAnthologyProgramFeatureTitle(
+      'PRISMATIC GROUND: wave 3, program 4: Kohei Ando'
+    ),
+    undefined
+  )
+})
+
+test('shouldForceAnthologyLocalOnly keeps unresolved program containers local-only', () => {
+  assert.equal(
+    shouldForceAnthologyLocalOnly({
+      rawTitle: 'ALLEN GINSBERG PGM 1',
+      movieTitle: 'ALLEN GINSBERG PGM 1',
+    }),
+    true
+  )
+  assert.equal(
+    shouldForceAnthologyLocalOnly({
+      rawTitle: 'ALLEN GINSBERG PGM 11: ROLLING THUNDER REVUE',
+      movieTitle: 'ROLLING THUNDER REVUE',
+    }),
+    false
+  )
+  assert.equal(
+    shouldForceAnthologyLocalOnly({
+      rawTitle: 'PRESENTED BY RAYMOND FOYE: JORDAN BELSON RARITIES',
+      movieTitle: 'JORDAN BELSON RARITIES',
+    }),
+    true
+  )
 })

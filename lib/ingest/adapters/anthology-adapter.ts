@@ -427,6 +427,38 @@ function stripEpisodeSuffix(title?: string | null): string | undefined {
   return stripped && stripped !== cleaned ? cleanAnthologyTitle(stripped) : cleaned
 }
 
+export function extractAnthologyProgramFeatureTitle(rawTitle: string): string | undefined {
+  const cleaned = cleanAnthologyTitle(rawTitle)
+  if (!cleaned) return undefined
+
+  const match = cleaned.match(
+    /^.+?\bPGM\s+\d+\s*[:\-–—]\s+(.+)$/i
+  )
+  if (!match?.[1]) {
+    return undefined
+  }
+
+  const suffix = cleanAnthologyTitle(match[1])
+  return suffix || undefined
+}
+
+function titleLooksLikeAnthologyProgramContainer(title?: string | null): boolean {
+  const cleaned = cleanAnthologyTitle(title)
+  if (!cleaned) return false
+
+  return /\b(?:PGM|PROGRAM)\s+\d+\b/i.test(cleaned)
+}
+
+export function shouldForceAnthologyLocalOnly(input: {
+  rawTitle: string
+  movieTitle: string
+}): boolean {
+  return (
+    isCuratorialPresentation(input.rawTitle) ||
+    titleLooksLikeAnthologyProgramContainer(input.movieTitle)
+  )
+}
+
 function chooseMovieTitle(input: {
   directorText?: string
   embeddedFeature: EmbeddedFeature
@@ -469,6 +501,11 @@ function chooseMovieTitle(input: {
 
   if (/^EC:\s*/i.test(rawTitle) && (input.directorText || input.metaLine)) {
     return cleanAnthologyTitle(rawTitle.replace(/^EC:\s*/i, ''))
+  }
+
+  const programFeatureTitle = extractAnthologyProgramFeatureTitle(rawTitle)
+  if (programFeatureTitle) {
+    return programFeatureTitle
   }
 
   if (/\s+\/\s+/.test(rawTitle) && (input.directorText || input.metaLine)) {
@@ -744,6 +781,14 @@ export function mergeAnthologyRows(
     secondary?.movieTitle,
     directorText
   )
+  const forceLocalOnly = primary.forceLocalOnly || secondary?.forceLocalOnly
+  const tmdbTitleCandidates = forceLocalOnly
+    ? undefined
+    : mergeUniqueStrings(
+        primary.tmdbTitleCandidates,
+        secondary?.tmdbTitleCandidates,
+        buildTitleVariants(movieTitle, directorText)
+      )
 
   return {
     movieTitle,
@@ -768,16 +813,12 @@ export function mergeAnthologyRows(
     runtimeMinutes: pickNonEmpty(primary.runtimeMinutes, secondary?.runtimeMinutes),
     overview: pickBetterOverview(primary.overview, secondary?.overview),
     posterUrl: posterUrl || DEFAULT_ANTHOLOGY_POSTER_URL,
-    tmdbTitleCandidates: mergeUniqueStrings(
-      primary.tmdbTitleCandidates,
-      secondary?.tmdbTitleCandidates,
-      buildTitleVariants(movieTitle, directorText)
-    ),
+    tmdbTitleCandidates,
     preferMovieTitleForDisplay:
       primary.preferMovieTitleForDisplay || secondary?.preferMovieTitleForDisplay,
     matchedMovieTitleHint:
       primary.matchedMovieTitleHint || secondary?.matchedMovieTitleHint,
-    forceLocalOnly: primary.forceLocalOnly || secondary?.forceLocalOnly,
+    forceLocalOnly,
   }
 }
 
@@ -867,7 +908,13 @@ function parseCalendarShowingRows(
     absoluteAnthologyUrl(noteRoot.find('a[href*="ticketing"]').first().attr('href')) ||
     absoluteAnthologyUrl(noteRoot.find('a[href*="veezi"]').first().attr('href'))
 
-  const forceLocalOnly = isCuratorialPresentation(rawTitle)
+  const forceLocalOnly = shouldForceAnthologyLocalOnly({
+    rawTitle,
+    movieTitle: normalizedMovieTitle,
+  })
+  const effectiveTmdbTitleCandidates = forceLocalOnly
+    ? undefined
+    : tmdbTitleCandidates
 
   return timeEntries.map((entry) => ({
     movieTitle: normalizedMovieTitle,
@@ -884,7 +931,7 @@ function parseCalendarShowingRows(
     posterUrl: absoluteAnthologyUrl(
       noteRoot.find('img.screening-image').first().attr('src')
     ),
-    tmdbTitleCandidates,
+    tmdbTitleCandidates: effectiveTmdbTitleCandidates,
     preferMovieTitleForDisplay: normalizedMovieTitle !== shownTitle,
     matchedMovieTitleHint: normalizedMovieTitle,
     forceLocalOnly: forceLocalOnly || undefined,
@@ -948,7 +995,13 @@ function parseVeeziFilmBlock(
     rawTitle,
   })
 
-  const forceLocalOnly = isCuratorialPresentation(rawTitle)
+  const forceLocalOnly = shouldForceAnthologyLocalOnly({
+    rawTitle,
+    movieTitle: normalizedMovieTitle,
+  })
+  const effectiveTmdbTitleCandidates = forceLocalOnly
+    ? undefined
+    : tmdbTitleCandidates
   const rows: ScrapedShowtime[] = []
 
   film.find('.sessions .date-container').each((_, dateContainerEl) => {
@@ -975,7 +1028,7 @@ function parseVeeziFilmBlock(
         releaseYear: meta.releaseYear,
         runtimeMinutes: meta.runtimeMinutes,
         overview,
-        tmdbTitleCandidates,
+        tmdbTitleCandidates: effectiveTmdbTitleCandidates,
         preferMovieTitleForDisplay: normalizedMovieTitle !== shownTitle,
         matchedMovieTitleHint: normalizedMovieTitle,
         forceLocalOnly: forceLocalOnly || undefined,

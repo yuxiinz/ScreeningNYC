@@ -3,7 +3,7 @@
 import { useState } from 'react'
 
 import WatchedReviewFields from '@/components/movie/WatchedReviewFields'
-import { getReviewWordCount } from '@/lib/user-movies/review'
+import { getReviewWordCount } from '@/lib/user-movies/review-helpers'
 import {
   normalizeClientReviewText,
   saveMovieWatchedEntry,

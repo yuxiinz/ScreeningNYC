@@ -9,7 +9,7 @@ import {
 import { useRefreshOnPath } from '@/components/list-actions/useRefreshOnPath'
 import WatchedReviewFields from '@/components/movie/WatchedReviewFields'
 import { getErrorMessageFromResponse } from '@/lib/api/client-response'
-import { getReviewWordCount } from '@/lib/user-movies/review'
+import { getReviewWordCount } from '@/lib/user-movies/review-helpers'
 import {
   normalizeClientReviewText,
   saveMovieWatchedEntry,

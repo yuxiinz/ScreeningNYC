@@ -3,6 +3,7 @@ import { normalizeComparableText } from './text'
 const TITLE_PROGRAM_PATTERNS = [
   /\btribute\b/i,
   /\bprogram\b/i,
+  /\bpgm\b/i,
   /\bshorts\b/i,
   /\bdouble feature\b/i,
   /\bepisodes\b/i,

@@ -39,4 +39,12 @@ test('isProgramContent still flags actual programs', () => {
     }),
     true
   )
+
+  assert.equal(
+    isProgramContent({
+      title: 'ALLEN GINSBERG PGM 1',
+      overview: 'A multi-work screening.',
+    }),
+    true
+  )
 })

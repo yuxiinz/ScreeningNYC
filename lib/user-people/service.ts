@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { getUpcomingShowtimeWhere } from '@/lib/showtime/queries'
+import { getUpcomingShowtimeWhere } from '@/lib/showtime/display'
 import {
   buildCollectionStateMap,
   patchCollectionState,

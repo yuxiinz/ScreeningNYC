@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { AuthRequiredError, requireUserId } from '@/lib/auth/require-user-id'
 import { buildUnauthorizedResponse, getPositiveIntegerParam, jsonError } from '@/lib/api/route'
-import { MarketplaceNotFoundError, MarketplaceValidationError } from '@/lib/marketplace/errors'
+import { MarketplaceNotFoundError, MarketplaceValidationError } from '@/lib/marketplace/shared'
 
 export function jsonMarketplaceError(
   code: string,

@@ -1,4 +1,4 @@
-import { MarketplaceValidationError } from '@/lib/marketplace/errors'
+import { MarketplaceValidationError } from '@/lib/marketplace/shared'
 import { normalizeMarketplacePostType } from '@/lib/marketplace/shared'
 
 type ParsedMarketplacePostCommonBody = {

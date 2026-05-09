@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { normalizeMarketplaceDisplayName, type MarketplacePostTypeValue } from '@/lib/marketplace/shared'
-import { MarketplaceNotFoundError } from '@/lib/marketplace/errors'
-import { getUpcomingShowtimeWhere } from '@/lib/showtime/queries'
+import { MarketplaceNotFoundError } from '@/lib/marketplace/shared'
+import { getUpcomingShowtimeWhere } from '@/lib/showtime/display'
 import {
   MARKETPLACE_MOVIE_SELECT,
   MARKETPLACE_SHOWTIME_SELECT,

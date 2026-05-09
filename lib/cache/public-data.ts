@@ -2,6 +2,10 @@ import { cacheLife, cacheTag } from 'next/cache'
 import { DateTime } from 'luxon'
 
 import { prisma } from '@/lib/prisma'
+import {
+  dedupeTheatersByNormalizedSlug,
+  normalizeTheaterSlug,
+} from '@/lib/theater/slug'
 import { APP_TIMEZONE, getDateKeyInAppTimezone } from '@/lib/timezone'
 
 export const PUBLIC_CACHE_TAGS = {
@@ -37,13 +41,41 @@ type CachedHomeQueryInput = {
   pageSize: number
 }
 
+async function resolveSelectedTheaterIds(selectedTheaterSlugs: string[]) {
+  const normalizedSlugs = [...new Set(
+    selectedTheaterSlugs
+      .map((slug) => normalizeTheaterSlug(slug))
+      .filter(Boolean)
+  )]
+
+  if (normalizedSlugs.length === 0) {
+    return []
+  }
+
+  const theaters = await prisma.theater.findMany({
+    where: {
+      OR: normalizedSlugs.map((slug) => ({
+        slug: {
+          equals: slug,
+          mode: 'insensitive',
+        },
+      })),
+    },
+    select: {
+      id: true,
+    },
+  })
+
+  return theaters.map((theater) => theater.id)
+}
+
 export async function getCachedTheaterDirectory() {
   'use cache'
 
   cacheLife('max')
   cacheTag(PUBLIC_CACHE_TAGS.theaterDirectory)
 
-  return prisma.theater.findMany({
+  const theaters = await prisma.theater.findMany({
     orderBy: {
       name: 'asc',
     },
@@ -51,8 +83,15 @@ export async function getCachedTheaterDirectory() {
       id: true,
       slug: true,
       name: true,
+      updatedAt: true,
     },
   })
+
+  return dedupeTheatersByNormalizedSlug(theaters).map((theater) => ({
+    id: theater.id,
+    slug: theater.slug,
+    name: theater.name,
+  }))
 }
 
 export async function getCachedHomeMovies({
@@ -66,18 +105,27 @@ export async function getCachedHomeMovies({
   cacheLife(TODAY_SCHEDULE_CACHE)
   cacheTag(PUBLIC_CACHE_TAGS.home, PUBLIC_CACHE_TAGS.todaySensitive, todayKey)
 
+  const theaterIds = await resolveSelectedTheaterIds(selectedTheaterSlugs)
+
+  if (selectedTheaterSlugs.length > 0 && theaterIds.length === 0) {
+    return {
+      totalCount: 0,
+      totalPages: 1,
+      safePage: 1,
+      movies: [],
+    }
+  }
+
   const now = new Date()
   const upcomingShowtimeWhere = {
     startTime: {
       gt: now,
     },
     status: 'SCHEDULED' as const,
-    ...(selectedTheaterSlugs.length > 0
+    ...(theaterIds.length > 0
       ? {
-          theater: {
-            slug: {
-              in: selectedTheaterSlugs,
-            },
+          theaterId: {
+            in: theaterIds,
           },
         }
       : {}),
@@ -164,6 +212,12 @@ export async function getCachedDateShowtimes({
     cacheTag(PUBLIC_CACHE_TAGS.todaySensitive, todayKey)
   }
 
+  const theaterIds = await resolveSelectedTheaterIds(selectedTheaterSlugs)
+
+  if (selectedTheaterSlugs.length > 0 && theaterIds.length === 0) {
+    return []
+  }
+
   const nowNy = DateTime.now().setZone(APP_TIMEZONE)
   const startOfDayNy = DateTime.fromISO(targetDate, {
     zone: APP_TIMEZONE,
@@ -180,12 +234,10 @@ export async function getCachedDateShowtimes({
         lte: endOfDayNy.toUTC().toJSDate(),
       },
       status: 'SCHEDULED',
-      ...(selectedTheaterSlugs.length > 0
+      ...(theaterIds.length > 0
         ? {
-            theater: {
-              slug: {
-                in: selectedTheaterSlugs,
-              },
+            theaterId: {
+              in: theaterIds,
             },
           }
         : {}),
@@ -228,6 +280,9 @@ export async function getCachedDateShowtimes({
 
 export async function getMapTheaters() {
   const rawTheaters = await prisma.theater.findMany({
+    orderBy: {
+      name: 'asc',
+    },
     select: {
       id: true,
       name: true,
@@ -235,10 +290,11 @@ export async function getMapTheaters() {
       latitude: true,
       longitude: true,
       address: true,
+      updatedAt: true,
     },
   })
 
-  return rawTheaters
+  return dedupeTheatersByNormalizedSlug(rawTheaters)
     .filter(
       (
         theater

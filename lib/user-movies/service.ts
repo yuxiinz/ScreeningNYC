@@ -9,8 +9,7 @@ import {
 import {
   getReviewWordCount,
   normalizeReviewText,
-} from '@/lib/user-movies/review'
-
+} from '@/lib/user-movies/review-helpers'
 export type MovieCollectionState = {
   inWant: boolean
   inWatched: boolean

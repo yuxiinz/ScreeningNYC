@@ -3,7 +3,7 @@ import { DateTime } from 'luxon'
 import { sendEmail } from '@/lib/auth/email'
 import { isMagicLinkConfigured } from '@/lib/auth/env'
 import { prisma } from '@/lib/prisma'
-import { getUpcomingShowtimeWhere } from '@/lib/showtime/queries'
+import { getUpcomingShowtimeWhere } from '@/lib/showtime/display'
 import { APP_TIMEZONE, getDateKeyInAppTimezone } from '@/lib/timezone'
 import {
   buildDirectorReminderEmail,

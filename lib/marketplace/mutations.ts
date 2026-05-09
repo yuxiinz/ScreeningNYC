@@ -8,8 +8,8 @@ import {
 import {
   MarketplaceNotFoundError,
   MarketplaceValidationError,
-} from '@/lib/marketplace/errors'
-import { getUpcomingShowtimeWhere } from '@/lib/showtime/queries'
+} from '@/lib/marketplace/shared'
+import { getUpcomingShowtimeWhere } from '@/lib/showtime/display'
 import {
   getMarketplaceDisplayName,
   getMarketplacePostWriteData,

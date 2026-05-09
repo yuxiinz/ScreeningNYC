@@ -1,3 +1,5 @@
+import { normalizeTheaterSlug } from '@/lib/theater/slug'
+
 export function getFirstSearchParamValue(value?: string | string[]) {
   return Array.isArray(value) ? value[0] : value
 }
@@ -12,7 +14,7 @@ export function parseTheaterSlugs(value?: string | string[]) {
 
   return rawValues
     .flatMap((item) => item.split(','))
-    .map((slug) => slug.trim())
+    .map((slug) => normalizeTheaterSlug(slug))
     .filter(Boolean)
 }
 

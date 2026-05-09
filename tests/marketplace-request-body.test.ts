@@ -5,7 +5,7 @@ import {
   parseMarketplacePostUpsertBody,
   parseMarketplacePostsBatchBody,
 } from '../lib/marketplace/request-body'
-import { MarketplaceValidationError } from '../lib/marketplace/errors'
+import { MarketplaceValidationError } from '../lib/marketplace/shared'
 
 test('parseMarketplacePostUpsertBody normalizes nullable fields for single upserts', () => {
   const parsed = parseMarketplacePostUpsertBody({

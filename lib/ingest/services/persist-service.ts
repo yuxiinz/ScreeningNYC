@@ -20,6 +20,10 @@ import {
   getFallbackReleaseDate,
 } from '@/lib/movie/movie-data'
 import { reconcileCanonicalMovie } from '@/lib/movie/canonical-merge'
+import {
+  chooseCanonicalTheaterRecord,
+  normalizeTheaterSlug,
+} from '@/lib/theater/slug'
 
 
 type PersistConfig = {
@@ -44,25 +48,77 @@ export class MovieIdentityConflictError extends Error {
 const SHOWTIME_CANCEL_LOOKAHEAD_DAYS = 120
 
 export async function upsertTheater(config: PersistConfig) {
-  return prisma.theater.upsert({
-    where: { slug: config.theaterSlug },
-    update: {
-      name: config.theaterName,
-      sourceName: config.sourceName,
-      officialSiteUrl: config.officialSiteUrl || null,
-      ...(config.address !== undefined ? { address: config.address } : {}),
-      ...(config.latitude !== undefined ? { latitude: config.latitude } : {}),
-      ...(config.longitude !== undefined ? { longitude: config.longitude } : {}),
-    },
-    create: {
-      name: config.theaterName,
-      slug: config.theaterSlug,
-      sourceName: config.sourceName,
-      officialSiteUrl: config.officialSiteUrl || null,
-      address: config.address || null,
-      latitude: typeof config.latitude === 'number' ? config.latitude : null,
-      longitude: typeof config.longitude === 'number' ? config.longitude : null,
-    },
+  const canonicalSlug = normalizeTheaterSlug(config.theaterSlug)
+
+  return prisma.$transaction(async (tx) => {
+    const matchingTheaters = await tx.theater.findMany({
+      where: {
+        slug: {
+          equals: canonicalSlug,
+          mode: 'insensitive',
+        },
+      },
+      orderBy: [
+        { updatedAt: 'desc' },
+        { id: 'desc' },
+      ],
+    })
+
+    const canonicalTheater = chooseCanonicalTheaterRecord(matchingTheaters)
+
+    if (!canonicalTheater) {
+      return tx.theater.create({
+        data: {
+          name: config.theaterName,
+          slug: canonicalSlug,
+          sourceName: config.sourceName,
+          officialSiteUrl: config.officialSiteUrl || null,
+          address: config.address || null,
+          latitude: typeof config.latitude === 'number' ? config.latitude : null,
+          longitude: typeof config.longitude === 'number' ? config.longitude : null,
+        },
+      })
+    }
+
+    const duplicateTheaterIds = matchingTheaters
+      .filter((theater) => theater.id !== canonicalTheater.id)
+      .map((theater) => theater.id)
+
+    if (duplicateTheaterIds.length > 0) {
+      await tx.showtime.updateMany({
+        where: {
+          theaterId: {
+            in: duplicateTheaterIds,
+          },
+        },
+        data: {
+          theaterId: canonicalTheater.id,
+        },
+      })
+
+      await tx.theater.deleteMany({
+        where: {
+          id: {
+            in: duplicateTheaterIds,
+          },
+        },
+      })
+    }
+
+    return tx.theater.update({
+      where: {
+        id: canonicalTheater.id,
+      },
+      data: {
+        name: config.theaterName,
+        slug: canonicalSlug,
+        sourceName: config.sourceName,
+        officialSiteUrl: config.officialSiteUrl || null,
+        ...(config.address !== undefined ? { address: config.address } : {}),
+        ...(config.latitude !== undefined ? { latitude: config.latitude } : {}),
+        ...(config.longitude !== undefined ? { longitude: config.longitude } : {}),
+      },
+    })
   })
 }
 
@@ -332,6 +388,7 @@ export async function upsertShowtime(params: {
 }) {
   const sharedData = {
     movieId: params.movieId,
+    theaterId: params.theaterId,
     formatId: params.formatId,
     startTime: params.startTime,
     endTime: params.endTime,
@@ -350,7 +407,6 @@ export async function upsertShowtime(params: {
     update: sharedData,
     create: {
       ...sharedData,
-      theaterId: params.theaterId,
       fingerprint: params.fingerprint,
     },
   })

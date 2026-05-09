@@ -8,7 +8,7 @@ import {
 } from '@/lib/api/route'
 import { AuthRequiredError, requireUserId } from '@/lib/auth/require-user-id'
 import { markWatched, removeWatched } from '@/lib/user-movies/service'
-import { getReviewWordCount } from '@/lib/user-movies/review'
+import { getReviewWordCount } from '@/lib/user-movies/review-helpers'
 
 const WATCHED_ROUTE_LOG_LABEL = '[api][me][movies][watched]'
 const WATCHED_ROUTE_ERROR_MESSAGE = 'Could not update watched list right now.'
